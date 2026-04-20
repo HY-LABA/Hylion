@@ -44,7 +44,7 @@
 ### 프로젝트 파일 구조
 
 ```
-robot_project/
+Hylion/
 │
 ├── jetson/                               # Jetson에서 실행되는 코드
 │   ├── arm/                              # so-arm (팔)
