@@ -4,6 +4,9 @@ from typing import Any, Dict
 from uuid import uuid4
 
 
+SCHEMA_VERSION = "1.0"
+
+
 ALLOWED_INTENTS = {"chat", "pick_place", "move", "stop", "unknown"}
 ALLOWED_GAIT_CMDS = {"walk_forward", "turn_left", "stop", "none"}
 
@@ -46,6 +49,7 @@ def build_action_json(user_text: str, online: bool, handles: Any) -> Dict[str, A
     action["action_id"] = str(uuid4())
     action["timestamp"] = datetime.now(timezone.utc).isoformat()
     action["session_id"] = "session-local"
+    action["schema_version"] = SCHEMA_VERSION
     action["source"] = "terminal"
     action["network_online"] = True
     return action
@@ -202,6 +206,7 @@ def _offline_json(fallback_reason: str = "offline") -> Dict[str, Any]:
         "action_id": str(uuid4()),
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "session_id": "session-local",
+        "schema_version": SCHEMA_VERSION,
         "source": "terminal",
         "network_online": False,
         "intent": "unknown",

@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "HYlion Executor Command",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "event_id",
+    "timestamp",
+    "session_id",
+    "source",
+    "schema_version",
+    "executor",
+    "command_type",
+    "command"
+  ],
+  "properties": {
+    "event_id": { "type": "string", "minLength": 1 },
+    "timestamp": { "type": "string", "minLength": 1 },
+    "session_id": { "type": "string", "minLength": 1 },
+    "source": { "type": "string", "enum": ["orchestrator"] },
+    "schema_version": { "type": "string", "minLength": 1 },
+    "executor": { "type": "string", "enum": ["smolvla", "bhl", "tts"] },
+    "command_type": { "type": "string", "enum": ["run", "stop", "speak"] },
+    "command": { "type": "object" },
+    "requires_ack": { "type": "boolean", "default": true }
+  }
+}
