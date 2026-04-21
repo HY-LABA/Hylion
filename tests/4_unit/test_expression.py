@@ -21,7 +21,7 @@ class _FakeSoundDevice:
 	def __init__(self):
 		self._devices = [
 			{"name": "builtin mic", "max_input_channels": 1, "default_samplerate": 16000},
-			{"name": "USB Audio Device", "max_input_channels": 1, "default_samplerate": 48000},
+			{"name": "USB Audio Device", "max_input_channels": 1, "default_samplerate": microphone.DEFAULT_SAMPLE_RATE},
 		]
 
 	def query_devices(self):
@@ -29,7 +29,7 @@ class _FakeSoundDevice:
 
 	def rec(self, frames, samplerate, channels, dtype, device):
 		assert frames > 0
-		assert samplerate == 16000
+		assert samplerate == microphone.DEFAULT_SAMPLE_RATE
 		assert channels == 1
 		assert dtype == "int16"
 		assert device == 1
@@ -59,7 +59,7 @@ def test_record_to_wav_creates_file(monkeypatch, tmp_path):
 		output_path=str(output),
 		duration_sec=1.0,
 		preferred_keyword="USB",
-		samplerate=16000,
+		samplerate=microphone.DEFAULT_SAMPLE_RATE,
 		channels=1,
 	)
 

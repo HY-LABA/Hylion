@@ -6,6 +6,11 @@ from typing import List, Optional
 import wave
 
 
+DEFAULT_SAMPLE_RATE = 44100
+DEFAULT_CHANNELS = 1
+DEFAULT_SAMPLE_WIDTH_BYTES = 2
+
+
 @dataclass(frozen=True)
 class AudioInputDevice:
 	index: int
@@ -72,17 +77,24 @@ def format_device_table(devices: List[AudioInputDevice]) -> str:
 	return "\n".join(lines)
 
 
+def _write_wav(path: Path, pcm_bytes: bytes, samplerate: int, channels: int) -> None:
+	path.parent.mkdir(parents=True, exist_ok=True)
+
+	with wave.open(str(path), "wb") as wf:
+		wf.setnchannels(channels)
+		wf.setsampwidth(DEFAULT_SAMPLE_WIDTH_BYTES)
+		wf.setframerate(samplerate)
+		wf.writeframes(pcm_bytes)
+
+
 def record_to_wav(
 	output_path: str,
 	duration_sec: float = 3.0,
 	preferred_keyword: Optional[str] = "USB",
-	samplerate: int = 16000,
-	channels: int = 1,
+	samplerate: int = DEFAULT_SAMPLE_RATE,
+	channels: int = DEFAULT_CHANNELS,
 ) -> str:
-	"""Record fixed-duration audio and store it as 16-bit PCM WAV.
-
-	This keeps Phase 2 simple: one-shot capture without VAD or streaming.
-	"""
+	"""Record fixed-duration audio and store it as 16-bit PCM WAV."""
 	if duration_sec <= 0:
 		raise ValueError("duration_sec must be > 0")
 	if channels <= 0:
@@ -107,14 +119,7 @@ def record_to_wav(
 	)
 	sd.wait()
 
-	pcm_bytes = recording.tobytes()
 	path = Path(output_path)
-	path.parent.mkdir(parents=True, exist_ok=True)
-
-	with wave.open(str(path), "wb") as wf:
-		wf.setnchannels(channels)
-		wf.setsampwidth(2)
-		wf.setframerate(samplerate)
-		wf.writeframes(pcm_bytes)
+	_write_wav(path, recording.tobytes(), samplerate, channels)
 
 	return str(path)
