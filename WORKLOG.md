@@ -157,3 +157,32 @@
   - 실 API 키/네트워크로 Cloud 경로 검증.
   - LocalLLMClient 실제 구현 전까지 Offline fallback reason 로그 확인.
   - STT 실입력(chat/move/pick_place/stop) 4케이스 변환 결과를 WORKLOG에 추가.
+
+### 2026-04-22 (Jetson pull 후 바로 실행할 다음 단계)
+
+- 목적:
+  - Jetson에서 `git pull` 직후 바로 이어서 검증하고, 결과를 다시 WORKLOG에 남길 수 있게 순서를 고정한다.
+- 다음 실행 순서:
+  1. `git pull origin ε1`
+  2. `python3 -m pip install -U pip`
+  3. `python3 -m pip install groq jsonschema faster-whisper pytest`
+  4. `python3 -m pytest tests/3_interface/test_groq_api.py -q`
+  5. `GROQ_API_KEY` 설정 후 STT 텍스트 4케이스(`chat`, `move`, `pick_place`, `stop`)를 `build_action_json_from_stt()`로 확인
+  6. 결과 JSON에서 아래 항목 확인
+     - `intent`
+     - `gait_cmd`
+     - `requires_smolvla`
+     - `requires_bhl`
+     - `source == stt`
+     - `fallback_policy`
+  7. Cloud 실패 상황도 1회 확인
+     - 키 제거 또는 네트워크 차단
+     - LocalLLM 실패 시 offline fallback 반환 확인
+  8. 검증 결과를 WORKLOG에 추가
+  9. 이상 없으면 다음 단계(Phase 4 coordinator)로 진행
+- Jetson에서 기록할 핵심 결과:
+  - 실행한 명령
+  - 통과/실패 여부
+  - 실패 시 에러 메시지
+  - 실제 반환 JSON 예시 1개 이상
+  - 다음 환경에서 할 일
