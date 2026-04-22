@@ -135,3 +135,25 @@
 - 수정한 파일
 - 결과
 - 남은 할 일
+
+### 2026-04-22 (Phase 3 리팩토링 정렬: schema/LLM fallback/source)
+
+- 한 줄 요약:
+  - `groq_client.py`를 동적 스키마 프롬프트 + Cloud->Local->Offline fallback 구조로 정렬하고, `source`를 `stt` 기준으로 스키마/코드/테스트 일치시킴.
+- 실행한 검증 명령:
+  - `python -m pytest tests/3_interface/test_groq_api.py -q`
+- 수정한 파일:
+  - `jetson/cloud/groq_client.py`
+  - `configs/schemas/action.schema.json`
+  - `tests/3_interface/test_groq_api.py`
+  - `docs/07_non_ros2_pipeline_master_plan.md`
+  - `WORKLOG.md`
+- 결과:
+  - 인터페이스 테스트 `5 passed`.
+  - action schema `source` enum에 `stt` 포함.
+  - action JSON 생성 시 `source=stt`로 통일.
+  - Cloud 실패 시 LocalLLM 시도, 이후 Offline 안전 fallback 동작.
+- 남은 할 일 (Jetson TARGET):
+  - 실 API 키/네트워크로 Cloud 경로 검증.
+  - LocalLLMClient 실제 구현 전까지 Offline fallback reason 로그 확인.
+  - STT 실입력(chat/move/pick_place/stop) 4케이스 변환 결과를 WORKLOG에 추가.

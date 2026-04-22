@@ -163,8 +163,8 @@ Jetson 중심의 음성-지시 파이프라인을 ROS2 없이 구현한다.
 
 - [x] [DEV->TARGET] `jetson/expression/microphone.py` 구현 (장치 선택, 녹음 세그먼트)
 - [x] [DEV->TARGET] VAD/무음 구간 분리 정책 추가
-- [ ] [DEV->TARGET] Whisper 모듈 연동 (`faster-whisper` 권장) (DEV 구현 완료, TARGET 검증 대기)
-- [ ] [DEV->TARGET] STT 결과 표준 이벤트(`input_event`)로 변환 (DEV 구현 완료, TARGET 검증 대기)
+- [x] [DEV->TARGET] Whisper 모듈 연동 (`faster-whisper` 권장)
+- [x] [DEV->TARGET] STT 결과 표준 이벤트(`input_event`)로 변환
 
 필요 장비/연결:
 
@@ -183,10 +183,10 @@ Jetson 중심의 음성-지시 파이프라인을 ROS2 없이 구현한다.
 
 ### Phase 3. LLM JSON 생성 계층
 
-- [ ] [DEV->TARGET] `jetson/cloud/groq_client.py` 구현 (timeout/retry 포함)
-- [ ] [DEV->TARGET] STT 텍스트 -> action JSON 생성 함수 구현
-- [ ] [DEV->TARGET] JSON 정규화/검증 실패 fallback 구현
-- [ ] [DEV->TARGET] 오프라인/키 누락 시 로컬 규칙 기반 fallback 구현
+- [x] [DEV->TARGET] `jetson/cloud/groq_client.py` 구현 (timeout/retry 포함) (DEV 구현 완료, TARGET 검증 대기)
+- [x] [DEV->TARGET] STT 텍스트 -> action JSON 생성 함수 구현 (DEV 구현 완료, TARGET 검증 대기)
+- [x] [DEV->TARGET] JSON 정규화/검증 실패 fallback 구현 (DEV 구현 완료, TARGET 검증 대기)
+- [x] [DEV->TARGET] 오프라인/키 누락 시 로컬 규칙 기반 fallback 구현 (Cloud -> LocalLLM -> Offline 3단 fallback, DEV 구현 완료, TARGET 검증 대기)
 
 필요 장비/연결:
 
@@ -301,7 +301,9 @@ Jetson 중심의 음성-지시 파이프라인을 ROS2 없이 구현한다.
 
 - Phase 0: 완료
 - Phase 1: 완료
-- Phase 2~8: 미착수
+- Phase 2: 완료
+- Phase 3: 진행 중 (DEV 구현 완료, TARGET 검증 대기)
+- Phase 4~8: 미착수
 
 현재 완료 항목:
 
@@ -312,6 +314,10 @@ Jetson 중심의 음성-지시 파이프라인을 ROS2 없이 구현한다.
 - `comm/protocol.py` 공통 메시지 헤더/타입 정의 완료
 - `configs/schemas`에 input/executor/emergency 스키마 초안 추가 완료
 - `comm/schema_validator.py` 검증 유틸 추가 완료
+- `jetson/expression/microphone.py` 장치선택/녹음/VAD 구현 및 TARGET 검증 완료
+- `jetson/expression/stt_whisper.py` Whisper 전사 및 `input_event` 변환 경로 구현/검증 완료
+- `jetson/cloud/groq_client.py` 동적 스키마 프롬프트 로딩 + Cloud/Local/Offline fallback 구조 반영 완료 (DEV)
+- STT 텍스트 -> action JSON 변환 테스트(`tests/3_interface/test_groq_api.py`) DEV 통과, TARGET 검증 대기
 
 ---
 
@@ -329,6 +335,6 @@ Jetson 중심의 음성-지시 파이프라인을 ROS2 없이 구현한다.
 
 ## 6. 다음 실행 권장 순서 (즉시 착수)
 
-1. Phase 2 [DEV->TARGET]: Whisper 최소 동작 구현
-2. Phase 3 [DEV->TARGET]: `groq_client.py`와 action JSON 경로 고도화
-3. Phase 4 [DEV->TARGET]: `coordinator.py` 1차 분기 구현 (mock executor 연결)
+1. Phase 3 [DEV->TARGET]: `groq_client.py`와 action JSON 경로 고도화
+2. Phase 4 [DEV->TARGET]: `coordinator.py` 1차 분기 구현 (mock executor 연결)
+3. Phase 5 [DEV->TARGET]: executor 어댑터(`smolvla_runner`, `nuc sender/receiver`) 1차 연결
