@@ -100,6 +100,33 @@
   - DEV unit test와 별개로 TARGET 실환경 검증 흐름 고정
   - Windows <-> Jetson 교대 시 같은 절차 재사용
 
+### 2026-04-22 (Jetson TARGET 5-step 실행 결과)
+
+- Step 1. `git pull`:
+  - `Fast-forward` 반영 완료 (`7de5236 -> e8a181e`)
+- Step 2. microphone 녹음 + VAD:
+  - 1차 녹음(`data/episodes/target_smoke.wav`)은 RMS가 낮아(`max=139`) VAD 구간 검출 실패
+  - 2차 재녹음(`data/episodes/target_smoke_voice.wav`)에서 VAD 구간 검출 확인
+    - `rms_threshold=400`: `[(4.68, 4.95)]`
+    - `rms_threshold=100`: `[(1.26, 2.16), (3.87, 4.98)]`
+- Step 3. whisper 전사:
+  - 초기 실패: `faster-whisper` 미설치
+  - 조치: `python -m pip install faster-whisper`
+  - 재실행 결과: 전사 성공 (`"마이크 테스트 마이크 테스트"`)
+- Step 4. `input_event` 생성/검증:
+  - 초기 샘플은 `input_text=''`로 strict schema 검증 실패 가능성 확인
+  - `jsonschema` 설치 후 strict 검증으로 재확인
+  - 재녹음 샘플 기준 `input_event` 검증 성공 (`ok`)
+- 실행한 검증 명령(요약):
+  - Python one-liner로 `record_to_wav -> detect_speech_segments -> transcribe_wav -> build_input_event -> validate_payload` 순차 실행
+- 수정/생성 파일:
+  - 수정: `data/episodes/target_smoke.wav` (재녹음)
+  - 생성: `data/episodes/target_smoke_voice.wav`
+  - 수정: `WORKLOG.md` (본 기록)
+- 남은 할 일:
+  - push 여부 결정 전, 샘플 WAV(`data/episodes/*`)를 커밋에 포함할지 정책 확정
+  - 포함 정책 확정 후 `git add/commit/push`
+
 ## 다음 기록 형식
 
 - 날짜
