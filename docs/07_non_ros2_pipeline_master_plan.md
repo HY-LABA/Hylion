@@ -161,10 +161,10 @@ Jetson 중심의 음성-지시 파이프라인을 ROS2 없이 구현한다.
 
 ### Phase 2. 마이크 + STT 파이프라인
 
-- [ ] [DEV->TARGET] `jetson/expression/microphone.py` 구현 (장치 선택, 녹음 세그먼트)
-- [ ] [DEV->TARGET] VAD/무음 구간 분리 정책 추가
-- [ ] [DEV->TARGET] Whisper 모듈 연동 (`faster-whisper` 권장)
-- [ ] [DEV->TARGET] STT 결과 표준 이벤트(`input_event`)로 변환
+- [x] [DEV->TARGET] `jetson/expression/microphone.py` 구현 (장치 선택, 녹음 세그먼트)
+- [x] [DEV->TARGET] VAD/무음 구간 분리 정책 추가
+- [ ] [DEV->TARGET] Whisper 모듈 연동 (`faster-whisper` 권장) (DEV 구현 완료, TARGET 검증 대기)
+- [ ] [DEV->TARGET] STT 결과 표준 이벤트(`input_event`)로 변환 (DEV 구현 완료, TARGET 검증 대기)
 
 필요 장비/연결:
 
@@ -329,6 +329,6 @@ Jetson 중심의 음성-지시 파이프라인을 ROS2 없이 구현한다.
 
 ## 6. 다음 실행 권장 순서 (즉시 착수)
 
-1. Phase 2 [DEV->TARGET]: `microphone.py`와 Whisper 최소 동작 구현
+1. Phase 2 [DEV->TARGET]: Whisper 최소 동작 구현
 2. Phase 3 [DEV->TARGET]: `groq_client.py`와 action JSON 경로 고도화
 3. Phase 4 [DEV->TARGET]: `coordinator.py` 1차 분기 구현 (mock executor 연결)
