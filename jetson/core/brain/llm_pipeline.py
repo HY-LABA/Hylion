@@ -7,7 +7,7 @@ from uuid import uuid4
 SCHEMA_VERSION = "1.0"
 
 
-ALLOWED_INTENTS = {"chat", "pick_place", "move", "stop", "unknown"}
+ALLOWED_INTENTS = {"chat", "pick_place", "move", "stop", "standby", "unknown"}
 ALLOWED_GAIT_CMDS = {"walk_forward", "turn_left", "stop", "none"}
 
 
@@ -17,7 +17,7 @@ SYSTEM_PROMPT = (
     "intent, target_object, reply_text, requires_smolvla, requires_bhl, gait_cmd, state_current, safety_allowed, fallback_policy. "
     "\n\n"
     "STRICT ENUM RULES: "
-    "intent must be one of [chat, pick_place, move, stop, unknown]. "
+    "intent must be one of [chat, pick_place, move, stop, standby, unknown]. "
     "Never output walk, navigate, greeting, or any other intent value. "
     "gait_cmd must be one of [walk_forward, turn_left, stop, none]. "
     "\n\n"
@@ -28,6 +28,7 @@ SYSTEM_PROMPT = (
     "Examples: stop, halt, 멈춰, 정지. "
     "- Object manipulation request -> intent=pick_place. "
     "- Pure conversation/greeting -> intent=chat. "
+    "- Conversation end intent -> intent=standby. "
     "\n\n"
     "CONSISTENCY RULES: "
     "- If intent=move and direction is unclear, set gait_cmd=walk_forward. "
@@ -104,6 +105,9 @@ def _normalize_llm_output(payload: Dict[str, Any], user_text: str = "") -> Dict[
         state = "IDLE"
     elif intent == "chat":
         state = "TALKING"
+    elif intent == "standby":
+        gait_cmd = "none"
+        state = "IDLE"
     else:
         state = "IDLE"
 
@@ -138,6 +142,12 @@ def _normalize_intent(raw_intent: str) -> str:
         "navigate": "move",
         "navigation": "move",
         "halt": "stop",
+        "standby": "standby",
+        "idle": "standby",
+        "wait": "standby",
+        "대기": "standby",
+        "대기모드": "standby",
+        "대화종료": "standby",
         "이동": "move",
         "걷기": "move",
         "보행": "move",

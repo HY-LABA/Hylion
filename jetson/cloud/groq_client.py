@@ -34,12 +34,26 @@ BASE_SYSTEM_PROMPT = (
 	"- requires_bhl은 intent가 move나 stop일 때만 true야.\n"
 	"- intent가 chat이면 사용자와 자연스럽게 대화하고, reply_text는 1~2문장의 따뜻하고 "
 	"용기 있는 말투로 작성해.\n"
+	"- 사용자가 대화를 마무리/종료하려는 의도라고 판단되면 intent를 standby로 설정해. "
+	"이 판단은 반드시 대화 맥락까지 포함해 LLM이 직접 수행해.\n"
+	"- 아래 [INTENT KEYWORD OVERRIDES] 섹션의 각 intent 키워드 칸이 비어있지 않다면, "
+	"해당 키워드가 포함된 입력은 반드시 그 intent로 분류해.\n"
 	"- 아래 캐릭터 설정을 reply_text 톤에 반영해:\n"
 	"  용맹하고 따뜻한 가슴을 가진 라이온 하트, 가장 온도가 높다는 푸른 불꽃의 모습을 닮은 "
 	"갈기로 주변을 따뜻하게 밝히며 사랑의 실천을 이어나간다.\n"
 	"  학생들의 사랑을 받으며 더 귀여워진 하이리온의 정체성을 소중히 여기고, 한양대를 가꾸는 "
 	"가드너 취미를 가진다.\n"
 	"- 반드시 JSON 객체 하나만 출력해."
+)
+
+
+INTENT_KEYWORD_OVERRIDES_TEMPLATE = (
+	"[INTENT KEYWORD OVERRIDES]\n"
+	"- chat:\n"
+	"- pick_place:\n"
+	"- move:\n"
+	"- stop:\n"
+	"- standby:\n"
 )
 
 
@@ -136,7 +150,11 @@ def load_action_schema_content(schema_path: Path = DEFAULT_ACTION_SCHEMA_PATH) -
 
 
 def build_system_prompt(schema_content: str) -> str:
-	return f"{BASE_SYSTEM_PROMPT}\n\n[JSON SCHEMA]\n{schema_content}"
+	return (
+		f"{BASE_SYSTEM_PROMPT}\n\n"
+		f"{INTENT_KEYWORD_OVERRIDES_TEMPLATE}\n"
+		f"\n[JSON SCHEMA]\n{schema_content}"
+	)
 
 
 def _validate_action_payload(action: Dict[str, Any], schema_path: Path) -> tuple[bool, str]:
@@ -204,6 +222,16 @@ def _offline_action_json(session_id: str, reason: str) -> Dict[str, Any]:
 	}
 
 
+def _apply_conversation_policy(action: Dict[str, Any]) -> Dict[str, Any]:
+	if action.get("intent") == "standby":
+		action["requires_smolvla"] = False
+		action["requires_bhl"] = False
+		action["gait_cmd"] = "none"
+		action["state_current"] = "IDLE"
+
+	return action
+
+
 def build_action_json_from_stt(
 	client: Any,
 	# parameters
@@ -211,6 +239,7 @@ def build_action_json_from_stt(
 	session_id: str,
 	system_prompt: Optional[str] = None,
 	local_client: Optional[Any] = None,
+	in_chat_mode: bool = False,
 	schema_path: Path = DEFAULT_ACTION_SCHEMA_PATH,
 ) -> Dict[str, Any]:
 	schema_content = load_action_schema_content(schema_path=schema_path)
@@ -223,12 +252,13 @@ def build_action_json_from_stt(
 	)
 	if cloud_call.ok:
 		try:
-			return _parse_and_validate_action_json(
+			action = _parse_and_validate_action_json(
 				cloud_call.content,
 				session_id=session_id,
 				network_online=True,
 				fallback_policy="none",
 			)
+			return _apply_conversation_policy(action)
 		except Exception:
 			pass
 
@@ -240,12 +270,13 @@ def build_action_json_from_stt(
 	)
 	if local_call.ok:
 		try:
-			return _parse_and_validate_action_json(
+			action = _parse_and_validate_action_json(
 				local_call.content,
 				session_id=session_id,
 				network_online=False,
 				fallback_policy="local_llm",
 			)
+			return _apply_conversation_policy(action)
 		except Exception:
 			pass
 

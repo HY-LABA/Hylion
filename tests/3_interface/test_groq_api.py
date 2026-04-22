@@ -7,7 +7,12 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(PROJECT_ROOT) not in sys.path:
 	sys.path.insert(0, str(PROJECT_ROOT))
 
-from jetson.cloud.groq_client import GroqCallResult, GroqClient, build_action_json_from_stt
+from jetson.cloud.groq_client import (
+	GroqCallResult,
+	GroqClient,
+	build_action_json_from_stt,
+	build_system_prompt,
+)
 
 
 class _FakeMessage:
@@ -157,3 +162,30 @@ def test_build_action_json_from_stt_cloud_fail_local_success():
 	assert action["intent"] == "chat"
 	assert action["network_online"] is False
 	assert action["fallback_policy"] == "local_llm"
+
+
+def test_build_system_prompt_contains_intent_keyword_override_slots():
+	prompt = build_system_prompt('{"type":"object"}')
+	assert "[INTENT KEYWORD OVERRIDES]" in prompt
+	assert "- chat:" in prompt
+	assert "- pick_place:" in prompt
+	assert "- move:" in prompt
+	assert "- stop:" in prompt
+	assert "- standby:" in prompt
+
+
+def test_build_action_json_from_stt_standby_intent_normalized_to_idle():
+	standby_result = GroqCallResult(ok=True, content=_valid_action_payload(intent="standby"))
+	wrapper = _FakeWrapper(standby_result)
+
+	action = build_action_json_from_stt(
+		client=wrapper,
+		stt_text="이제 대기할게",
+		session_id="sess-standby",
+		system_prompt="json only",
+	)
+
+	assert action["intent"] == "standby"
+	assert action["state_current"] == "IDLE"
+	assert action["requires_smolvla"] is False
+	assert action["requires_bhl"] is False

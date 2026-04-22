@@ -27,7 +27,7 @@
     "schema_version": { "type": "string", "minLength": 1 },
     "source": { "type": "string", "enum": ["terminal", "mic", "stt"] },
     "network_online": { "type": "boolean" },
-    "intent": { "type": "string", "enum": ["chat", "pick_place", "move", "stop", "unknown"] },
+    "intent": { "type": "string", "enum": ["chat", "pick_place", "move", "stop", "standby", "unknown"] },
     "target_object": { "type": "string" },
     "reply_text": { "type": "string", "minLength": 1 },
     "requires_smolvla": { "type": "boolean" },

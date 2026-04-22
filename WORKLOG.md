@@ -138,6 +138,32 @@
 
 ### 2026-04-22 (Phase 3 리팩토링 정렬: schema/LLM fallback/source)
 
+### 2026-04-22 (Phase 4 coordinator 실동작 루프 + standby intent 반영)
+
+- 한 줄 요약:
+  - mock 입력 대신 실제 마이크->Whisper->Groq 경로를 표준으로 사용하는 `coordinator.py`를 구현하고, 대화 종료용 `standby` intent 및 자동 대기 복귀 흐름을 추가했다.
+- 실행한 검증 명령:
+  - `python3 -m pytest tests/3_interface/test_groq_api.py -q`
+  - `python3 -m jetson.core.coordinator --help`
+- 수정한 파일:
+  - `jetson/core/coordinator.py`
+  - `jetson/cloud/groq_client.py`
+  - `configs/schemas/action.schema.json`
+  - `jetson/core/brain/llm_pipeline.py`
+  - `tests/3_interface/test_groq_api.py`
+  - `WORKLOG.md`
+- 결과:
+  - `coordinator.py`에서 실마이크 녹음(`record_to_wav`) -> Whisper STT(`transcribe_wav`) -> 실 Groq 호출(`build_action_json_from_stt`) 루프 구현
+  - 실행 전 `GROQ_API_KEY`/네트워크 체크 및 실제 Groq API probe 추가
+  - 요청대로 터미널에 `INPUT_JSON`/`ACTION_JSON` 출력 추가
+  - chat 의도는 루프 유지, 대화 종료 키워드 감지 시 `intent=standby`로 전환
+  - `pick_place`/`move`/`stop` 이후 자동 `ACTION_JSON (AUTO-STANDBY)` 출력 및 대기 모드 복귀
+  - action schema의 `intent` enum에 `standby` 추가
+  - 인터페이스 테스트에 conversation-end -> standby 케이스 추가 후 `7 passed`
+- 남은 할 일:
+  - Jetson에서 실제 마이크 장치 연결 상태로 `python3 -m jetson.core.coordinator` 실주행 검증
+  - executor 실연동(arm/bhl) 시 현재 mock route 출력을 실제 호출로 치환
+
 - 한 줄 요약:
   - `groq_client.py`를 동적 스키마 프롬프트 + Cloud->Local->Offline fallback 구조로 정렬하고, `source`를 `stt` 기준으로 스키마/코드/테스트 일치시킴.
 - 실행한 검증 명령:
@@ -186,3 +212,77 @@
   - 실패 시 에러 메시지
   - 실제 반환 JSON 예시 1개 이상
   - 다음 환경에서 할 일
+
+### 2026-04-22 (실행 단계 검증 결과)
+
+- 한 줄 요약:
+  - WORKLOG 마지막 단계들을 실제 환경에서 순차 실행했고, Groq 인터페이스 테스트와 STT 4케이스 매핑, 오프라인 fallback까지 확인했다.
+- 실행한 검증 명령:
+  - `git pull origin ε1`
+  - `python3 -m pip install -U pip`
+  - `python3 -m pip install groq jsonschema faster-whisper pytest`
+  - `python3 -m pip install -U pytest`
+  - `python3 -m pytest tests/3_interface/test_groq_api.py -q`
+  - Python one-liner로 `build_action_json_from_stt()` 4케이스 검증
+  - `env -u GROQ_API_KEY` 상태로 오프라인 fallback 1회 검증
+- 수정한 파일:
+  - `WORKLOG.md`
+- 결과:
+  - `git pull origin ε1`: 이미 업데이트 상태
+  - 기존 pytest 6.2.5는 anyio 플러그인과 충돌해 초기 실패했으나, pytest 9.0.3으로 업그레이드 후 `tests/3_interface/test_groq_api.py`가 `5 passed`
+  - STT 4케이스 결과:
+    - `chat` -> `intent=chat`, `gait_cmd=none`, `requires_smolvla=False`, `requires_bhl=False`, `source=stt`, `fallback_policy=none`
+    - `move` -> `intent=move`, `gait_cmd=walk_forward`, `requires_smolvla=False`, `requires_bhl=True`, `source=stt`, `fallback_policy=none`
+    - `pick_place` -> `intent=pick_place`, `gait_cmd=none`, `requires_smolvla=True`, `requires_bhl=False`, `source=stt`, `fallback_policy=none`
+    - `stop` -> `intent=stop`, `gait_cmd=stop`, `requires_smolvla=False`, `requires_bhl=True`, `source=stt`, `fallback_policy=none`
+  - 오프라인 fallback 확인:
+    - `GROQ_API_KEY` 제거 시 `intent=unknown`, `source=stt`, `fallback_policy=cloud_fail_local_not_ready`, `network_online=False`
+- 남은 할 일:
+  - 실제 `GROQ_API_KEY`/네트워크 조합에서 재검증이 필요하면 Jetson 환경에서 1회 더 확인
+  - 다음 단계로 Phase 4 coordinator 진입 전 현재 변경분(`data/episodes/*`, 기존 작업 내역) 커밋 여부를 정리
+
+### 2026-04-22 (Phase 4 coordinator 실동작 루프 + standby intent 반영)
+
+- 한 줄 요약:
+  - mock 입력 대신 실제 마이크->Whisper->Groq 경로를 표준으로 사용하는 `coordinator.py`를 구현하고, 대화 종료용 `standby` intent 및 자동 대기 복귀 흐름을 추가했다.
+- 실행한 검증 명령:
+  - `python3 -m pytest tests/3_interface/test_groq_api.py -q`
+  - `python3 -m jetson.core.coordinator --help`
+- 수정한 파일:
+  - `jetson/core/coordinator.py`
+  - `jetson/cloud/groq_client.py`
+  - `configs/schemas/action.schema.json`
+  - `jetson/core/brain/llm_pipeline.py`
+  - `tests/3_interface/test_groq_api.py`
+  - `WORKLOG.md`
+- 결과:
+  - `coordinator.py`에서 실마이크 녹음(`record_to_wav`) -> Whisper STT(`transcribe_wav`) -> 실 Groq 호출(`build_action_json_from_stt`) 루프 구현
+  - 실행 전 `GROQ_API_KEY`/네트워크 체크 및 실제 Groq API probe 추가
+  - 요청대로 터미널에 `INPUT_JSON`/`ACTION_JSON` 출력 추가
+  - chat 의도는 루프 유지, 대화 종료 키워드 감지 시 `intent=standby`로 전환
+  - `pick_place`/`move`/`stop` 이후 자동 `ACTION_JSON (AUTO-STANDBY)` 출력 및 대기 모드 복귀
+  - action schema의 `intent` enum에 `standby` 추가
+  - 인터페이스 테스트에 conversation-end -> standby 케이스 추가 후 `7 passed`
+- 남은 할 일:
+  - Jetson에서 실제 마이크 장치 연결 상태로 `python3 -m jetson.core.coordinator` 실주행 검증
+  - executor 실연동(arm/bhl) 시 현재 mock route 출력을 실제 호출로 치환
+
+### 2026-04-22 (Phase 4 coordinator Jetson 테스트 완료)
+
+- 한 줄 요약:
+  - 대화 종료 하드코딩 제거 + Groq 프롬프트 기반 분류 + intent별 키워드 슬롯 추가
+  - 마이크 녹음 시작 시점 표시 강화
+  - 실제 음성으로 전체 파이프라인 테스트
+- 실행한 검증 명령:
+  - `python3 -m pytest tests/3_interface/test_groq_api.py -q`
+  - `python3 -m jetson.core.coordinator`
+- 수정한 파일:
+  - `jetson/core/coordinator.py`
+  - `jetson/cloud/groq_client.py`
+  - `WORKLOG.md`
+- 결과:
+  - 하드코딩 종료 키워드 로직을 제거
+  - LLM이 프롬프트 규칙으로 대화 종료를 판단해 standby로 분류
+  - 요청대로 intent별 키워드 강제 분류용 빈 템플릿 칸을 프롬프트에 추가
+  - 녹음 타이밍 알 수 있게 START/STOP 메시지를 추가
+  - 실제 테스트 결과 정상 작동
