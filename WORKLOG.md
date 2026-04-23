@@ -421,3 +421,27 @@
 - 남은 할 일:
   - Jetson에서 auto-standby 후 실제 재트리거 여부 확인
   - 필요 시 `HYLION_WAKEWORD_AUTO_STANDBY_COOLDOWN_SEC` 값을 1.0~2.5초 범위로 조정
+
+### 2026-04-23 (chat->standby 재트리거 역전 이슈 수정)
+
+- 한 줄 요약:
+  - auto-standby는 안정적이지만 chat에서 standby로 종료될 때만 키워드 없이 재기동되던 문제를, chat-standby 전용 cooldown + wake model state reset으로 보정함.
+- 수정한 파일:
+  - `jetson/core/coordinator.py`
+  - `jetson/expression/wake_word.py`
+  - `.env`
+  - `WORKLOG.md`
+- 결과:
+  - `HYLION_WAKEWORD_CHAT_STANDBY_COOLDOWN_SEC`(기본 1.2s) 추가
+  - `intent == "standby"` 경로에서 wakeword 재무장 전에 chat-standby cooldown 적용
+  - wakeword listener 재진입 시 `openwakeword` 모델의 내부 상태를 가능한 경우 `reset()`으로 초기화
+  - `.env`를 custom wakeword 기준으로 정렬
+    - `WAKE_WORD_MODEL_PATH=checkpoints/wakeword/Hey_Hyleon.onnx`
+    - `WAKE_WORD_THRESHOLD=0.5`
+    - `HYLION_WAKEWORD_CHAT_STANDBY_COOLDOWN_SEC=1.2`
+    - `HYLION_WAKEWORD_AUTO_STANDBY_COOLDOWN_SEC=1.5`
+- 원인 설명:
+  - chat 종료 발화 직후 바로 listener를 재무장하면, 잔향/노이즈 + 모델의 temporal state 영향으로 early trigger가 발생할 수 있음
+- 남은 할 일:
+  - Jetson 실환경에서 chat 종료("이제 대기해") 후 키워드 없이 재트리거되는지 재확인
+  - 필요 시 chat-standby cooldown을 1.2 -> 1.6초로 상향

@@ -12,6 +12,7 @@ from uuid import uuid4
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 LIVE_AUDIO_DIR = PROJECT_ROOT / "data" / "episodes"
 AUTO_STANDBY_COOLDOWN_SEC = float(os.getenv("HYLION_WAKEWORD_AUTO_STANDBY_COOLDOWN_SEC", "1.5"))
+CHAT_STANDBY_COOLDOWN_SEC = float(os.getenv("HYLION_WAKEWORD_CHAT_STANDBY_COOLDOWN_SEC", "1.2"))
 
 # Load environment variables (e.g., GROQ_API_KEY, HYLION_WAKEWORD_MODEL)
 try:
@@ -201,6 +202,9 @@ def run_live_pipeline(
 
 			if intent == "standby":
 				# User ended conversation; exit chat mode immediately
+				if CHAT_STANDBY_COOLDOWN_SEC > 0:
+					print(f"[Mode] chat-standby cooldown for {CHAT_STANDBY_COOLDOWN_SEC:.1f}s before re-arming wake word.")
+					sleep(CHAT_STANDBY_COOLDOWN_SEC)
 				in_chat_mode = False
 				print("[Mode] returned to wake-word standby.")
 				continue

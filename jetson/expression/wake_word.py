@@ -267,6 +267,16 @@ class WakeWordListener:
             device_name=self._device_name,
         )
 
+    def _reset_model_state(self) -> None:
+        # Some wake-word backends keep temporal state across predict calls.
+        # Reset on each re-arm to reduce stale-score immediate retriggers.
+        reset_fn = getattr(self._model, "reset", None)
+        if callable(reset_fn):
+            try:
+                reset_fn()
+            except Exception:
+                pass
+
     def wait_for_wake_word(self) -> WakeWordActivation:
         """Block until the configured wake word is detected.
 
@@ -281,6 +291,7 @@ class WakeWordListener:
 
         if self._stream is None:
             self._open_with_plan_a_or_b()
+        self._reset_model_state()
 
         try:
             while True:
