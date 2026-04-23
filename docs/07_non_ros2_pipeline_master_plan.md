@@ -1,7 +1,7 @@
 # HYlion Non-ROS2 Pipeline Master Plan
 
-기준일: 2026-04-21  
-상태: Active Plan (체크리스트 기반)
+기준일: 2026-04-23  
+상태: Active Plan (Phase 4 라이브 루프까지 반영)
 
 ---
 
@@ -183,10 +183,10 @@ Jetson 중심의 음성-지시 파이프라인을 ROS2 없이 구현한다.
 
 ### Phase 3. LLM JSON 생성 계층
 
-- [x] [DEV->TARGET] `jetson/cloud/groq_client.py` 구현 (timeout/retry 포함) (DEV 구현 완료, TARGET 검증 대기)
-- [x] [DEV->TARGET] STT 텍스트 -> action JSON 생성 함수 구현 (DEV 구현 완료, TARGET 검증 대기)
-- [x] [DEV->TARGET] JSON 정규화/검증 실패 fallback 구현 (DEV 구현 완료, TARGET 검증 대기)
-- [x] [DEV->TARGET] 오프라인/키 누락 시 로컬 규칙 기반 fallback 구현 (Cloud -> LocalLLM -> Offline 3단 fallback, DEV 구현 완료, TARGET 검증 대기)
+- [x] [DEV->TARGET] `jetson/cloud/groq_client.py` 구현 (timeout/retry 포함)
+- [x] [DEV->TARGET] STT 텍스트 -> action JSON 생성 함수 구현
+- [x] [DEV->TARGET] JSON 정규화/검증 실패 fallback 구현
+- [x] [DEV->TARGET] 오프라인/키 누락 시 로컬 규칙 기반 fallback 구현 (Cloud -> LocalLLM -> Offline 3단 fallback)
 
 필요 장비/연결:
 
@@ -204,12 +204,12 @@ Jetson 중심의 음성-지시 파이프라인을 ROS2 없이 구현한다.
 
 ### Phase 4. Orchestrator 코어
 
-- [ ] [DEV->TARGET] `jetson/core/coordinator.py` 구현
-- [ ] [DEV->TARGET] 분기 규칙 구현
-- [ ] [DEV->TARGET] `requires_smolvla=true` -> arm executor
-- [ ] [DEV->TARGET] `requires_bhl=true` -> bhl executor
-- [ ] [DEV->TARGET] chat -> reply/TTS only
-- [ ] [DEV->TARGET] 실행 상태 전이(IDLE/TALKING/MANIPULATING/WALKING) 반영
+- [x] [DEV->TARGET] `jetson/core/coordinator.py` 구현 (실마이크 -> STT -> Groq 라이브 루프)
+- [x] [DEV->TARGET] 분기 규칙 구현 (intent 기준 route)
+- [x] [DEV->TARGET] `requires_smolvla=true` -> arm executor route 결정 (현재 mock route 출력)
+- [x] [DEV->TARGET] `requires_bhl=true` -> bhl executor route 결정 (현재 mock route 출력)
+- [x] [DEV->TARGET] chat -> reply/TTS only 경로 반영 (현재 reply 중심)
+- [x] [DEV->TARGET] 실행 상태 전이(IDLE/TALKING/MANIPULATING/WALKING) 반영 + standby 복귀
 
 산출물:
 
@@ -302,8 +302,9 @@ Jetson 중심의 음성-지시 파이프라인을 ROS2 없이 구현한다.
 - Phase 0: 완료
 - Phase 1: 완료
 - Phase 2: 완료
-- Phase 3: 진행 중 (DEV 구현 완료, TARGET 검증 대기)
-- Phase 4~8: 미착수
+- Phase 3: 완료 (TARGET 검증 포함)
+- Phase 4: 코어 루프 완료 (실 executor 연동은 Phase 5에서 진행)
+- Phase 5~8: 미착수/부분 착수
 
 현재 완료 항목:
 
@@ -316,8 +317,17 @@ Jetson 중심의 음성-지시 파이프라인을 ROS2 없이 구현한다.
 - `comm/schema_validator.py` 검증 유틸 추가 완료
 - `jetson/expression/microphone.py` 장치선택/녹음/VAD 구현 및 TARGET 검증 완료
 - `jetson/expression/stt_whisper.py` Whisper 전사 및 `input_event` 변환 경로 구현/검증 완료
-- `jetson/cloud/groq_client.py` 동적 스키마 프롬프트 로딩 + Cloud/Local/Offline fallback 구조 반영 완료 (DEV)
-- STT 텍스트 -> action JSON 변환 테스트(`tests/3_interface/test_groq_api.py`) DEV 통과, TARGET 검증 대기
+- `jetson/cloud/groq_client.py` 동적 스키마 프롬프트 로딩 + Cloud/Local/Offline fallback 구조 반영 완료
+- STT 텍스트 -> action JSON 변환 테스트(`tests/3_interface/test_groq_api.py`) DEV/TARGET 검증 완료
+- `configs/schemas/action.schema.json`에 `intent=standby`, `source=stt` 정렬 완료
+- `jetson/core/coordinator.py` 라이브 루프(실마이크, Whisper, Groq, route 출력, auto-standby) 구현/Jetson 실주행 확인 완료
+- 대화 종료 intent는 하드코딩 키워드가 아니라 LLM 분류로 standby 전환되도록 정리 완료
+
+현재 경계 조건(아직 남은 부분):
+
+- arm/bhl executor는 아직 실제 호출이 아닌 mock route 출력
+- TTS speaker 실제 출력 경로는 미연결
+- emergency 실신호 end-to-end 차단은 아직 미완료
 
 ---
 
@@ -333,8 +343,217 @@ Jetson 중심의 음성-지시 파이프라인을 ROS2 없이 구현한다.
 
 ---
 
-## 6. 다음 실행 권장 순서 (즉시 착수)
+## 6. 전체 진행 흐름 (Step-by-Step, 쉬운 설명)
 
-1. Phase 3 [DEV->TARGET]: `groq_client.py`와 action JSON 경로 고도화
-2. Phase 4 [DEV->TARGET]: `coordinator.py` 1차 분기 구현 (mock executor 연결)
-3. Phase 5 [DEV->TARGET]: executor 어댑터(`smolvla_runner`, `nuc sender/receiver`) 1차 연결
+이 프로젝트는 아래 9단계 흐름으로 진행 중이다.
+
+1. ROS2 경로 분리: 기존 ROS2 코드를 legacy로 이동해 새 런타임 충돌을 제거함
+2. 데이터 계약 확정: 스키마(JSON 형식 약속) 4종을 먼저 고정함
+3. 음성 입력 구현: 마이크 녹음 + VAD(무음/발화 구분)로 깨끗한 음성 구간 확보
+4. STT 구현: Whisper로 음성을 텍스트로 변환
+5. LLM 판단 구현: 텍스트를 action JSON으로 변환, 실패 시 fallback
+6. 오케스트레이터 루프 구현: 반복적으로 듣고 판단하고 분기
+7. 실행기 연동: arm/bhl/speaker를 실제 장치 호출로 연결 (현재 진행 예정)
+8. 안전 계층 연동: emergency 신호가 오면 즉시 정지하도록 연결
+9. 운영화: 재부팅 자동실행, 로그 수집, 장애 대응 문서화
+
+---
+
+## 7. 현재까지 구현된 것과 작동 원리
+
+### 7.1 현재 구현 완료 범위
+
+- 완료: Phase 0, 1, 2, 3
+- 완료: Phase 4 코어 루프(실마이크 -> STT -> Groq -> intent 분기 -> auto-standby)
+- 미완료: Phase 5 실 executor 실호출, Phase 6 emergency 실연동, Phase 8 운영 자동화
+
+### 7.2 구조도 (현재 코드 기준)
+
+```mermaid
+flowchart LR
+	 U[사용자 음성] --> M[Microphone record_to_wav]
+	 M --> W[Whisper transcribe_wav]
+	 W --> I[build_input_event]
+	 I --> G[build_action_json_from_stt]
+	 G --> V[action schema validate]
+	 V --> C[coordinator intent route]
+	 C --> S1[SMOLVLA route mock]
+	 C --> S2[BHL route mock]
+	 C --> S3[chat reply route]
+	 C --> S4[standby]
+```
+
+### 7.3 신호/데이터가 지나가는 실제 함수 경로
+
+1. 음성 녹음
+	- `jetson/expression/microphone.py`
+	- `record_to_wav()`가 장치를 선택하고 WAV 파일 생성
+
+2. 음성 -> 텍스트
+	- `jetson/expression/stt_whisper.py`
+	- `transcribe_wav()`가 Whisper로 STT 수행
+
+3. 입력 이벤트 생성
+	- `jetson/expression/stt_whisper.py`
+	- `build_input_event()`가 `input_event` JSON 생성
+
+4. 텍스트 -> 액션 JSON
+	- `jetson/cloud/groq_client.py`
+	- `build_action_json_from_stt()` 실행
+	- 내부에서 Cloud 실패 시 LocalLLM, 둘 다 실패 시 Offline fallback
+
+5. 스키마 검증
+	- `jetson/cloud/groq_client.py`
+	- `_parse_and_validate_action_json()`에서 `action.schema.json` 기준 검증
+
+6. 분기 실행
+	- `jetson/core/coordinator.py`
+	- `run_live_pipeline()` 루프에서 intent 확인
+	- `_route_action()`이 현재는 executor route를 mock 출력
+
+7. 작업 후 대기 복귀
+	- `jetson/core/coordinator.py`
+	- `_build_standby_action()`으로 자동 standby action 생성
+
+### 7.4 동작 원리 핵심
+
+- Orchestrator(오케스트레이터: 전체 흐름을 조정하는 중심 제어기)는 직접 하드웨어를 만지기보다, action JSON을 보고 "어디로 보낼지"를 결정한다.
+- Schema(스키마: JSON 필드 규칙)가 맞지 않으면 즉시 fallback으로 내려가 안전한 unknown/IDLE 응답을 만든다.
+- Fallback(폴백: 실패 시 안전하게 돌아가는 우회 경로)은 Cloud -> Local -> Offline 순서다.
+
+---
+
+## 8. 시나리오/상황별 동작 흐름
+
+### 8.1 Chat 시나리오
+
+```mermaid
+sequenceDiagram
+	 participant User
+	 participant Mic
+	 participant STT
+	 participant LLM
+	 participant Coord
+	 User->>Mic: 음성 입력
+	 Mic->>STT: WAV 전달
+	 STT->>LLM: 텍스트 전달
+	 LLM->>Coord: intent=chat
+	 Coord-->>User: reply 출력, chat 모드 유지
+```
+
+결과:
+
+- 루프를 끊지 않고 다음 발화를 계속 받음
+
+### 8.2 Move 시나리오
+
+1. STT 결과가 이동 명령으로 해석됨
+2. action JSON에서 `intent=move`, `requires_bhl=true`
+3. coordinator가 BHL route로 분기(mock)
+4. 작업 후 자동 standby action 출력
+
+### 8.3 Pick and Place 시나리오
+
+1. STT 결과가 조작 명령으로 해석됨
+2. action JSON에서 `intent=pick_place`, `requires_smolvla=true`
+3. coordinator가 SMOLVLA route로 분기(mock)
+4. 작업 후 자동 standby action 출력
+
+### 8.4 Stop 시나리오
+
+1. action JSON에서 `intent=stop`, `gait_cmd=stop`
+2. coordinator가 BHL stop route로 분기(mock)
+3. 즉시 대기 상태로 복귀
+
+### 8.5 Conversation End(대화 종료) 시나리오
+
+1. 사용자가 대화 마무리 의도를 말함
+2. LLM이 `intent=standby` 반환
+3. coordinator가 chat mode를 해제하고 standby 모드로 전환
+
+### 8.6 장애 시나리오 (Cloud 실패)
+
+1. Groq 호출 실패 또는 스키마 불일치
+2. LocalLLM 시도
+3. Local도 실패하면 Offline fallback JSON 생성
+4. `intent=unknown`, `state_current=IDLE`로 안전 대기
+
+---
+
+## 9. 지금부터 해야 할 일 (더 잘게 쪼갠 Step-by-Step)
+
+### Step 1. Phase 5-1: executor 인터페이스 먼저 고정
+
+1. `execute(command) -> status` 공통 인터페이스를 arm/bhl/speaker에 동일하게 맞춤
+2. mock executor와 real executor를 같은 호출 시그니처로 통일
+3. coordinator의 `_route_action()`에서 print가 아니라 인터페이스 호출로 치환
+
+완료 기준:
+
+- intent마다 실제 함수 호출이 발생하고 status가 반환됨
+
+### Step 2. Phase 5-2: SMOLVLA arm 실연동
+
+1. `jetson/arm/policy/smolvla_runner.py`에 실행 래퍼 구현
+2. pick_place 입력 시 arm 실행 커맨드 생성
+3. 성공/실패 status와 에러 로그 규격화
+
+완료 기준:
+
+- pick_place에서 mock 출력이 아니라 실제 arm runner 함수가 호출됨
+
+### Step 3. Phase 5-3: BHL + UDP 실연동
+
+1. `comm/nuc/sender.py`, `comm/nuc/receiver.py`에 seq/ACK/재전송 적용
+2. move/stop intent를 executor_command로 변환
+3. NUC 수신 측에서 중복 제거와 ACK 반환
+
+완료 기준:
+
+- 패킷 유실 상황에서도 stop 명령 전달 보장
+
+### Step 4. Phase 5-4: chat reply -> speaker(TTS) 연결
+
+1. reply_text를 speaker 어댑터로 전달
+2. chat intent에서는 모션 executor를 건드리지 않도록 보호
+3. 음성 출력 실패 시 텍스트 fallback 로그 유지
+
+완료 기준:
+
+- chat 입력에서 실제 음성 출력까지 동작
+
+### Step 5. Phase 6: emergency 우선 차단
+
+1. emergency latch(래치: 한 번 걸리면 해제 전까지 유지되는 안전 잠금) 구현
+2. emergency_event 수신 시 모든 executor 호출 차단
+3. 해제 전에는 어떤 intent도 실행 불가
+
+완료 기준:
+
+- emergency 주입 테스트에서 즉시 safe state 전환
+
+### Step 6. Phase 7: 테스트 체계 정리
+
+1. 인터페이스 테스트를 coordinator 분기까지 확장
+2. 통합 mock 테스트로 chat/move/pick_place/stop/standby 5경로 고정
+3. TARGET smoke test 스크립트 자동화
+
+완료 기준:
+
+- DEV + TARGET 모두에서 핵심 시나리오 재현 가능
+
+### Step 7. Phase 8: 운영화
+
+1. 실행 스크립트/systemd 정리
+2. 장애 대응 runbook 문서화
+3. 로그 포맷(JSONL)와 저장 위치 확정
+
+완료 기준:
+
+- 재부팅 후 자동 구동 + 장애 대응 절차 문서 확보
+
+---
+
+## 10. 현재 시점 한 줄 정리
+
+지금은 "음성 입력 -> STT -> LLM 의도판단 -> 오케스트레이터 분기"까지는 실기기에서 돌아가며, 다음 핵심은 "분기 결과를 실제 arm/bhl/speaker에 연결"하는 단계다.
