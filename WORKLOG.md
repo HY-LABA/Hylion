@@ -527,3 +527,35 @@
     - 동일 duration을 서보 스레드에 전달해 lipsync 시간 정합 유지
 - 남은 할 일:
   - Jetson 런타임에 `gTTS`, `mutagen`, `mpg123` 설치/가용성 확인
+
+### 2026-04-23 (온라인/오프라인 하이브리드 라우팅 리팩토링)
+
+- 한 줄 요약:
+  - wake word 직후 네트워크 상태를 확인해 online이면 Groq + ClovaTTS, offline이면 LocalLLM 스텁 + PiperTTS 스텁으로 분기하는 하이브리드 구조를 추가함.
+- 수정한 파일:
+  - `jetson/core/brain/network_probe.py`
+  - `jetson/core/coordinator.py`
+  - `jetson/expression/speaker.py`
+  - `docs/09_runtime_tuning_table.md`
+  - `WORKLOG.md`
+- 결과:
+  - `is_online()`를 가벼운 socket reachability probe로 정리
+    - 8.8.8.8:53
+    - 1.1.1.1:53
+    - www.google.com:443
+    - www.naver.com:443
+  - `speaker.py`
+    - 온라인: `ClovaTTS`
+    - 오프라인: `PiperTTS` 스텁
+    - Clova 기본 speaker 파라미터를 `ara`로 고정
+    - NAVER API 인증키는 `os.getenv("NAVER_CLIENT_ID")`, `os.getenv("NAVER_CLIENT_SECRET")`로만 읽음
+    - mp3 생성 후 `mutagen`으로 duration 추출, `mpg123` 재생, 실패 시 `time.sleep(duration)` fallback 유지
+    - reply 오디오 저장 위치를 `Hylion/data/reply/`로 유지하면서 timestamp 파일로 누적 저장
+  - `coordinator.py`
+    - wake word 감지 직후 네트워크 상태를 확인하고 turn 단위로 backend를 선택
+    - online이면 `GroqClient` + `ClovaTTS`
+    - offline이면 `LocalLLM` 스텁 + `PiperTTS` 스텁
+    - online 준비 실패 시 안전하게 offline stub으로 fallback
+- 남은 할 일:
+  - Jetson에서 NAVER API 키 설정 후 ClovaTTS 실제 발화 테스트
+  - 오프라인 스텁은 이후 Piper TTS 실제 구현 시 교체

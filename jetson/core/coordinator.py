@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
 from datetime import datetime, timezone
 from pathlib import Path
 from time import sleep
@@ -18,7 +17,7 @@ from jetson.cloud.groq_client import GroqClient, build_action_json_from_stt
 from jetson.core.brain.network_probe import is_online
 from jetson.expression.mouth_servo import cleanup_gpio
 from jetson.expression.wake_word import build_wake_word_listener
-from jetson.expression.speaker import speak_with_lipsync
+from jetson.expression.speaker import DEFAULT_CLOVA_SPEAKER, build_tts_backend
 from jetson.expression.microphone import record_to_wav
 from jetson.expression.stt_whisper import build_input_event, transcribe_wav
 
@@ -64,6 +63,45 @@ def _probe_real_groq_connection(client: GroqClient) -> None:
 		raise RuntimeError(f"Groq API connection failed: {probe.error}")
 
 
+class LocalLLM:
+	def build_action_json_from_stt(self, stt_text: str, session_id: str, in_chat_mode: bool) -> dict:
+		print("[Offline Mode] LocalLLM 동작 예정 (현재 미구현)")
+		reply_text = "오프라인 모드는 아직 준비 중이에요."
+		intent = "standby" if stt_text.strip() else "unknown"
+		return {
+			"action_id": str(uuid4()),
+			"timestamp": datetime.now(timezone.utc).isoformat(),
+			"session_id": session_id,
+			"schema_version": "1.0",
+			"source": "local_llm_stub",
+			"network_online": False,
+			"intent": intent,
+			"target_object": "none",
+			"reply_text": reply_text,
+			"requires_smolvla": False,
+			"requires_bhl": False,
+			"gait_cmd": "none",
+			"state_current": "IDLE",
+			"safety_allowed": True,
+			"fallback_policy": "offline_stub",
+		}
+
+
+def _build_turn_services(online: bool):
+	if online:
+		try:
+			client = GroqClient()
+			_probe_real_groq_connection(client)
+			tts_backend = build_tts_backend(is_online=True, speaker=DEFAULT_CLOVA_SPEAKER)
+			return True, client, tts_backend
+		except Exception as exc:
+			print(f"[Hybrid] online route unavailable -> fallback to offline stub: {exc}")
+
+	local_llm = LocalLLM()
+	tts_backend = build_tts_backend(is_online=False)
+	return False, local_llm, tts_backend
+
+
 def _route_action(action_json: dict) -> None:
 	intent = action_json.get("intent")
 	if intent == "pick_place":
@@ -79,14 +117,14 @@ def _route_action(action_json: dict) -> None:
 	sleep(0.2)
 
 
-def _speak_reply_if_any(action_json: dict, stage: str) -> None:
+def _speak_reply_if_any(action_json: dict, stage: str, tts_backend) -> None:
 	reply_text = str(action_json.get("reply_text", "")).strip()
 	if not reply_text:
 		print(f"[Speaker] {stage} -> no reply_text; skip")
 		return
 
 	try:
-		elapsed = speak_with_lipsync(reply_text)
+		elapsed = tts_backend.speak_with_lipsync(reply_text)
 		print(f"[Speaker] {stage} -> done ({elapsed:.2f}s)")
 	except Exception as exc:
 		print(f"[Speaker] {stage} -> failed: {exc}")
@@ -120,14 +158,6 @@ def run_live_pipeline(
 	whisper_language: str,
     wakeword_listener,
 ) -> None:
-	if not os.getenv("GROQ_API_KEY"):
-		raise RuntimeError("GROQ_API_KEY is not set. Real Groq testing requires a live key.")
-	if not is_online():
-		raise RuntimeError("Network is offline. Real Groq testing requires internet connectivity.")
-
-	client = GroqClient()
-	_probe_real_groq_connection(client)
-
 	session_id = f"sess-live-{uuid4().hex[:8]}"
 
 	print("HYlion coordinator wake-word mode")
@@ -145,10 +175,14 @@ def run_live_pipeline(
 			f"source={activation.source}, device={activation.device_name}"
 		)
 
+		online = is_online()
+		print(f"[Network] is_online={online}")
+		online, llm_backend, tts_backend = _build_turn_services(online)
+
 		# Issue greeting action to enter chat mode
 		greeting_action = _build_greeting_action(session_id=session_id)
 		_print_block("ACTION_JSON (GREETING)", greeting_action)
-		_speak_reply_if_any(greeting_action, stage="greeting")
+		_speak_reply_if_any(greeting_action, stage="greeting", tts_backend=tts_backend)
 
 		in_chat_mode = True
 
@@ -177,16 +211,23 @@ def run_live_pipeline(
 			input_event = build_input_event(stt_result=stt_result, session_id=session_id, source="stt")
 			_print_block("INPUT_JSON", input_event)
 
-			action_json = build_action_json_from_stt(
-				client=client,
-				stt_text=stt_result.text,
-				session_id=session_id,
-				in_chat_mode=in_chat_mode,
-			)
+			if online:
+				action_json = build_action_json_from_stt(
+					client=llm_backend,
+					stt_text=stt_result.text,
+					session_id=session_id,
+					in_chat_mode=in_chat_mode,
+				)
+			else:
+				action_json = llm_backend.build_action_json_from_stt(
+					stt_text=stt_result.text,
+					session_id=session_id,
+					in_chat_mode=in_chat_mode,
+				)
 			_print_block("ACTION_JSON", action_json)
 
 			intent = action_json.get("intent", "unknown")
-			_speak_reply_if_any(action_json, stage=f"before_{intent}")
+			_speak_reply_if_any(action_json, stage=f"before_{intent}", tts_backend=tts_backend)
 
 			if intent == "chat":
 				# Chat continues; listen for next utterance
@@ -207,7 +248,7 @@ def run_live_pipeline(
 
 			standby_action = _build_standby_action(session_id=session_id, reason=f"auto_after_{intent}")
 			_print_block("ACTION_JSON (AUTO-STANDBY)", standby_action)
-			_speak_reply_if_any(standby_action, stage=f"after_{intent}")
+			_speak_reply_if_any(standby_action, stage=f"after_{intent}", tts_backend=tts_backend)
 			if AUTO_STANDBY_COOLDOWN_SEC > 0:
 				print(f"[Mode] standby cooldown for {AUTO_STANDBY_COOLDOWN_SEC:.1f}s before re-arming wake word.")
 				sleep(AUTO_STANDBY_COOLDOWN_SEC)
