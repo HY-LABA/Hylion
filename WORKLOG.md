@@ -320,3 +320,19 @@
   - check_mouth_servo.py에서 했듯이 PMW 직접 생성으로 코드 수정
 
 - 테스트 결과 성공. 정상적으로 작동함.
+
+### 2026-04-23 (all-intent reply 음성+입술동기화 확장)
+
+- 한 줄 요약:
+  - chat 전용이던 speaker/lipsync 호출을 모든 intent 공통으로 확장해서, `reply_text`가 있으면 항상 먼저 말하고(입술동기화), non-chat 작업 후에는 standby 안내 멘트도 다시 말하도록 정리함.
+- 수정한 파일:
+  - `jetson/core/coordinator.py`
+- 결과:
+  - 공통 helper `_speak_reply_if_any()` 추가
+  - 모든 `action_json` 처리 직후 `before_<intent>` 단계에서 reply 출력
+  - `pick_place`/`move`/`stop` 등 non-chat intent는 executor route 수행 후, auto-standby action의 reply를 `after_<intent>` 단계에서 추가 출력
+  - `chat` intent는 reply 출력 후 기존처럼 chat loop 유지
+- 남은 할 일:
+  - Jetson 실환경에서 시나리오 검증
+    - 예: "컵 집어줘" -> 사전 안내 멘트(lipsync) -> executor route -> 완료 멘트(lipsync) -> standby 복귀
+  - 커밋/푸시는 사용자 직접 수행

@@ -74,6 +74,19 @@ def _route_action(action_json: dict) -> None:
 	sleep(0.2)
 
 
+def _speak_reply_if_any(action_json: dict, stage: str) -> None:
+	reply_text = str(action_json.get("reply_text", "")).strip()
+	if not reply_text:
+		print(f"[Speaker] {stage} -> no reply_text; skip")
+		return
+
+	try:
+		elapsed = speak_with_lipsync(reply_text)
+		print(f"[Speaker] {stage} -> done ({elapsed:.2f}s)")
+	except Exception as exc:
+		print(f"[Speaker] {stage} -> failed: {exc}")
+
+
 def run_live_pipeline(
 	record_sec: float,
 	preferred_keyword: str,
@@ -135,17 +148,9 @@ def run_live_pipeline(
 		_print_block("ACTION_JSON", action_json)
 
 		intent = action_json.get("intent", "unknown")
+		_speak_reply_if_any(action_json, stage=f"before_{intent}")
 
 		if intent == "chat":
-			reply_text = str(action_json.get("reply_text", "")).strip()
-			if reply_text:
-				try:
-					elapsed = speak_with_lipsync(reply_text)
-					print(f"[Executor] chat -> speaker done ({elapsed:.2f}s)")
-				except Exception as exc:
-					print(f"[Executor] chat -> speaker failed: {exc}")
-			else:
-				print("[Executor] chat -> no reply_text; skip speaker")
 			in_chat_mode = True
 			print("[Mode] chat loop continues. Listening for next utterance.")
 			continue
@@ -159,6 +164,7 @@ def run_live_pipeline(
 
 		standby_action = _build_standby_action(session_id=session_id, reason=f"auto_after_{intent}")
 		_print_block("ACTION_JSON (AUTO-STANDBY)", standby_action)
+		_speak_reply_if_any(standby_action, stage=f"after_{intent}")
 		in_chat_mode = False
 
 
