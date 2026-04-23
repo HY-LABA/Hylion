@@ -1,5 +1,8 @@
 from pathlib import Path
 import sys
+import importlib
+import types
+import threading
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -134,3 +137,61 @@ def test_detect_speech_segments_ignores_short_noise():
 	)
 
 	assert segments == []
+
+
+class _FakeGPIO:
+	BOARD = "BOARD"
+	OUT = "OUT"
+	HIGH = 1
+	LOW = 0
+
+	def __init__(self):
+		self.calls = []
+
+	def setwarnings(self, enabled):
+		self.calls.append(("setwarnings", enabled))
+
+	def setmode(self, mode):
+		self.calls.append(("setmode", mode))
+
+	def setup(self, pin, mode):
+		self.calls.append(("setup", pin, mode))
+
+	def output(self, pin, value):
+		self.calls.append(("output", pin, value))
+
+	def cleanup(self, pin=None):
+		self.calls.append(("cleanup", pin))
+
+
+def test_mouth_servo_uses_direct_gpio_pulses(monkeypatch):
+	fake_gpio = _FakeGPIO()
+	jetson_pkg = types.ModuleType("Jetson")
+	jetson_pkg.GPIO = fake_gpio
+	monkeypatch.setitem(sys.modules, "Jetson", jetson_pkg)
+	monkeypatch.setitem(sys.modules, "Jetson.GPIO", fake_gpio)
+	sys.modules.pop("jetson.expression.mouth_servo", None)
+	mouth_servo = importlib.import_module("jetson.expression.mouth_servo")
+
+	class _FakeClock:
+		def __init__(self):
+			self.now = 0.0
+
+		def sleep(self, seconds):
+			self.now += max(0.0, seconds)
+
+		def monotonic(self):
+			return self.now
+
+	clock = _FakeClock()
+	monkeypatch.setattr(mouth_servo.time, "sleep", clock.sleep)
+	monkeypatch.setattr(mouth_servo.time, "monotonic", clock.monotonic)
+
+	controller = mouth_servo.MouthServoController(pin=33, move_interval_sec=0.04)
+	controller.initialize()
+	controller.move_to_angle(30.0)
+	controller.cleanup()
+
+	assert ("setup", 33, fake_gpio.OUT) in fake_gpio.calls
+	assert any(call[0] == "output" and call[1] == 33 for call in fake_gpio.calls)
+	assert not hasattr(fake_gpio, "PWM")

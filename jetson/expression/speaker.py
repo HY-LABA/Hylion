@@ -135,7 +135,11 @@ def speak_with_lipsync(
             stop_event.set()
 
     def _servo_worker() -> None:
-        servo.run_lipsync_for_duration(duration_sec=duration, stop_event=stop_event)
+        try:
+            servo.run_lipsync_for_duration(duration_sec=duration, stop_event=stop_event)
+        except Exception as exc:
+            print(f"[FaceSpeaker] servo playback failed -> fallback audio-only ({exc})")
+            stop_event.set()
 
     audio_thread = threading.Thread(target=_audio_worker, name="face-audio", daemon=True)
     servo_thread = threading.Thread(target=_servo_worker, name="face-servo", daemon=True)

@@ -40,7 +40,6 @@ class MouthServoController:
 		self._lock = threading.Lock()
 		self._initialized = False
 		self._available = GPIO is not None
-		self._pwm: Optional[object] = None
 
 	@property
 	def is_available(self) -> bool:
@@ -57,27 +56,35 @@ class MouthServoController:
 		if not self._available or self._initialized:
 			return
 
-		# Jetson.GPIO GPIO.PWM is software PWM and Pin 33 uses BOARD numbering.
+		# Pin 33 is controlled with direct output pulses, matching the working test script.
 		GPIO.setwarnings(False)
 		GPIO.setmode(GPIO.BOARD)
 		GPIO.setup(self.pin, GPIO.OUT)
-
-		self._pwm = GPIO.PWM(self.pin, self.pwm_hz)
-		self._pwm.start(self._angle_to_duty(self.closed_angle))
 		self._initialized = True
 		time.sleep(0.15)
+
+	def _pulse_once(self, pulse_ms: float) -> None:
+		GPIO.output(self.pin, GPIO.HIGH)
+		time.sleep(max(0.0, pulse_ms) / 1000.0)
+		GPIO.output(self.pin, GPIO.LOW)
+		time.sleep(max(0.0, 1000.0 / float(self.pwm_hz) - pulse_ms) / 1000.0)
+
+	def _drive_angle_for_duration(self, angle: float, duration_sec: float) -> None:
+		if duration_sec <= 0:
+			return
+
+		pulse_ms = self.min_pulse_ms + (max(0.0, min(180.0, angle)) / 180.0) * (self.max_pulse_ms - self.min_pulse_ms)
+		cycles = max(1, int(duration_sec * float(self.pwm_hz)))
+		for _ in range(cycles):
+			self._pulse_once(pulse_ms)
 
 	def move_to_angle(self, angle: float) -> None:
 		if not self._available:
 			return
 		if not self._initialized:
 			self.initialize()
-		if not self._pwm:
-			return
-
-		duty = self._angle_to_duty(angle)
 		with self._lock:
-			self._pwm.ChangeDutyCycle(duty)
+			self._drive_angle_for_duration(angle, self.move_interval_sec)
 
 	def run_lipsync_for_duration(self, duration_sec: float, stop_event: threading.Event) -> None:
 		if duration_sec <= 0:
@@ -91,10 +98,10 @@ class MouthServoController:
 
 		while time.monotonic() < end_ts and not stop_event.is_set():
 			angle = random.uniform(self.open_angle_min, self.open_angle_max)
-			self.move_to_angle(angle)
-			time.sleep(self.move_interval_sec)
+			remaining = end_ts - time.monotonic()
+			self._drive_angle_for_duration(angle, min(self.move_interval_sec, max(0.0, remaining)))
 
-		self.move_to_angle(self.closed_angle)
+		self._drive_angle_for_duration(self.closed_angle, min(self.move_interval_sec, max(0.0, end_ts - time.monotonic())))
 
 	def cleanup(self) -> None:
 		if not self._available:
@@ -103,12 +110,8 @@ class MouthServoController:
 			return
 
 		try:
-			if self._pwm:
-				self._pwm.ChangeDutyCycle(self._angle_to_duty(self.closed_angle))
-				time.sleep(0.05)
-				self._pwm.stop()
+			self._drive_angle_for_duration(self.closed_angle, 0.08)
 		finally:
 			# Do cleanup only for this pin to avoid side effects on other GPIO users.
 			GPIO.cleanup(self.pin)
 			self._initialized = False
-			self._pwm = None

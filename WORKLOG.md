@@ -313,3 +313,10 @@
 - 비고:
   - 현재 코드는 chat intent에서 TTS 생성 -> 오디오 재생 -> MG90S Pin 33 서보 lipsync -> 대기 모드 복귀 흐름으로 연결됨
   - 스피커 부재 시에도 playback 실패를 잡아서 duration만큼 sleep fallback이 동작함
+
+### 2026-04-23 (Jetson 테스트 완료)
+
+- mouth_servo.py가 PMW를 직접 생성하는 것이 아니라 High/Low로 출력하도록 되어 있어 Jetson에서 지속적으로 오류 발생
+  - check_mouth_servo.py에서 했듯이 PMW 직접 생성으로 코드 수정
+
+- 테스트 결과 성공. 정상적으로 작동함.
