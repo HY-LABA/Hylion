@@ -355,3 +355,22 @@
 - 남은 할 일:
   - Jetson Ubuntu 실환경에서 wake word 실제 감지/오인식/복귀 동작 smoke test
   - 필요 시 wake word 모델명/threshold/device keyword를 환경변수로 조정
+
+### 2026-04-23 (Jetson 테스트 피드백 반영 + .env 설정)
+
+- 한 줄 요약:
+  - 실제 Jetson 테스트 후 3가지 피드백 반영: ① wake word 감지 후 "네, 말씀하세요!" 음성 응답 + lip-sync 추가, ② chat 모드에서 wake word로 돌아가지 않고 mic 루프 반복, ③ wake word 모델을 "hey mycroft"에서 "hey hylion"으로 변경하되 .env 파일로 관리
+- 수정한 파일:
+  - `jetson/core/coordinator.py`
+  - `.env` (신규 생성)
+- 결과:
+  - `_build_greeting_action()` 함수 추가: wake word 감지 후 chat intent action_json 발행 (source="wake_word", reply_text="네, 말씀하세요!")
+  - `speak_with_lipsync()` 실행으로 greeting 멘트 음성화 + MG90S 입술 동작
+  - coordinator 메인 루프 개선: `while True` 외부에서 wake word 감지, inner `while in_chat_mode` 루프에서 mic recording/STT/LLM 실행
+  - chat intent 지속 시 inner loop 반복, non-chat intent 시 inner loop 탈출 후 standby 멘트 + outer loop 재진입 (wake word 대기)
+  - 프로젝트 루트(`.env`)에 `HYLION_WAKEWORD_MODEL=hey hylion` 설정
+  - `coordinator.py` import 부분에 `dotenv` 로드 추가: `try: from dotenv import load_dotenv; load_dotenv(PROJECT_ROOT / ".env")` 패턴으로 dotenv 미설치 시에도 안전하게 실행
+- 다음 단계:
+  - Jetson에서 `pip install python-dotenv` 설치 (미설치 시)
+  - `python jetson/core/coordinator.py` 실행해 wake word "hey hylion" 감지 동작 확인
+  - 커밋/푸시는 사용자 직접 수행

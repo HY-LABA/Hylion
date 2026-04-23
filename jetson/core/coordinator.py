@@ -8,6 +8,13 @@ from pathlib import Path
 from time import sleep
 from uuid import uuid4
 
+try:
+	from dotenv import load_dotenv
+	PROJECT_ROOT = Path(__file__).resolve().parents[2]
+	load_dotenv(PROJECT_ROOT / ".env")
+except ImportError:
+	pass
+
 from jetson.cloud.groq_client import GroqClient, build_action_json_from_stt
 from jetson.core.brain.network_probe import is_online
 from jetson.expression.mouth_servo import cleanup_gpio
@@ -19,6 +26,7 @@ from jetson.expression.stt_whisper import build_input_event, transcribe_wav
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 LIVE_AUDIO_DIR = PROJECT_ROOT / "data" / "episodes"
+
 
 
 def _print_block(title: str, payload: dict) -> None:
@@ -89,6 +97,27 @@ def _speak_reply_if_any(action_json: dict, stage: str) -> None:
 		print(f"[Speaker] {stage} -> failed: {exc}")
 
 
+def _build_greeting_action(session_id: str) -> dict:
+	"""Build a greeting action that triggers chat mode with lip-sync response."""
+	return {
+		"action_id": str(uuid4()),
+		"timestamp": datetime.now(timezone.utc).isoformat(),
+		"session_id": session_id,
+		"schema_version": "1.0",
+		"source": "wake_word",
+		"network_online": True,
+		"intent": "chat",
+		"target_object": "none",
+		"reply_text": "네, 말씀하세요!",
+		"requires_smolvla": False,
+		"requires_bhl": False,
+		"gait_cmd": "none",
+		"state_current": "IDLE",
+		"safety_allowed": True,
+		"fallback_policy": "greeting",
+	}
+
+
 def run_live_pipeline(
 	record_sec: float,
 	preferred_keyword: str,
@@ -116,66 +145,67 @@ def run_live_pipeline(
 
 	while True:
 		activation = wakeword_listener.wait_for_wake_word()
-		print("[Wake Word 감지] 네, 말씀하세요!")
 		print(
 			f"[Wake Word] label={activation.label}, score={activation.score:.3f}, "
 			f"source={activation.source}, device={activation.device_name}"
 		)
 
-		in_chat_mode = False
+		# Issue greeting action with lip-sync response to enter chat mode
+		greeting_action = _build_greeting_action(session_id=session_id)
+		_print_block("ACTION_JSON (GREETING)", greeting_action)
+		_speak_reply_if_any(greeting_action, stage="greeting")
 
-		wav_path = LIVE_AUDIO_DIR / f"live_{datetime.now().strftime('%Y%m%d_%H%M%S')}.wav"
-		print("[Mic] Ready. Speak after the START line.")
-		print(f"[Mic] START recording for {record_sec:.1f}s -> {wav_path}")
-		recorded_path = record_to_wav(
-			output_path=str(wav_path),
-			duration_sec=record_sec,
-			preferred_keyword=preferred_keyword,
-		)
-		print("[Mic] STOP recording")
+		in_chat_mode = True
 
-		stt_result = transcribe_wav(
-			recorded_path,
-			model_size=whisper_model_size,
-			language=whisper_language,
-		)
+		# Chat mode loop: keep listening without waiting for wake word again
+		while in_chat_mode:
+			wav_path = LIVE_AUDIO_DIR / f"live_{datetime.now().strftime('%Y%m%d_%H%M%S')}.wav"
+			print("[Mic] Ready. Speak after the START line.")
+			print(f"[Mic] START recording for {record_sec:.1f}s -> {wav_path}")
+			recorded_path = record_to_wav(
+				output_path=str(wav_path),
+				duration_sec=record_sec,
+				preferred_keyword=preferred_keyword,
+			)
+			print("[Mic] STOP recording")
 
-		if not stt_result.text.strip():
-			print("[STT] Empty transcription. Keeping current mode.")
-			continue
+			stt_result = transcribe_wav(
+				recorded_path,
+				model_size=whisper_model_size,
+				language=whisper_language,
+			)
 
-		input_event = build_input_event(stt_result=stt_result, session_id=session_id, source="stt")
-		_print_block("INPUT_JSON", input_event)
+			if not stt_result.text.strip():
+				print("[STT] Empty transcription. Keeping current mode.")
+				continue
 
-		action_json = build_action_json_from_stt(
-			client=client,
-			stt_text=stt_result.text,
-			session_id=session_id,
-			in_chat_mode=in_chat_mode,
-		)
-		_print_block("ACTION_JSON", action_json)
+			input_event = build_input_event(stt_result=stt_result, session_id=session_id, source="stt")
+			_print_block("INPUT_JSON", input_event)
 
-		intent = action_json.get("intent", "unknown")
-		_speak_reply_if_any(action_json, stage=f"before_{intent}")
+			action_json = build_action_json_from_stt(
+				client=client,
+				stt_text=stt_result.text,
+				session_id=session_id,
+				in_chat_mode=in_chat_mode,
+			)
+			_print_block("ACTION_JSON", action_json)
 
-		if intent == "chat":
-			in_chat_mode = True
-			print("[Mode] chat loop continues. Listening for next utterance.")
-			continue
+			intent = action_json.get("intent", "unknown")
+			_speak_reply_if_any(action_json, stage=f"before_{intent}")
 
-		if intent == "standby":
+			if intent == "chat":
+				print("[Mode] chat loop continues. Listening for next utterance.")
+				continue
+
+			# Non-chat intent: exit chat mode and go back to wake-word standby
+			_route_action(action_json)
+
+			standby_action = _build_standby_action(session_id=session_id, reason=f"auto_after_{intent}")
+			_print_block("ACTION_JSON (AUTO-STANDBY)", standby_action)
+			_speak_reply_if_any(standby_action, stage=f"after_{intent}")
 			in_chat_mode = False
-			print("[Mode] conversation ended -> standby mode.")
-			continue
-
-		_route_action(action_json)
-
-		standby_action = _build_standby_action(session_id=session_id, reason=f"auto_after_{intent}")
-		_print_block("ACTION_JSON (AUTO-STANDBY)", standby_action)
-		_speak_reply_if_any(standby_action, stage=f"after_{intent}")
-		in_chat_mode = False
-		print("[Mode] returned to wake-word standby.")
-		print("Waiting for wake word...")
+			print("[Mode] returned to wake-word standby.")
+			print("Waiting for wake word...")
 
 
 def _parse_args() -> argparse.Namespace:
