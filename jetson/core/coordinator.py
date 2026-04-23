@@ -10,6 +10,8 @@ from uuid import uuid4
 
 from jetson.cloud.groq_client import GroqClient, build_action_json_from_stt
 from jetson.core.brain.network_probe import is_online
+from jetson.expression.mouth_servo import cleanup_gpio
+from jetson.expression.wake_word import build_wake_word_listener
 from jetson.expression.speaker import speak_with_lipsync
 from jetson.expression.microphone import record_to_wav
 from jetson.expression.stt_whisper import build_input_event, transcribe_wav
@@ -92,6 +94,7 @@ def run_live_pipeline(
 	preferred_keyword: str,
 	whisper_model_size: str,
 	whisper_language: str,
+    wakeword_listener,
 ) -> None:
 	if not os.getenv("GROQ_API_KEY"):
 		raise RuntimeError("GROQ_API_KEY is not set. Real Groq testing requires a live key.")
@@ -102,19 +105,24 @@ def run_live_pipeline(
 	_probe_real_groq_connection(client)
 
 	session_id = f"sess-live-{uuid4().hex[:8]}"
-	in_chat_mode = False
 
-	print("HYlion coordinator live mode")
+	print("HYlion coordinator wake-word mode")
 	print("- Real microphone capture")
+	print("- Wake word trigger")
 	print("- Whisper STT")
 	print("- Real Groq action generation")
-	print("Press Enter to record, or type q then Enter to quit.")
+	print("- Auto standby after each completed turn")
+	print("Waiting for wake word...")
 
 	while True:
-		command = input("\n[Control] Enter=record, q=quit > ").strip().lower()
-		if command in {"q", "quit", "exit"}:
-			print("Coordinator stopped.")
-			break
+		activation = wakeword_listener.wait_for_wake_word()
+		print("[Wake Word 감지] 네, 말씀하세요!")
+		print(
+			f"[Wake Word] label={activation.label}, score={activation.score:.3f}, "
+			f"source={activation.source}, device={activation.device_name}"
+		)
+
+		in_chat_mode = False
 
 		wav_path = LIVE_AUDIO_DIR / f"live_{datetime.now().strftime('%Y%m%d_%H%M%S')}.wav"
 		print("[Mic] Ready. Speak after the START line.")
@@ -166,6 +174,8 @@ def run_live_pipeline(
 		_print_block("ACTION_JSON (AUTO-STANDBY)", standby_action)
 		_speak_reply_if_any(standby_action, stage=f"after_{intent}")
 		in_chat_mode = False
+		print("[Mode] returned to wake-word standby.")
+		print("Waiting for wake word...")
 
 
 def _parse_args() -> argparse.Namespace:
@@ -179,12 +189,22 @@ def _parse_args() -> argparse.Namespace:
 
 def main() -> None:
 	args = _parse_args()
-	run_live_pipeline(
-		record_sec=args.record_sec,
-		preferred_keyword=args.preferred_keyword,
-		whisper_model_size=args.whisper_model_size,
-		whisper_language=args.whisper_language,
-	)
+	wakeword_listener = None
+	try:
+		wakeword_listener = build_wake_word_listener()
+		run_live_pipeline(
+			record_sec=args.record_sec,
+			preferred_keyword=args.preferred_keyword,
+			whisper_model_size=args.whisper_model_size,
+			whisper_language=args.whisper_language,
+			wakeword_listener=wakeword_listener,
+		)
+	except KeyboardInterrupt:
+		print("Coordinator stopped by user.")
+	finally:
+		if wakeword_listener is not None:
+			wakeword_listener.close()
+		cleanup_gpio()
 
 
 if __name__ == "__main__":

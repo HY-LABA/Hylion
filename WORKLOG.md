@@ -336,3 +336,22 @@
   - Jetson 실환경에서 시나리오 검증
     - 예: "컵 집어줘" -> 사전 안내 멘트(lipsync) -> executor route -> 완료 멘트(lipsync) -> standby 복귀
   - 커밋/푸시는 사용자 직접 수행
+
+### 2026-04-23 (wake word 자동 트리거 전환)
+
+- 한 줄 요약:
+  - `coordinator.py`의 `input()` 블로킹을 제거하고, `openwakeword` 기반 wake word 대기 루프로 바꾸었으며, 감지 후 마이크를 닫고 0.5초 바톤 터치 지연을 준 뒤 STT/LLM 파이프라인으로 넘어가게 정리했다.
+- 수정한 파일:
+  - `jetson/expression/wake_word.py`
+  - `jetson/core/coordinator.py`
+  - `jetson/expression/mouth_servo.py`
+  - `WORKLOG.md`
+- 결과:
+  - Plan A: ALSA `plughw` + 16kHz 요청으로 OS 리샘플링 우선 시도
+  - Plan B: 실패 시 44.1kHz로 열고 `audioop` 또는 `numpy`로 16kHz 다운샘플링
+  - wake word 감지 직후 오디오 스트림을 즉시 닫고 `time.sleep(0.5)` 후 반환하도록 구현
+  - coordinator 최상단 실행 블록에 `KeyboardInterrupt` + `finally` 정리 경로 추가
+  - 종료 시 wake word 스트림과 GPIO cleanup을 보장하도록 정리함
+- 남은 할 일:
+  - Jetson Ubuntu 실환경에서 wake word 실제 감지/오인식/복귀 동작 smoke test
+  - 필요 시 wake word 모델명/threshold/device keyword를 환경변수로 조정

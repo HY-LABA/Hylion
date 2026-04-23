@@ -115,3 +115,17 @@ class MouthServoController:
 			# Do cleanup only for this pin to avoid side effects on other GPIO users.
 			GPIO.cleanup(self.pin)
 			self._initialized = False
+
+
+def cleanup_gpio(pin: Optional[int] = None) -> None:
+	"""Best-effort GPIO cleanup used by the coordinator shutdown path."""
+	if GPIO is None:
+		return
+
+	try:
+		if pin is None:
+			GPIO.cleanup()
+		else:
+			GPIO.cleanup(pin)
+	except Exception:
+		pass
