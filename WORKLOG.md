@@ -356,21 +356,50 @@
   - Jetson Ubuntu 실환경에서 wake word 실제 감지/오인식/복귀 동작 smoke test
   - 필요 시 wake word 모델명/threshold/device keyword를 환경변수로 조정
 
-### 2026-04-23 (Jetson 테스트 피드백 반영 + .env 설정)
+### 2026-04-23 (wake word 모델 재설정 + chat loop 정리)
+
 
 - 한 줄 요약:
-  - 실제 Jetson 테스트 후 3가지 피드백 반영: ① wake word 감지 후 "네, 말씀하세요!" 음성 응답 + lip-sync 추가, ② chat 모드에서 wake word로 돌아가지 않고 mic 루프 반복, ③ wake word 모델을 "hey mycroft"에서 "hey hylion"으로 변경하되 .env 파일로 관리
+  - OpenWakeWord의 기본 모델만 지원 가능 (커스텀 "hey hylion" 불가) -> "hey google"로 변경
+  - Chat loop 중 intent=standby면 바로 대기모드 복귀, non-chat 작업 후만 auto-standby 발행으로 정리
+  - 코드 중복(PROJECT_ROOT) 제거 및 가독성 개선
 - 수정한 파일:
+  - `.env`: HYLION_WAKEWORD_MODEL을 "hey hylion" -> "hey google"로 변경
+  - `jetson/core/coordinator.py`:
+    - PROJECT_ROOT 중복 정의 제거 + import 정리
+    - standby intent 처리 분기 추가 (LLM 분류된 standby면 바로 탈출)
+    - auto-standby 발행 로직만 non-chat 경로에 남김
+    - 중복 "Waiting for wake word..." 제거
+- Wake word 상황 설명:
+  - OpenWakeWord는 사전 학습된 모델만 사용 가능 (hey google, hey mycroft, hey siri, alexa, ok google 등)
+  - "hey hylion" 커스텀 모델을 사용하려면: OpenWakeWord 문서 참고해 모델 학습 -> .pt 파일 생성 -> 경로를 .env에 지정 필요
+  - 현재는 "hey google"으로 설정해 바로 테스트 가능
+- Chat loop 동작:
+  - intent == "chat": 루프 유지 (마이크 재대기)
+  - intent == "standby": 바로 chat mode 탈출, wake word 대기 복귀
+  - 기타 intent (pick_place, move, stop 등): executor route 실행 -> auto-standby 발행 -> 탈출
+- 남은 할 일:
+  - Jetson에서 `python3 -m jetson.core.coordinator` 실행 후 "hey google" 감지 테스트
+  - Chat loop에서 standby 분기 동작 확인
+
+### 2026-04-23 (custom Hey_Hyleon ONNX 연동)
+
+- 한 줄 요약:
+  - OpenWakeWord를 기본 내장 키워드가 아닌 커스텀 ONNX 모델(`Hey_Hyleon.onnx`) 경로 로드 방식으로 전환하고, 민감도 threshold를 `WAKE_WORD_THRESHOLD` 환경 변수로 제어 가능하게 반영함.
+- 수정한 파일:
+  - `jetson/expression/wake_word.py`
   - `jetson/core/coordinator.py`
-  - `.env` (신규 생성)
+  - `WORKLOG.md`
 - 결과:
-  - `_build_greeting_action()` 함수 추가: wake word 감지 후 chat intent action_json 발행 (source="wake_word", reply_text="네, 말씀하세요!")
-  - `speak_with_lipsync()` 실행으로 greeting 멘트 음성화 + MG90S 입술 동작
-  - coordinator 메인 루프 개선: `while True` 외부에서 wake word 감지, inner `while in_chat_mode` 루프에서 mic recording/STT/LLM 실행
-  - chat intent 지속 시 inner loop 반복, non-chat intent 시 inner loop 탈출 후 standby 멘트 + outer loop 재진입 (wake word 대기)
-  - 프로젝트 루트(`.env`)에 `HYLION_WAKEWORD_MODEL=hey hylion` 설정
-  - `coordinator.py` import 부분에 `dotenv` 로드 추가: `try: from dotenv import load_dotenv; load_dotenv(PROJECT_ROOT / ".env")` 패턴으로 dotenv 미설치 시에도 안전하게 실행
-- 다음 단계:
-  - Jetson에서 `pip install python-dotenv` 설치 (미설치 시)
-  - `python jetson/core/coordinator.py` 실행해 wake word "hey hylion" 감지 동작 확인
-  - 커밋/푸시는 사용자 직접 수행
+  - 모델 경로 우선순위: `WAKE_WORD_MODEL_PATH` -> `HYLION_WAKEWORD_MODEL` -> 기본값(`checkpoints/wakeword/Hey_Hyleon.onnx`)
+  - 모델 파일이 없으면 즉시 명확한 에러 메시지로 실패하도록 보호 로직 추가
+  - `WAKE_WORD_THRESHOLD`(기본 0.5) 환경변수로 민감도 실시간 조절 가능
+  - custom ONNX 사용에 맞춰 wakeword inference 기본 프레임워크를 `onnx`로 설정
+  - Plan A(16k ALSA plughw) -> Plan B(44.1k + Python resample) 로직 유지
+  - wake word 감지 후 stream close + `time.sleep(0.5)` 바톤 터치 로직 유지
+  - coordinator 종료 시 `wakeword_listener.close()`와 `cleanup_gpio()`를 각각 try/except로 보호해 finally cleanup 안정성 보강
+- 확인 사항:
+  - 모델 파일 존재 확인: `checkpoints/wakeword/Hey_Hyleon.onnx`
+- 남은 할 일:
+  - Jetson에서 `WAKE_WORD_MODEL_PATH` 미설정 상태 기본 경로 로드 확인
+  - `WAKE_WORD_THRESHOLD` 값(예: 0.35/0.5/0.7) 별 오인식/미인식 trade-off 측정

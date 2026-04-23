@@ -8,9 +8,13 @@ from pathlib import Path
 from time import sleep
 from uuid import uuid4
 
+# parameters
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+LIVE_AUDIO_DIR = PROJECT_ROOT / "data" / "episodes"
+
+# Load environment variables (e.g., GROQ_API_KEY, HYLION_WAKEWORD_MODEL)
 try:
 	from dotenv import load_dotenv
-	PROJECT_ROOT = Path(__file__).resolve().parents[2]
 	load_dotenv(PROJECT_ROOT / ".env")
 except ImportError:
 	pass
@@ -22,10 +26,6 @@ from jetson.expression.wake_word import build_wake_word_listener
 from jetson.expression.speaker import speak_with_lipsync
 from jetson.expression.microphone import record_to_wav
 from jetson.expression.stt_whisper import build_input_event, transcribe_wav
-
-
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
-LIVE_AUDIO_DIR = PROJECT_ROOT / "data" / "episodes"
 
 
 
@@ -150,7 +150,7 @@ def run_live_pipeline(
 			f"source={activation.source}, device={activation.device_name}"
 		)
 
-		# Issue greeting action with lip-sync response to enter chat mode
+		# Issue greeting action to enter chat mode
 		greeting_action = _build_greeting_action(session_id=session_id)
 		_print_block("ACTION_JSON (GREETING)", greeting_action)
 		_speak_reply_if_any(greeting_action, stage="greeting")
@@ -194,10 +194,17 @@ def run_live_pipeline(
 			_speak_reply_if_any(action_json, stage=f"before_{intent}")
 
 			if intent == "chat":
+				# Chat continues; listen for next utterance
 				print("[Mode] chat loop continues. Listening for next utterance.")
 				continue
 
-			# Non-chat intent: exit chat mode and go back to wake-word standby
+			if intent == "standby":
+				# User ended conversation; exit chat mode immediately
+				in_chat_mode = False
+				print("[Mode] returned to wake-word standby.")
+				continue
+
+			# Non-chat, non-standby intent: execute action, then generate auto-standby
 			_route_action(action_json)
 
 			standby_action = _build_standby_action(session_id=session_id, reason=f"auto_after_{intent}")
@@ -205,7 +212,6 @@ def run_live_pipeline(
 			_speak_reply_if_any(standby_action, stage=f"after_{intent}")
 			in_chat_mode = False
 			print("[Mode] returned to wake-word standby.")
-			print("Waiting for wake word...")
 
 
 def _parse_args() -> argparse.Namespace:
@@ -233,8 +239,14 @@ def main() -> None:
 		print("Coordinator stopped by user.")
 	finally:
 		if wakeword_listener is not None:
-			wakeword_listener.close()
-		cleanup_gpio()
+			try:
+				wakeword_listener.close()
+			except Exception as exc:
+				print(f"[Cleanup] wakeword listener close failed: {exc}")
+		try:
+			cleanup_gpio()
+		except Exception as exc:
+			print(f"[Cleanup] GPIO cleanup failed: {exc}")
 
 
 if __name__ == "__main__":
