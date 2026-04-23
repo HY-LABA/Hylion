@@ -303,3 +303,13 @@
 - 남은 할 일:
   - Jetson Ubuntu 실환경에서 실제 마이크/STT/LLM/chat lip-sync smoke test 수행
   - 테스트 결과와 로그를 이 파일에 추가한 뒤 `git push` 진행
+
+### 2026-04-23 (push 완료)
+
+- 커밋 해시:
+  - `3653953` (`Add chat lip-sync speaker flow`)
+- 원격 반영:
+  - `origin/ε1` 푸시 완료
+- 비고:
+  - 현재 코드는 chat intent에서 TTS 생성 -> 오디오 재생 -> MG90S Pin 33 서보 lipsync -> 대기 모드 복귀 흐름으로 연결됨
+  - 스피커 부재 시에도 playback 실패를 잡아서 duration만큼 sleep fallback이 동작함
