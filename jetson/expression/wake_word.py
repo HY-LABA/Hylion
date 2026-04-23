@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import os
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -27,24 +26,14 @@ except Exception:  # pragma: no cover - Jetson target dependency
 # parameters
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_WAKEWORD_MODEL_PATH = str(PROJECT_ROOT / "checkpoints" / "wakeword" / "Hey_Hyleon.onnx")
-
-
-def _env_float(name: str, fallback: str) -> float:
-    try:
-        return float(os.getenv(name, fallback))
-    except (TypeError, ValueError):
-        return float(fallback)
-
-
-# Required by current integration request.
-DEFAULT_WAKEWORD_MODEL = os.getenv("WAKE_WORD_MODEL_PATH") or os.getenv("HYLION_WAKEWORD_MODEL") or DEFAULT_WAKEWORD_MODEL_PATH
-DEFAULT_WAKEWORD_THRESHOLD = _env_float("WAKE_WORD_THRESHOLD", os.getenv("HYLION_WAKEWORD_THRESHOLD", "0.5"))
-DEFAULT_PLAN_A_DEVICE_KEYWORD = os.getenv("HYLION_WAKEWORD_PLAN_A_DEVICE_KEYWORD", "plughw")
-DEFAULT_PLAN_B_DEVICE_KEYWORD = os.getenv("HYLION_WAKEWORD_PLAN_B_DEVICE_KEYWORD", "")
-DEFAULT_PLAN_A_SAMPLE_RATE = int(os.getenv("HYLION_WAKEWORD_PLAN_A_SAMPLE_RATE", "16000"))
-DEFAULT_PLAN_B_SAMPLE_RATE = int(os.getenv("HYLION_WAKEWORD_PLAN_B_SAMPLE_RATE", "44100"))
-DEFAULT_WAKEWORD_BLOCK_MS = int(os.getenv("HYLION_WAKEWORD_BLOCK_MS", "80"))
-DEFAULT_BATON_TOUCH_DELAY_SEC = float(os.getenv("HYLION_WAKEWORD_BATON_TOUCH_DELAY_SEC", "0.5"))
+DEFAULT_WAKEWORD_MODEL = DEFAULT_WAKEWORD_MODEL_PATH
+DEFAULT_WAKEWORD_THRESHOLD = 0.5
+DEFAULT_PLAN_A_DEVICE_KEYWORD = "plughw"
+DEFAULT_PLAN_B_DEVICE_KEYWORD = ""
+DEFAULT_PLAN_A_SAMPLE_RATE = 16000
+DEFAULT_PLAN_B_SAMPLE_RATE = 44100
+DEFAULT_WAKEWORD_BLOCK_MS = 80
+DEFAULT_BATON_TOUCH_DELAY_SEC = 0.5
 
 
 @dataclass(frozen=True)

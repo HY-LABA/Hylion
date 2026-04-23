@@ -11,15 +11,8 @@ from uuid import uuid4
 # parameters
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 LIVE_AUDIO_DIR = PROJECT_ROOT / "data" / "episodes"
-AUTO_STANDBY_COOLDOWN_SEC = float(os.getenv("HYLION_WAKEWORD_AUTO_STANDBY_COOLDOWN_SEC", "1.5"))
-CHAT_STANDBY_COOLDOWN_SEC = float(os.getenv("HYLION_WAKEWORD_CHAT_STANDBY_COOLDOWN_SEC", "1.2"))
-
-# Load environment variables (e.g., GROQ_API_KEY, HYLION_WAKEWORD_MODEL)
-try:
-	from dotenv import load_dotenv  # type: ignore[import-not-found]
-	load_dotenv(PROJECT_ROOT / ".env")
-except ImportError:
-	pass
+AUTO_STANDBY_COOLDOWN_SEC = 1.5
+CHAT_STANDBY_COOLDOWN_SEC = 1.2
 
 from jetson.cloud.groq_client import GroqClient, build_action_json_from_stt
 from jetson.core.brain.network_probe import is_online

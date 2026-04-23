@@ -445,3 +445,46 @@
 - 남은 할 일:
   - Jetson 실환경에서 chat 종료("이제 대기해") 후 키워드 없이 재트리거되는지 재확인
   - 필요 시 chat-standby cooldown을 1.2 -> 1.6초로 상향
+
+### 2026-04-23 (공유 가능한 runtime env로 전환)
+
+- 한 줄 요약:
+  - 비민감 wakeword 설정을 `.env`에서 추적 가능한 `configs/runtime.env`로 이동해 push/pull 동기화 가능하게 정리함.
+- 수정한 파일:
+  - `configs/runtime.env` (신규)
+  - `jetson/core/coordinator.py`
+  - `.env`
+  - `WORKLOG.md`
+- 결과:
+  - `configs/runtime.env`에 공유 설정 저장
+    - `WAKE_WORD_MODEL_PATH`
+    - `WAKE_WORD_THRESHOLD`
+    - `HYLION_WAKEWORD_CHAT_STANDBY_COOLDOWN_SEC`
+    - `HYLION_WAKEWORD_AUTO_STANDBY_COOLDOWN_SEC`
+  - coordinator 환경 로드 순서 정리
+    1) `configs/runtime.env` (git 추적, 공통값)
+    2) `.env` (로컬 override, 선택)
+  - env 로드 이후에 cooldown 상수를 계산하도록 순서 수정하여 값 반영 누락 가능성 제거
+  - `.env`는 로컬 override 안내 주석만 남김
+- 남은 할 일:
+  - Jetson에서 pull 후 `.env` 없이도 동일 값으로 동작하는지 1회 확인
+
+### 2026-04-23 (runtime env 사용 철회, 코드 파라미터로 복귀)
+
+- 한 줄 요약:
+  - 사용자 요청에 따라 wakeword/coordinator 런타임 설정을 다시 코드 내부 parameters 섹션으로 고정하고, env 기반 공유 설정 구조를 철회함.
+- 수정한 파일:
+  - `jetson/core/coordinator.py`
+  - `jetson/expression/wake_word.py`
+  - `.env`
+  - `WORKLOG.md`
+- 결과:
+  - `coordinator.py`에서 `configs/runtime.env`/`.env` 자동 로드 로직 제거
+  - cooldown 파라미터를 코드 상수로 복귀
+    - `AUTO_STANDBY_COOLDOWN_SEC = 1.5`
+    - `CHAT_STANDBY_COOLDOWN_SEC = 1.2`
+  - `wake_word.py`의 모델/threshold/오디오 fallback 파라미터를 env 읽기 대신 코드 상수로 복귀
+  - `configs/runtime.env` 파일 제거
+  - `.env`는 로컬 비밀값(예: API key) 용도 안내만 유지
+- 남은 할 일:
+  - 필요시 이후 튜닝은 코드 parameters 값 직접 수정 방식으로 진행
