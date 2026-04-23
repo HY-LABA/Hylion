@@ -286,3 +286,20 @@
   - 요청대로 intent별 키워드 강제 분류용 빈 템플릿 칸을 프롬프트에 추가
   - 녹음 타이밍 알 수 있게 START/STOP 메시지를 추가
   - 실제 테스트 결과 정상 작동
+
+### 2026-04-23 (chat lip-sync 연결 정리)
+
+- 한 줄 요약:
+  - `coordinator.py`의 `intent == chat` 경로에 TTS/입술동기화 루프를 연결하고, 스피커 부재 시에도 duration만큼 서보가 움직이도록 fallback 구조를 정리했다.
+- 수정한 파일:
+  - `jetson/core/coordinator.py`
+  - `jetson/expression/speaker.py`
+  - `jetson/expression/mouth_servo.py`
+  - `WORKLOG.md`
+- 결과:
+  - chat intent 발생 시 `reply_text`를 받아 음성 파일을 생성하고 재생하는 동안 Pin 33의 MG90S 서보가 동작하도록 연결됨
+  - 오디오 재생 실패 시에도 `time.sleep(duration)` fallback으로 입술 동작 시간 보장
+  - chat 응답이 끝나면 기존 흐름대로 대기 모드로 복귀함
+- 남은 할 일:
+  - Jetson Ubuntu 실환경에서 실제 마이크/STT/LLM/chat lip-sync smoke test 수행
+  - 테스트 결과와 로그를 이 파일에 추가한 뒤 `git push` 진행

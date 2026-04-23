@@ -10,6 +10,7 @@ from uuid import uuid4
 
 from jetson.cloud.groq_client import GroqClient, build_action_json_from_stt
 from jetson.core.brain.network_probe import is_online
+from jetson.expression.speaker import speak_with_lipsync
 from jetson.expression.microphone import record_to_wav
 from jetson.expression.stt_whisper import build_input_event, transcribe_wav
 
@@ -136,6 +137,15 @@ def run_live_pipeline(
 		intent = action_json.get("intent", "unknown")
 
 		if intent == "chat":
+			reply_text = str(action_json.get("reply_text", "")).strip()
+			if reply_text:
+				try:
+					elapsed = speak_with_lipsync(reply_text)
+					print(f"[Executor] chat -> speaker done ({elapsed:.2f}s)")
+				except Exception as exc:
+					print(f"[Executor] chat -> speaker failed: {exc}")
+			else:
+				print("[Executor] chat -> no reply_text; skip speaker")
 			in_chat_mode = True
 			print("[Mode] chat loop continues. Listening for next utterance.")
 			continue
