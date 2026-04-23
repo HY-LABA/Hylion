@@ -488,3 +488,42 @@
   - `.env`는 로컬 비밀값(예: API key) 용도 안내만 유지
 - 남은 할 일:
   - 필요시 이후 튜닝은 코드 parameters 값 직접 수정 방식으로 진행
+
+### 2026-04-23 (runtime tuning table 문서화 + reply audio 저장 위치 정리)
+
+- 한 줄 요약:
+  - wakeword/STT/coordinator 전체 튜닝 파라미터를 단일 표로 문서화하고, reply용 음성 파일 저장 위치와 보존 정책을 코드 기준으로 명확히 정리함.
+- 수정한 파일:
+  - `docs/09_runtime_tuning_table.md` (신규)
+  - `WORKLOG.md`
+- 결과:
+  - wakeword, coordinator, STT 튜닝 항목(현재값/권장범위/효과/부작용/우선순위) 표 추가
+  - 현장 테스트용 quick matrix 추가
+  - reply audio 저장 위치 정리
+    - Ubuntu/Jetson 기준 `/tmp/hylion_tts`
+    - 파일명 `reply_<timestamp>.mp3` 또는 fallback `reply_<timestamp>.wav`
+  - 현재 구현은 재생 후 자동 삭제를 하지 않음을 문서에 명시
+- 남은 할 일:
+  - 필요 시 `speaker.py`에 재생 후 자동 삭제 정책 추가 검토
+
+### 2026-04-23 (speaker 실음성 TTS + data/reply 저장 경로 전환)
+
+- 한 줄 요약:
+  - `speaker.py`의 무음 fallback 생성을 제거하고, gTTS(ko)로 실제 한국어 MP3를 생성해 `data/reply/reply.mp3`로 저장/재생하도록 교체함.
+- 수정한 파일:
+  - `jetson/expression/speaker.py`
+  - `WORKLOG.md`
+- 결과:
+  - `synthesize_reply_audio()`:
+    - `gTTS(text=reply_text, lang="ko")`로 실제 음성 생성
+    - 저장 전 `os.makedirs(save_dir, exist_ok=True)` 수행
+    - 저장 경로를 프로젝트 내부 `data/reply/reply.mp3`로 고정
+  - `get_audio_duration_sec()`:
+    - `mutagen.mp3.MP3`로 정확한 재생 길이(초) 추출
+  - `play_audio_blocking()`:
+    - Linux `mpg123 -q <file>` 기반 재생으로 정리
+  - `speak_with_lipsync()`:
+    - 오디오 재생 실패 시 duration 기반 `time.sleep()` fallback 유지
+    - 동일 duration을 서보 스레드에 전달해 lipsync 시간 정합 유지
+- 남은 할 일:
+  - Jetson 런타임에 `gTTS`, `mutagen`, `mpg123` 설치/가용성 확인
