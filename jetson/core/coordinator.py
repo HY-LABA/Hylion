@@ -11,10 +11,11 @@ from uuid import uuid4
 # parameters
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 LIVE_AUDIO_DIR = PROJECT_ROOT / "data" / "episodes"
+AUTO_STANDBY_COOLDOWN_SEC = float(os.getenv("HYLION_WAKEWORD_AUTO_STANDBY_COOLDOWN_SEC", "1.5"))
 
 # Load environment variables (e.g., GROQ_API_KEY, HYLION_WAKEWORD_MODEL)
 try:
-	from dotenv import load_dotenv
+	from dotenv import load_dotenv  # type: ignore[import-not-found]
 	load_dotenv(PROJECT_ROOT / ".env")
 except ImportError:
 	pass
@@ -210,6 +211,9 @@ def run_live_pipeline(
 			standby_action = _build_standby_action(session_id=session_id, reason=f"auto_after_{intent}")
 			_print_block("ACTION_JSON (AUTO-STANDBY)", standby_action)
 			_speak_reply_if_any(standby_action, stage=f"after_{intent}")
+			if AUTO_STANDBY_COOLDOWN_SEC > 0:
+				print(f"[Mode] standby cooldown for {AUTO_STANDBY_COOLDOWN_SEC:.1f}s before re-arming wake word.")
+				sleep(AUTO_STANDBY_COOLDOWN_SEC)
 			in_chat_mode = False
 			print("[Mode] returned to wake-word standby.")
 

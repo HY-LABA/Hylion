@@ -403,3 +403,21 @@
 - 남은 할 일:
   - Jetson에서 `WAKE_WORD_MODEL_PATH` 미설정 상태 기본 경로 로드 확인
   - `WAKE_WORD_THRESHOLD` 값(예: 0.35/0.5/0.7) 별 오인식/미인식 trade-off 측정
+
+### 2026-04-23 (auto-standby 직후 즉시 재트리거 수정)
+
+- 한 줄 요약:
+  - 작업 완료 후 auto-standby에서 wake word가 너무 빨리 다시 열려 잔향/마지막 발화에 반응하던 문제를 non-chat 경로에만 짧은 cooldown으로 해결함.
+- 수정한 파일:
+  - `jetson/core/coordinator.py`
+  - `WORKLOG.md`
+- 결과:
+  - `HYLION_WAKEWORD_AUTO_STANDBY_COOLDOWN_SEC` 환경변수 추가 (기본값 `1.5`초)
+  - `intent == "standby"` 경로는 그대로 즉시 wake-word 대기로 복귀
+  - `pick_place` / `move` / `stop` 등 non-chat 작업 후 auto-standby를 말한 뒤에만 cooldown을 적용하고 재무장함
+  - coordinator 종료 시 `wakeword_listener.close()`와 `cleanup_gpio()` cleanup 로직은 그대로 안전하게 유지됨
+- 원인 설명:
+  - 작업 완료 멘트가 끝난 직후 바로 wake-word listener가 재가동되면서, 마지막 음성/echo/마이크 바닥잡음이 wake trigger로 다시 잡히는 현상
+- 남은 할 일:
+  - Jetson에서 auto-standby 후 실제 재트리거 여부 확인
+  - 필요 시 `HYLION_WAKEWORD_AUTO_STANDBY_COOLDOWN_SEC` 값을 1.0~2.5초 범위로 조정
