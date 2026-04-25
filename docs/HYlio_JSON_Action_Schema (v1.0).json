@@ -1,0 +1,12 @@
+{
+  "action_id": "string",
+  "timestamp": "string",
+  "state": "string",
+  "intent": "string",
+  "target_object": "string",
+  "emotion": "string",
+  "tts_text": "string",
+  "gait_cmd": "string",
+  "confidence": 0.0,
+  "fallback": "string"
+}

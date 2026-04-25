@@ -1,0 +1,59 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hylion.local/schemas/smolvla_episode.schema.json",
+  "title": "SmolVLA Episode Schema (Minimal)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "episode_id",
+    "session_id",
+    "object_class",
+    "image_dir",
+    "actions_file",
+    "success"
+  ],
+  "properties": {
+    "episode_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "session_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "recorded_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "object_class": {
+      "type": "string",
+      "enum": ["starbucks_cup", "tumbler", "doll"]
+    },
+    "rotation_deg": {
+      "type": "integer",
+      "enum": [0, 90, 180]
+    },
+    "approach": {
+      "type": "string",
+      "enum": ["front", "side"]
+    },
+    "image_dir": {
+      "type": "string",
+      "minLength": 1
+    },
+    "actions_file": {
+      "type": "string",
+      "minLength": 1
+    },
+    "success": {
+      "type": "boolean"
+    },
+    "failure_reason": {
+      "type": "string",
+      "enum": ["none", "misgrip", "drop", "collision", "other"]
+    },
+    "notes": {
+      "type": "string"
+    }
+  }
+}
