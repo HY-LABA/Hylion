@@ -559,3 +559,21 @@
 - 남은 할 일:
   - Jetson에서 NAVER API 키 설정 후 ClovaTTS 실제 발화 테스트
   - 오프라인 스텁은 이후 Piper TTS 실제 구현 시 교체
+
+### 2026-04-24 (07 master plan 문서 최신 진행상태 동기화)
+
+- 한 줄 요약:
+  - `WORKLOG.md` 최신 진행 내역(웨이크워드 안정화, 하이브리드 라우팅, Clova/Piper, TTS+lipsync 반영)을 `docs/07_non_ros2_pipeline_master_plan.md`에 반영해 체크리스트/스냅샷/시나리오를 최신화함.
+- 수정한 파일:
+  - `docs/07_non_ros2_pipeline_master_plan.md`
+  - `WORKLOG.md`
+- 결과:
+  - 기준일/상태를 2026-04-24 기준으로 업데이트
+  - Phase 4에 wakeword 안정화 + online/offline 분기 완료 항목 추가
+  - Phase 5에서 TTS/speaker adapter 항목을 완료로 갱신
+  - 현재 경계 조건을 "Clova TARGET 검증 필요 / Piper-LocalLLM 스텁" 상태로 명확화
+  - 구조도와 데이터 경로 설명에 wakeword/network_probe/TTS+lipsync 단계 반영
+  - 장애 시나리오를 네트워크/Cloud 실패를 함께 다루는 형태로 갱신
+- 남은 할 일:
+  - Jetson에서 Clova 실키 기반 발화 검증 결과를 07/WORKLOG에 추가
+  - Piper TTS 및 LocalLLM 실구현 시 해당 체크리스트 항목 업데이트
