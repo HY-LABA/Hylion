@@ -1,0 +1,274 @@
+### OS/JetPack/L4T
+Distributor ID:	Ubuntu
+Description:	Ubuntu 22.04.5 LTS
+Release:	22.04
+Codename:	jammy
+# R36 (release), REVISION: 5.0, GCID: 43688277, BOARD: generic, EABI: aarch64, DATE: Fri Jan 16 03:50:45 UTC 2026
+# KERNEL_VARIANT: oot
+TARGET_USERSPACE_LIB_DIR=nvidia
+TARGET_USERSPACE_LIB_DIR_PATH=usr/lib/aarch64-linux-gnu/nvidia
+Linux ubuntu 5.15.185-tegra #1 SMP PREEMPT Thu Jan 15 19:24:38 PST 2026 aarch64 aarch64 aarch64 GNU/Linux
+
+### CUDA/GPU
+nvcc: NVIDIA (R) Cuda compiler driver
+Copyright (c) 2005-2024 NVIDIA Corporation
+Built on Wed_Aug_14_10:14:07_PDT_2024
+Cuda compilation tools, release 12.6, V12.6.68
+Build cuda_12.6.r12.6/compiler.34714021_0
+{
+   "cuda" : {
+      "name" : "CUDA SDK",
+      "version" : "12.6.11"
+   },
+   "cuda_cccl" : {
+      "name" : "CUDA C++ Core Compute Libraries",
+      "version" : "12.6.37"
+   },
+   "cuda_compat" : {
+      "name" : "CUDA Specific Libraries",
+      "version" : "12.6.36890662"
+   },
+   "cuda_cudart" : {
+      "name" : "CUDA Runtime (cudart)",
+      "version" : "12.6.68"
+   },
+   "cuda_cuobjdump" : {
+      "name" : "cuobjdump",
+      "version" : "12.6.68"
+   },
+   "cuda_cupti" : {
+      "name" : "CUPTI",
+      "version" : "12.6.68"
+   },
+   "cuda_cuxxfilt" : {
+      "name" : "CUDA cu++ filt",
+      "version" : "12.6.68"
+   },
+   "cuda_gdb" : {
+      "name" : "CUDA GDB",
+      "version" : "12.6.68"
+   },
+   "cuda_nvcc" : {
+      "name" : "CUDA NVCC",
+      "version" : "12.6.68"
+   },
+   "cuda_nvdisasm" : {
+      "name" : "CUDA nvdisasm",
+      "version" : "12.6.68"
+   },
+   "cuda_nvml_dev" : {
+      "name" : "CUDA NVML Headers",
+      "version" : "12.6.68"
+   },
+   "cuda_nvprune" : {
+      "name" : "CUDA nvprune",
+      "version" : "12.6.68"
+   },
+   "cuda_nvrtc" : {
+      "name" : "CUDA NVRTC",
+      "version" : "12.6.68"
+   },
+   "cuda_nvtx" : {
+      "name" : "CUDA NVTX",
+      "version" : "12.6.68"
+   },
+   "cuda_sanitizer_api" : {
+      "name" : "CUDA Compute Sanitizer API",
+      "version" : "12.6.68"
+   },
+   "libcublas" : {
+      "name" : "CUDA cuBLAS",
+      "version" : "12.6.1.4"
+   },
+   "libcudla" : {
+      "name" : "CUDA cuDLA",
+      "version" : "12.6.68"
+   },
+   "libcufft" : {
+      "name" : "CUDA cuFFT",
+      "version" : "11.2.6.59"
+   },
+   "libcufile" : {
+      "name" : "GPUDirect Storage (cufile)",
+      "version" : "1.11.1.6"
+   },
+   "libcurand" : {
+      "name" : "CUDA cuRAND",
+      "version" : "10.3.7.68"
+   },
+   "libcusolver" : {
+      "name" : "CUDA cuSOLVER",
+      "version" : "11.6.4.69"
+   },
+   "libcusparse" : {
+      "name" : "CUDA cuSPARSE",
+      "version" : "12.5.3.3"
+   },
+   "libnpp" : {
+      "name" : "CUDA NPP",
+      "version" : "12.3.1.54"
+   },
+   "libnvfatbin" : {
+      "name" : "Fatbin interaction library",
+      "version" : "12.6.68"
+   },
+   "libnvjitlink" : {
+      "name" : "JIT Linker Library",
+      "version" : "12.6.68"
+   },
+   "libnvjpeg" : {
+      "name" : "CUDA nvJPEG",
+      "version" : "12.3.3.54"
+   },
+   "nsight_compute" : {
+      "name" : "Nsight Compute",
+      "version" : "2024.3.1.2"
+   },
+   "nvidia_fs" : {
+      "name" : "NVIDIA file-system",
+      "version" : "2.22.3"
+   }
+}
+Tue Apr 21 13:16:24 2026       
++---------------------------------------------------------------------------------------+
+| NVIDIA-SMI 540.5.0                Driver Version: 540.5.0      CUDA Version: 12.6     |
+|-----------------------------------------+----------------------+----------------------+
+| GPU  Name                 Persistence-M | Bus-Id        Disp.A | Volatile Uncorr. ECC |
+| Fan  Temp   Perf          Pwr:Usage/Cap |         Memory-Usage | GPU-Util  Compute M. |
+|                                         |                      |               MIG M. |
+|=========================================+======================+======================|
+|   0  Orin (nvgpu)                  N/A  | N/A              N/A |                  N/A |
+| N/A   N/A  N/A               N/A /  N/A | Not Supported        |     N/A          N/A |
+|                                         |                      |                  N/A |
++-----------------------------------------+----------------------+----------------------+
+                                                                                         
++---------------------------------------------------------------------------------------+
+| Processes:                                                                            |
+|  GPU   GI   CI        PID   Type   Process name                            GPU Memory |
+|        ID   ID                                                             Usage      |
+|=======================================================================================|
+|  No running processes found                                                           |
++---------------------------------------------------------------------------------------+
+
+### PyTorch
+
+### Docker
+NAMES     IMAGE     STATUS
+
+### SSH
+ii  openssh-server                                    1:8.9p1-3ubuntu0.13                         arm64        secure shell (SSH) server, for secure access from remote machines
+active
+enabled
+LISTEN 0      128          0.0.0.0:22         0.0.0.0:*    users:(("sshd",pid=1293,fd=3))                          
+LISTEN 0      128             [::]:22            [::]:*    users:(("sshd",pid=1293,fd=4))                          
+
+### nvpmodel
+NV Power Mode: 25W
+1
+NVPM VERB: Config file: /etc/nvpmodel.conf
+NVPM VERB: parsing done for /etc/nvpmodel.conf
+NVPM VERB: Current mode: NV Power Mode: 25W
+1
+NVPM VERB: PARAM CPU_ONLINE: ARG CORE_0: PATH /sys/devices/system/cpu/cpu0/online: REAL_VAL: 1 CONF_VAL: 1
+NVPM VERB: PARAM CPU_ONLINE: ARG CORE_1: PATH /sys/devices/system/cpu/cpu1/online: REAL_VAL: 1 CONF_VAL: 1
+NVPM VERB: PARAM CPU_ONLINE: ARG CORE_2: PATH /sys/devices/system/cpu/cpu2/online: REAL_VAL: 1 CONF_VAL: 1
+NVPM VERB: PARAM CPU_ONLINE: ARG CORE_3: PATH /sys/devices/system/cpu/cpu3/online: REAL_VAL: 1 CONF_VAL: 1
+NVPM VERB: PARAM CPU_ONLINE: ARG CORE_4: PATH /sys/devices/system/cpu/cpu4/online: REAL_VAL: 1 CONF_VAL: 1
+NVPM VERB: PARAM CPU_ONLINE: ARG CORE_5: PATH /sys/devices/system/cpu/cpu5/online: REAL_VAL: 1 CONF_VAL: 1
+NVPM VERB: PARAM FBP_POWER_GATING: ARG FBP_PG_MASK: PATH /sys/devices/platform/gpu.0/fbp_pg_mask: REAL_VAL: 2 CONF_VAL: 2
+NVPM VERB: PARAM TPC_POWER_GATING: ARG TPC_PG_MASK: PATH /sys/devices/platform/gpu.0/tpc_pg_mask: REAL_VAL: 15 CONF_VAL: 240
+NVPM VERB: PARAM GPU_POWER_CONTROL_ENABLE: ARG GPU_PWR_CNTL_EN: PATH /sys/devices/platform/gpu.0/power/control: REAL_VAL: auto CONF_VAL: on
+NVPM VERB: PARAM CPU_A78_0: ARG MIN_FREQ: PATH /sys/devices/system/cpu/cpu0/cpufreq/scaling_min_freq: REAL_VAL: 729600 CONF_VAL: 729600
+NVPM VERB: PARAM CPU_A78_0: ARG MAX_FREQ: PATH /sys/devices/system/cpu/cpu0/cpufreq/scaling_max_freq: REAL_VAL: 1344000 CONF_VAL: 1344000
+NVPM VERB: PARAM CPU_A78_1: ARG MIN_FREQ: PATH /sys/devices/system/cpu/cpu1/cpufreq/scaling_min_freq: REAL_VAL: 729600 CONF_VAL: 729600
+NVPM VERB: PARAM CPU_A78_1: ARG MAX_FREQ: PATH /sys/devices/system/cpu/cpu1/cpufreq/scaling_max_freq: REAL_VAL: 1344000 CONF_VAL: 1344000
+NVPM VERB: PARAM CPU_A78_2: ARG MIN_FREQ: PATH /sys/devices/system/cpu/cpu2/cpufreq/scaling_min_freq: REAL_VAL: 729600 CONF_VAL: 729600
+NVPM VERB: PARAM CPU_A78_2: ARG MAX_FREQ: PATH /sys/devices/system/cpu/cpu2/cpufreq/scaling_max_freq: REAL_VAL: 1344000 CONF_VAL: 1344000
+NVPM VERB: PARAM CPU_A78_3: ARG MIN_FREQ: PATH /sys/devices/system/cpu/cpu3/cpufreq/scaling_min_freq: REAL_VAL: 729600 CONF_VAL: 729600
+NVPM VERB: PARAM CPU_A78_3: ARG MAX_FREQ: PATH /sys/devices/system/cpu/cpu3/cpufreq/scaling_max_freq: REAL_VAL: 1344000 CONF_VAL: 1344000
+NVPM VERB: PARAM CPU_A78_4: ARG MIN_FREQ: PATH /sys/devices/system/cpu/cpu4/cpufreq/scaling_min_freq: REAL_VAL: 729600 CONF_VAL: 729600
+NVPM VERB: PARAM CPU_A78_4: ARG MAX_FREQ: PATH /sys/devices/system/cpu/cpu4/cpufreq/scaling_max_freq: REAL_VAL: 1344000 CONF_VAL: 1344000
+NVPM VERB: PARAM CPU_A78_5: ARG MIN_FREQ: PATH /sys/devices/system/cpu/cpu5/cpufreq/scaling_min_freq: REAL_VAL: 729600 CONF_VAL: 729600
+NVPM VERB: PARAM CPU_A78_5: ARG MAX_FREQ: PATH /sys/devices/system/cpu/cpu5/cpufreq/scaling_max_freq: REAL_VAL: 1344000 CONF_VAL: 1344000
+NVPM VERB: PARAM GPU: ARG MIN_FREQ: PATH /sys/devices/platform/17000000.gpu/devfreq_dev/min_freq: REAL_VAL: 306000000 CONF_VAL: 0
+NVPM VERB: PARAM GPU: ARG MAX_FREQ: PATH /sys/devices/platform/17000000.gpu/devfreq_dev/max_freq: REAL_VAL: 918000000 CONF_VAL: 918000000
+NVPM VERB: PARAM GPU_POWER_CONTROL_DISABLE: ARG GPU_PWR_CNTL_DIS: PATH /sys/devices/platform/gpu.0/power/control: REAL_VAL: auto CONF_VAL: auto
+NVPM VERB: PARAM EMC: ARG MAX_FREQ: PATH /sys/kernel/nvpmodel_clk_cap/emc: REAL_VAL: 3199000000 CONF_VAL: 3199000000
+
+### Storage
+NAME         MODEL                      SIZE TYPE TRAN   FSTYPE   UUID                                 MOUNTPOINT
+loop0                                     4K loop        squashfs                                      /snap/bare/5
+loop1                                 184.9M loop        squashfs                                      /snap/chromium/3393
+loop2                                    69M loop        squashfs                                      /snap/core22/2412
+loop3                                  61.9M loop        squashfs                                      /snap/core24/1588
+loop4                                  47.9M loop        squashfs                                      /snap/cups/1171
+loop5                                 552.9M loop        squashfs                                      /snap/gnome-46-2404/154
+loop6                                  91.7M loop        squashfs                                      /snap/gtk-common-themes/1535
+loop7                                  41.8M loop        squashfs                                      /snap/snapd/26383
+loop8                                 174.6M loop        squashfs                                      /snap/mesa-2404/1166
+loop9                                    16M loop        vfat     1234-ABCD                            
+zram0                                 633.9M disk                                                      [SWAP]
+zram1                                 633.9M disk                                                      [SWAP]
+zram2                                 633.9M disk                                                      [SWAP]
+zram3                                 633.9M disk                                                      [SWAP]
+zram4                                 633.9M disk                                                      [SWAP]
+zram5                                 633.9M disk                                                      [SWAP]
+nvme0n1      SAMSUNG MZVL2256HCHQ-00B 238.5G disk nvme                                                 
+├─nvme0n1p1                             237G part nvme   ext4     e40bab95-c3c9-44ed-8cbd-41f146f5c19e /
+├─nvme0n1p2                             128M part nvme                                                 
+├─nvme0n1p3                             768K part nvme                                                 
+├─nvme0n1p4                            31.6M part nvme                                                 
+├─nvme0n1p5                             128M part nvme                                                 
+├─nvme0n1p6                             768K part nvme                                                 
+├─nvme0n1p7                            31.6M part nvme                                                 
+├─nvme0n1p8                              80M part nvme                                                 
+├─nvme0n1p9                             512K part nvme                                                 
+├─nvme0n1p10                             64M part nvme   vfat     C232-A294                            /boot/efi
+├─nvme0n1p11                             80M part nvme                                                 
+├─nvme0n1p12                            512K part nvme                                                 
+├─nvme0n1p13                             64M part nvme                                                 
+├─nvme0n1p14                            400M part nvme                                                 
+└─nvme0n1p15                          479.5M part nvme                                                 
+Node                  SN                   Model                                    Namespace Usage                      Format           FW Rev  
+--------------------- -------------------- ---------------------------------------- --------- -------------------------- ---------------- --------
+/dev/nvme0n1          S63DNF0X217372       SAMSUNG MZVL2256HCHQ-00B                 1          29.24  GB / 256.06  GB    512   B +  0 B   GXA7GK2Q
+/dev/nvme0n1p1 / ext4 rw,relatime
+proc /proc proc rw,relatime
+sysfs /sys sysfs rw,relatime
+none /dev devtmpfs rw,relatime,size=3752252k,nr_inodes=938063,mode=755
+securityfs /sys/kernel/security securityfs rw,nosuid,nodev,noexec,relatime
+selinuxfs /sys/fs/selinux selinuxfs rw,nosuid,noexec,relatime
+tmpfs /dev/shm tmpfs rw,nosuid,nodev
+devpts /dev/pts devpts rw,nosuid,noexec,relatime,gid=5,mode=620,ptmxmode=000
+tmpfs /run tmpfs rw,nosuid,nodev,size=1557992k,nr_inodes=819200,mode=755
+tmpfs /run/lock tmpfs rw,nosuid,nodev,noexec,relatime,size=5120k
+cgroup2 /sys/fs/cgroup cgroup2 rw,nosuid,nodev,noexec,relatime,nsdelegate,memory_recursiveprot
+pstore /sys/fs/pstore pstore rw,nosuid,nodev,noexec,relatime
+efivarfs /sys/firmware/efi/efivars efivarfs rw,nosuid,nodev,noexec,relatime
+bpf /sys/fs/bpf bpf rw,nosuid,nodev,noexec,relatime,mode=700
+systemd-1 /proc/sys/fs/binfmt_misc autofs rw,relatime,fd=30,pgrp=1,timeout=0,minproto=5,maxproto=5,direct
+hugetlbfs /dev/hugepages hugetlbfs rw,relatime,pagesize=2M
+mqueue /dev/mqueue mqueue rw,nosuid,nodev,noexec,relatime
+debugfs /sys/kernel/debug debugfs rw,nosuid,nodev,noexec,relatime
+tracefs /sys/kernel/tracing tracefs rw,nosuid,nodev,noexec,relatime
+fusectl /sys/fs/fuse/connections fusectl rw,nosuid,nodev,noexec,relatime
+configfs /sys/kernel/config configfs rw,nosuid,nodev,noexec,relatime
+none /run/credentials/systemd-sysusers.service ramfs ro,nosuid,nodev,noexec,relatime,mode=700
+/dev/loop0 /snap/bare/5 squashfs ro,nodev,relatime,errors=continue
+/dev/loop1 /snap/chromium/3393 squashfs ro,nodev,relatime,errors=continue
+/dev/loop2 /snap/core22/2412 squashfs ro,nodev,relatime,errors=continue
+/dev/loop3 /snap/core24/1588 squashfs ro,nodev,relatime,errors=continue
+/dev/loop4 /snap/cups/1171 squashfs ro,nodev,relatime,errors=continue
+/dev/loop5 /snap/gnome-46-2404/154 squashfs ro,nodev,relatime,errors=continue
+/dev/loop6 /snap/gtk-common-themes/1535 squashfs ro,nodev,relatime,errors=continue
+/dev/loop7 /snap/snapd/26383 squashfs ro,nodev,relatime,errors=continue
+/dev/loop8 /snap/mesa-2404/1166 squashfs ro,nodev,relatime,errors=continue
+/dev/nvme0n1p10 /boot/efi vfat rw,relatime,fmask=0022,dmask=0022,codepage=437,iocharset=iso8859-1,shortname=mixed,errors=remount-ro
+binfmt_misc /proc/sys/fs/binfmt_misc binfmt_misc rw,nosuid,nodev,noexec,relatime
+tmpfs[/snapd/ns] /run/snapd/ns tmpfs rw,nosuid,nodev,size=1557992k,nr_inodes=819200,mode=755
+nsfs[mnt:[4026534217]] /run/snapd/ns/cups.mnt nsfs rw
+tmpfs /run/user/1000 tmpfs rw,nosuid,nodev,relatime,size=778992k,nr_inodes=194748,mode=700,uid=1000,gid=1000
+gvfsd-fuse /run/user/1000/gvfs fuse.gvfsd-fuse rw,nosuid,nodev,relatime,user_id=1000,group_id=1000
+portal /run/user/1000/doc fuse.portal rw,nosuid,nodev,relatime,user_id=1000,group_id=1000
+/dev/root            /                     ext4           defaults                                     0 1
+UUID=C232-A294 /boot/efi vfat defaults 0 1

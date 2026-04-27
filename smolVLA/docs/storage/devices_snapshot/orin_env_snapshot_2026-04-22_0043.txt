@@ -1,0 +1,417 @@
+### HOST
+ubuntu
+2026. 04. 22. (수) 00:43:35 KST
+DEVICE_TYPE: orin
+
+### OS / JetPack / L4T
+Distributor ID:	Ubuntu
+Description:	Ubuntu 22.04.5 LTS
+Release:	22.04
+Codename:	jammy
+# R36 (release), REVISION: 5.0, GCID: 43688277, BOARD: generic, EABI: aarch64, DATE: Fri Jan 16 03:50:45 UTC 2026
+# KERNEL_VARIANT: oot
+TARGET_USERSPACE_LIB_DIR=nvidia
+TARGET_USERSPACE_LIB_DIR_PATH=usr/lib/aarch64-linux-gnu/nvidia
+nv_jetpack_version not found
+Linux ubuntu 5.15.185-tegra #1 SMP PREEMPT Thu Jan 15 19:24:38 PST 2026 aarch64 aarch64 aarch64 GNU/Linux
+
+### CPU
+Architecture:                            aarch64
+CPU(s):                                  6
+On-line CPU(s) list:                     0-5
+Model name:                              Cortex-A78AE
+Thread(s) per core:                      1
+Core(s) per cluster:                     3
+Socket(s):                               -
+CPU max MHz:                             1728.0000
+CPU min MHz:                             115.2000
+NUMA node(s):                            1
+NUMA node0 CPU(s):                       0-5
+
+### Memory
+               총계         사용        여분      공유    버퍼/캐시    가용
+메모리:      7.4Gi       1.8Gi       3.8Gi        30Mi       1.8Gi       5.4Gi
+스  왑:      3.7Gi          0B       3.7Gi
+
+### GPU (nvidia-smi)
+Wed Apr 22 00:43:35 2026       
++---------------------------------------------------------------------------------------+
+| NVIDIA-SMI 540.5.0                Driver Version: 540.5.0      CUDA Version: 12.6     |
+|-----------------------------------------+----------------------+----------------------+
+| GPU  Name                 Persistence-M | Bus-Id        Disp.A | Volatile Uncorr. ECC |
+| Fan  Temp   Perf          Pwr:Usage/Cap |         Memory-Usage | GPU-Util  Compute M. |
+|                                         |                      |               MIG M. |
+|=========================================+======================+======================|
+|   0  Orin (nvgpu)                  N/A  | N/A              N/A |                  N/A |
+| N/A   N/A  N/A               N/A /  N/A | Not Supported        |     N/A          N/A |
+|                                         |                      |                  N/A |
++-----------------------------------------+----------------------+----------------------+
+                                                                                         
++---------------------------------------------------------------------------------------+
+| Processes:                                                                            |
+|  GPU   GI   CI        PID   Type   Process name                            GPU Memory |
+|        ID   ID                                                             Usage      |
+|=======================================================================================|
+|  No running processes found                                                           |
++---------------------------------------------------------------------------------------+
+
+### GPU (tegrastats snapshot)
+04-22-2026 00:43:36 RAM 1970/7607MB (lfb 18x4MB) SWAP 0/3804MB (cached 0MB) CPU [1%@729,1%@729,2%@729,0%@729,0%@729,0%@729] GR3D_FREQ 0% cpu@48.718C soc2@48.906C soc0@49.062C gpu@50.5C tj@50.5C soc1@49.75C VDD_IN 5069mW/5069mW VDD_CPU_GPU_CV 510mW/510mW VDD_SOC 1453mW/1453mW
+
+### nvpmodel
+NV Power Mode: 25W
+1
+NVPM VERB: Config file: /etc/nvpmodel.conf
+NVPM VERB: parsing done for /etc/nvpmodel.conf
+NVPM VERB: Current mode: NV Power Mode: 25W
+1
+NVPM VERB: PARAM CPU_ONLINE: ARG CORE_0: PATH /sys/devices/system/cpu/cpu0/online: REAL_VAL: 1 CONF_VAL: 1
+NVPM VERB: PARAM CPU_ONLINE: ARG CORE_1: PATH /sys/devices/system/cpu/cpu1/online: REAL_VAL: 1 CONF_VAL: 1
+NVPM VERB: PARAM CPU_ONLINE: ARG CORE_2: PATH /sys/devices/system/cpu/cpu2/online: REAL_VAL: 1 CONF_VAL: 1
+NVPM VERB: PARAM CPU_ONLINE: ARG CORE_3: PATH /sys/devices/system/cpu/cpu3/online: REAL_VAL: 1 CONF_VAL: 1
+NVPM VERB: PARAM CPU_ONLINE: ARG CORE_4: PATH /sys/devices/system/cpu/cpu4/online: REAL_VAL: 1 CONF_VAL: 1
+NVPM VERB: PARAM CPU_ONLINE: ARG CORE_5: PATH /sys/devices/system/cpu/cpu5/online: REAL_VAL: 1 CONF_VAL: 1
+NVPM VERB: PARAM FBP_POWER_GATING: ARG FBP_PG_MASK: PATH /sys/devices/platform/gpu.0/fbp_pg_mask: REAL_VAL: 2 CONF_VAL: 2
+NVPM VERB: PARAM TPC_POWER_GATING: ARG TPC_PG_MASK: PATH /sys/devices/platform/gpu.0/tpc_pg_mask: REAL_VAL: 15 CONF_VAL: 240
+NVPM VERB: PARAM GPU_POWER_CONTROL_ENABLE: ARG GPU_PWR_CNTL_EN: PATH /sys/devices/platform/gpu.0/power/control: REAL_VAL: auto CONF_VAL: on
+NVPM VERB: PARAM CPU_A78_0: ARG MIN_FREQ: PATH /sys/devices/system/cpu/cpu0/cpufreq/scaling_min_freq: REAL_VAL: 729600 CONF_VAL: 729600
+NVPM VERB: PARAM CPU_A78_0: ARG MAX_FREQ: PATH /sys/devices/system/cpu/cpu0/cpufreq/scaling_max_freq: REAL_VAL: 1344000 CONF_VAL: 1344000
+NVPM VERB: PARAM CPU_A78_1: ARG MIN_FREQ: PATH /sys/devices/system/cpu/cpu1/cpufreq/scaling_min_freq: REAL_VAL: 729600 CONF_VAL: 729600
+NVPM VERB: PARAM CPU_A78_1: ARG MAX_FREQ: PATH /sys/devices/system/cpu/cpu1/cpufreq/scaling_max_freq: REAL_VAL: 1344000 CONF_VAL: 1344000
+NVPM VERB: PARAM CPU_A78_2: ARG MIN_FREQ: PATH /sys/devices/system/cpu/cpu2/cpufreq/scaling_min_freq: REAL_VAL: 729600 CONF_VAL: 729600
+NVPM VERB: PARAM CPU_A78_2: ARG MAX_FREQ: PATH /sys/devices/system/cpu/cpu2/cpufreq/scaling_max_freq: REAL_VAL: 1344000 CONF_VAL: 1344000
+NVPM VERB: PARAM CPU_A78_3: ARG MIN_FREQ: PATH /sys/devices/system/cpu/cpu3/cpufreq/scaling_min_freq: REAL_VAL: 729600 CONF_VAL: 729600
+NVPM VERB: PARAM CPU_A78_3: ARG MAX_FREQ: PATH /sys/devices/system/cpu/cpu3/cpufreq/scaling_max_freq: REAL_VAL: 1344000 CONF_VAL: 1344000
+NVPM VERB: PARAM CPU_A78_4: ARG MIN_FREQ: PATH /sys/devices/system/cpu/cpu4/cpufreq/scaling_min_freq: REAL_VAL: 729600 CONF_VAL: 729600
+NVPM VERB: PARAM CPU_A78_4: ARG MAX_FREQ: PATH /sys/devices/system/cpu/cpu4/cpufreq/scaling_max_freq: REAL_VAL: 1344000 CONF_VAL: 1344000
+NVPM VERB: PARAM CPU_A78_5: ARG MIN_FREQ: PATH /sys/devices/system/cpu/cpu5/cpufreq/scaling_min_freq: REAL_VAL: 729600 CONF_VAL: 729600
+NVPM VERB: PARAM CPU_A78_5: ARG MAX_FREQ: PATH /sys/devices/system/cpu/cpu5/cpufreq/scaling_max_freq: REAL_VAL: 1344000 CONF_VAL: 1344000
+NVPM VERB: PARAM GPU: ARG MIN_FREQ: PATH /sys/devices/platform/17000000.gpu/devfreq_dev/min_freq: REAL_VAL: 306000000 CONF_VAL: 0
+NVPM VERB: PARAM GPU: ARG MAX_FREQ: PATH /sys/devices/platform/17000000.gpu/devfreq_dev/max_freq: REAL_VAL: 918000000 CONF_VAL: 918000000
+NVPM VERB: PARAM GPU_POWER_CONTROL_DISABLE: ARG GPU_PWR_CNTL_DIS: PATH /sys/devices/platform/gpu.0/power/control: REAL_VAL: auto CONF_VAL: auto
+NVPM VERB: PARAM EMC: ARG MAX_FREQ: PATH /sys/kernel/nvpmodel_clk_cap/emc: REAL_VAL: 3199000000 CONF_VAL: 3199000000
+
+### CUDA
+nvcc not found
+{
+   "cuda" : {
+      "name" : "CUDA SDK",
+      "version" : "12.6.11"
+   },
+   "cuda_cccl" : {
+      "name" : "CUDA C++ Core Compute Libraries",
+      "version" : "12.6.37"
+   },
+   "cuda_compat" : {
+      "name" : "CUDA Specific Libraries",
+      "version" : "12.6.36890662"
+   },
+   "cuda_cudart" : {
+      "name" : "CUDA Runtime (cudart)",
+      "version" : "12.6.68"
+   },
+   "cuda_cuobjdump" : {
+      "name" : "cuobjdump",
+      "version" : "12.6.68"
+   },
+   "cuda_cupti" : {
+      "name" : "CUPTI",
+      "version" : "12.6.68"
+   },
+   "cuda_cuxxfilt" : {
+      "name" : "CUDA cu++ filt",
+      "version" : "12.6.68"
+   },
+   "cuda_gdb" : {
+      "name" : "CUDA GDB",
+      "version" : "12.6.68"
+   },
+   "cuda_nvcc" : {
+      "name" : "CUDA NVCC",
+      "version" : "12.6.68"
+   },
+   "cuda_nvdisasm" : {
+      "name" : "CUDA nvdisasm",
+      "version" : "12.6.68"
+   },
+   "cuda_nvml_dev" : {
+      "name" : "CUDA NVML Headers",
+      "version" : "12.6.68"
+   },
+   "cuda_nvprune" : {
+      "name" : "CUDA nvprune",
+      "version" : "12.6.68"
+   },
+   "cuda_nvrtc" : {
+      "name" : "CUDA NVRTC",
+      "version" : "12.6.68"
+   },
+   "cuda_nvtx" : {
+      "name" : "CUDA NVTX",
+      "version" : "12.6.68"
+   },
+   "cuda_sanitizer_api" : {
+      "name" : "CUDA Compute Sanitizer API",
+      "version" : "12.6.68"
+   },
+   "libcublas" : {
+      "name" : "CUDA cuBLAS",
+      "version" : "12.6.1.4"
+   },
+   "libcudla" : {
+      "name" : "CUDA cuDLA",
+      "version" : "12.6.68"
+   },
+   "libcufft" : {
+      "name" : "CUDA cuFFT",
+      "version" : "11.2.6.59"
+   },
+   "libcufile" : {
+      "name" : "GPUDirect Storage (cufile)",
+      "version" : "1.11.1.6"
+   },
+   "libcurand" : {
+      "name" : "CUDA cuRAND",
+      "version" : "10.3.7.68"
+   },
+   "libcusolver" : {
+      "name" : "CUDA cuSOLVER",
+      "version" : "11.6.4.69"
+   },
+   "libcusparse" : {
+      "name" : "CUDA cuSPARSE",
+      "version" : "12.5.3.3"
+   },
+   "libnpp" : {
+      "name" : "CUDA NPP",
+      "version" : "12.3.1.54"
+   },
+   "libnvfatbin" : {
+      "name" : "Fatbin interaction library",
+      "version" : "12.6.68"
+   },
+   "libnvjitlink" : {
+      "name" : "JIT Linker Library",
+      "version" : "12.6.68"
+   },
+   "libnvjpeg" : {
+      "name" : "CUDA nvJPEG",
+      "version" : "12.3.3.54"
+   },
+   "nsight_compute" : {
+      "name" : "Nsight Compute",
+      "version" : "2024.3.1.2"
+   },
+   "nvidia_fs" : {
+      "name" : "NVIDIA file-system",
+      "version" : "2.22.3"
+   }
+}
+
+### cuDNN
+un  libcudnn9             <none>       <none>       (설명 없음)
+ii  libcudnn9-cuda-12     9.3.0.75-1   arm64        cuDNN runtime libraries for CUDA 12.6
+un  libcudnn9-dev         <none>       <none>       (설명 없음)
+ii  libcudnn9-dev-cuda-12 9.3.0.75-1   arm64        cuDNN development headers and symlinks for CUDA 12.6
+ii  libcudnn9-samples     9.3.0.75-1   all          cuDNN samples
+
+### TensorRT
+ii  tensorrt       10.3.0.30-1+cuda12.5 arm64        Meta package for TensorRT
+
+### PyTorch
+PyTorch not installed
+
+### Python
+Python 3.10.12
+colcon-ros                           0.5.0
+numpy                                1.21.5
+rosdep                               0.26.0
+rosdep-modules                       0.26.0
+rosdistro-modules                    1.0.1
+rospkg-modules                       1.6.1
+
+### ROS2
+ros2 not available
+action_msgs
+action_tutorials_cpp
+action_tutorials_interfaces
+action_tutorials_py
+actionlib_msgs
+ament_cmake
+ament_cmake_auto
+ament_cmake_copyright
+ament_cmake_core
+ament_cmake_cppcheck
+ament_cmake_cpplint
+ament_cmake_export_definitions
+ament_cmake_export_dependencies
+ament_cmake_export_include_directories
+ament_cmake_export_interfaces
+ament_cmake_export_libraries
+ament_cmake_export_link_flags
+ament_cmake_export_targets
+ament_cmake_flake8
+ament_cmake_gen_version_h
+
+### Docker
+NAMES     IMAGE     STATUS
+
+REPOSITORY      TAG       SIZE      CREATED AT
+breakout-game   latest    294MB     2026-04-15 20:19:40 +0900 KST
+breakout-game   dev       294MB     2026-04-15 20:19:40 +0900 KST
+
+### SSH
+ii  openssh-server 1:8.9p1-3ubuntu0.13 arm64        secure shell (SSH) server, for secure access from remote machines
+active
+enabled
+LISTEN 0      128          0.0.0.0:22         0.0.0.0:*                                              
+LISTEN 0      128             [::]:22            [::]:*                                              
+
+### LSBLK
+NAME         MODEL                    SERIAL           SIZE TYPE TRAN   FSTYPE   UUID                                 MOUNTPOINT
+loop0                                                    4K loop        squashfs                                      /snap/bare/5
+loop1                                                184.9M loop        squashfs                                      /snap/chromium/3393
+loop2                                                   69M loop        squashfs                                      /snap/core22/2412
+loop3                                                 61.9M loop        squashfs                                      /snap/core24/1588
+loop4                                                 47.9M loop        squashfs                                      /snap/cups/1171
+loop5                                                552.9M loop        squashfs                                      /snap/gnome-46-2404/154
+loop6                                                174.6M loop        squashfs                                      /snap/mesa-2404/1166
+loop7                                                 91.7M loop        squashfs                                      /snap/gtk-common-themes/1535
+loop8                                                 41.8M loop        squashfs                                      /snap/snapd/26383
+loop9                                                   16M loop        vfat     1234-ABCD                            
+zram0                                                633.9M disk                                                      [SWAP]
+zram1                                                633.9M disk                                                      [SWAP]
+zram2                                                633.9M disk                                                      [SWAP]
+zram3                                                633.9M disk                                                      [SWAP]
+zram4                                                633.9M disk                                                      [SWAP]
+zram5                                                633.9M disk                                                      [SWAP]
+nvme0n1      SAMSUNG MZVL2256HCHQ-00B S63DNF0X217372 238.5G disk nvme                                                 
+├─nvme0n1p1                                            237G part nvme   ext4     e40bab95-c3c9-44ed-8cbd-41f146f5c19e /
+├─nvme0n1p2                                            128M part nvme                                                 
+├─nvme0n1p3                                            768K part nvme                                                 
+├─nvme0n1p4                                           31.6M part nvme                                                 
+├─nvme0n1p5                                            128M part nvme                                                 
+├─nvme0n1p6                                            768K part nvme                                                 
+├─nvme0n1p7                                           31.6M part nvme                                                 
+├─nvme0n1p8                                             80M part nvme                                                 
+├─nvme0n1p9                                            512K part nvme                                                 
+├─nvme0n1p10                                            64M part nvme   vfat     C232-A294                            /boot/efi
+├─nvme0n1p11                                            80M part nvme                                                 
+├─nvme0n1p12                                           512K part nvme                                                 
+├─nvme0n1p13                                            64M part nvme                                                 
+├─nvme0n1p14                                           400M part nvme                                                 
+└─nvme0n1p15                                         479.5M part nvme                                                 
+
+### NVME
+Node                  SN                   Model                                    Namespace Usage                      Format           FW Rev  
+--------------------- -------------------- ---------------------------------------- --------- -------------------------- ---------------- --------
+/dev/nvme0n1                                                                        1           0.00   B /   0.00   B      1   B +  0 B   
+
+### DF
+파일 시스템     형식   크기  사용  가용 사용% 마운트위치
+/dev/nvme0n1p1  ext4   233G   23G  198G   11% /
+/dev/nvme0n1p10 vfat    63M   78K   63M    1% /boot/efi
+
+### USB
+Bus 002 Device 002: ID 0bda:0489 Realtek Semiconductor Corp. 4-Port USB 3.0 Hub
+Bus 002 Device 001: ID 1d6b:0003 Linux Foundation 3.0 root hub
+Bus 001 Device 003: ID 13d3:3549 IMC Networks Bluetooth Radio
+Bus 001 Device 006: ID 0c76:0005 JMTek, LLC. Transcend Flash disk
+Bus 001 Device 005: ID 04ca:0027 Lite-On Technology Corp. USB Multimedia Keyboard
+Bus 001 Device 004: ID 093a:2510 Pixart Imaging, Inc. Optical Mouse
+Bus 001 Device 002: ID 0bda:5489 Realtek Semiconductor Corp. 4-Port USB 2.0 Hub
+Bus 001 Device 001: ID 1d6b:0002 Linux Foundation 2.0 root hub
+
+### MOUNT
+
+### FSTAB
+# /etc/fstab: static file system information.
+#
+# These are the filesystems that are always mounted on boot, you can
+# override any of these by copying the appropriate line from this file into
+# /etc/fstab and tweaking it as you see fit.  See fstab(5).
+#
+# <file system> <mount point>             <type>          <options>                               <dump> <pass>
+/dev/root            /                     ext4           defaults                                     0 1
+UUID=C232-A294 /boot/efi vfat defaults 0 1
+
+### NETWORK INTERFACES
+1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536 qdisc noqueue state UNKNOWN group default qlen 1000
+    link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
+    inet 127.0.0.1/8 scope host lo
+       valid_lft forever preferred_lft forever
+    inet6 ::1/128 scope host 
+       valid_lft forever preferred_lft forever
+2: wlP1p1s0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc mq state UP group default qlen 1000
+    link/ether 9c:c7:d3:f6:a0:e9 brd ff:ff:ff:ff:ff:ff
+    inet 172.16.138.215/24 brd 172.16.138.255 scope global dynamic noprefixroute wlP1p1s0
+       valid_lft 1010sec preferred_lft 1010sec
+    inet6 fe80::3224:4de:bbdb:8592/64 scope link noprefixroute 
+       valid_lft forever preferred_lft forever
+3: can0: <NOARP,ECHO> mtu 16 qdisc noop state DOWN group default qlen 10
+    link/can 
+4: eno1: <NO-CARRIER,BROADCAST,MULTICAST,UP> mtu 1500 qdisc mq state DOWN group default qlen 1000
+    link/ether 4c:bb:47:62:14:08 brd ff:ff:ff:ff:ff:ff
+5: l4tbr0: <BROADCAST,MULTICAST> mtu 1500 qdisc noop state DOWN group default qlen 1000
+    link/ether 2a:d0:ea:66:c2:4e brd ff:ff:ff:ff:ff:ff
+6: usb0: <NO-CARRIER,BROADCAST,MULTICAST,UP> mtu 1500 qdisc pfifo_fast master l4tbr0 state DOWN group default qlen 1000
+    link/ether 2a:30:7d:fe:bb:45 brd ff:ff:ff:ff:ff:ff
+7: usb1: <NO-CARRIER,BROADCAST,MULTICAST,UP> mtu 1500 qdisc pfifo_fast master l4tbr0 state DOWN group default qlen 1000
+    link/ether 2a:30:7d:fe:bb:47 brd ff:ff:ff:ff:ff:ff
+8: br-529c48a4abc5: <NO-CARRIER,BROADCAST,MULTICAST,UP> mtu 1500 qdisc noqueue state DOWN group default 
+    link/ether ea:c2:36:d5:b4:ef brd ff:ff:ff:ff:ff:ff
+    inet 172.18.0.1/16 brd 172.18.255.255 scope global br-529c48a4abc5
+       valid_lft forever preferred_lft forever
+9: docker0: <NO-CARRIER,BROADCAST,MULTICAST,UP> mtu 1500 qdisc noqueue state DOWN group default 
+    link/ether 3e:f4:1d:38:83:49 brd ff:ff:ff:ff:ff:ff
+    inet 172.17.0.1/16 brd 172.17.255.255 scope global docker0
+       valid_lft forever preferred_lft forever
+
+### ROUTING TABLE
+default via 172.16.138.254 dev wlP1p1s0 proto dhcp metric 600 
+169.254.0.0/16 dev br-529c48a4abc5 scope link metric 1000 linkdown 
+172.16.138.0/24 dev wlP1p1s0 proto kernel scope link src 172.16.138.215 metric 600 
+172.17.0.0/16 dev docker0 proto kernel scope link src 172.17.0.1 linkdown 
+172.18.0.0/16 dev br-529c48a4abc5 proto kernel scope link src 172.18.0.1 linkdown 
+
+### DNS
+# Dynamic resolv.conf(5) file for glibc resolver(3) generated by resolvconf(8)
+#     DO NOT EDIT THIS FILE BY HAND -- YOUR CHANGES WILL BE OVERWRITTEN
+# 127.0.0.53 is the systemd-resolved stub resolver.
+# run "systemd-resolve --status" to see details about the actual nameservers.
+
+nameserver 127.0.0.53
+
+### OPEN PORTS (LISTEN)
+State  Recv-Q Send-Q Local Address:Port  Peer Address:PortProcess                                    
+LISTEN 0      4096       127.0.0.1:45793      0.0.0.0:*    users:(("code-61b3d0ab13",pid=10380,fd=9))
+LISTEN 0      128          0.0.0.0:22         0.0.0.0:*                                              
+LISTEN 0      4096         0.0.0.0:111        0.0.0.0:*                                              
+LISTEN 0      4096         0.0.0.0:631        0.0.0.0:*                                              
+LISTEN 0      4096   127.0.0.53%lo:53         0.0.0.0:*                                              
+LISTEN 0      128             [::]:22            [::]:*                                              
+LISTEN 0      4096            [::]:111           [::]:*                                              
+LISTEN 0      4096            [::]:631           [::]:*                                              
+
+### HOSTNAME & HOSTS
+ubuntu
+127.0.0.1	localhost
+127.0.1.1	ubuntu
+
+# The following lines are desirable for IPv6 capable hosts
+::1     ip6-localhost ip6-loopback
+fe00::0 ip6-localnet
+ff00::0 ip6-mcastprefix
+ff02::1 ip6-allnodes
+ff02::2 ip6-allrouters
+
+### PING TEST
+PING 8.8.8.8 (8.8.8.8) 56(84) bytes of data.
+64 bytes from 8.8.8.8: icmp_seq=1 ttl=114 time=38.3 ms
+64 bytes from 8.8.8.8: icmp_seq=2 ttl=114 time=38.2 ms
+
+--- 8.8.8.8 ping statistics ---
+2 packets transmitted, 2 received, 0% packet loss, time 1002ms
+rtt min/avg/max/mdev = 38.194/38.249/38.305/0.055 ms
+[외부 인터넷 연결 OK]
+

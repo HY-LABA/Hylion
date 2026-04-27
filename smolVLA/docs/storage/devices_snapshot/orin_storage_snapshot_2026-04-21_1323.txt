@@ -1,0 +1,96 @@
+### HOST
+ubuntu
+2026. 04. 21. (화) 13:23:35 KST
+
+### LSBLK
+NAME         MODEL                    SERIAL           SIZE TYPE TRAN   FSTYPE   UUID                                 MOUNTPOINT
+loop0                                                    4K loop        squashfs                                      /snap/bare/5
+loop1                                                184.9M loop        squashfs                                      /snap/chromium/3393
+loop2                                                   69M loop        squashfs                                      /snap/core22/2412
+loop3                                                 61.9M loop        squashfs                                      /snap/core24/1588
+loop4                                                 47.9M loop        squashfs                                      /snap/cups/1171
+loop5                                                552.9M loop        squashfs                                      /snap/gnome-46-2404/154
+loop6                                                 91.7M loop        squashfs                                      /snap/gtk-common-themes/1535
+loop7                                                 41.8M loop        squashfs                                      /snap/snapd/26383
+loop8                                                174.6M loop        squashfs                                      /snap/mesa-2404/1166
+loop9                                                   16M loop        vfat     1234-ABCD                            
+zram0                                                633.9M disk                                                      [SWAP]
+zram1                                                633.9M disk                                                      [SWAP]
+zram2                                                633.9M disk                                                      [SWAP]
+zram3                                                633.9M disk                                                      [SWAP]
+zram4                                                633.9M disk                                                      [SWAP]
+zram5                                                633.9M disk                                                      [SWAP]
+nvme0n1      SAMSUNG MZVL2256HCHQ-00B S63DNF0X217372 238.5G disk nvme                                                 
+├─nvme0n1p1                                            237G part nvme   ext4     e40bab95-c3c9-44ed-8cbd-41f146f5c19e /
+├─nvme0n1p2                                            128M part nvme                                                 
+├─nvme0n1p3                                            768K part nvme                                                 
+├─nvme0n1p4                                           31.6M part nvme                                                 
+├─nvme0n1p5                                            128M part nvme                                                 
+├─nvme0n1p6                                            768K part nvme                                                 
+├─nvme0n1p7                                           31.6M part nvme                                                 
+├─nvme0n1p8                                             80M part nvme                                                 
+├─nvme0n1p9                                            512K part nvme                                                 
+├─nvme0n1p10                                            64M part nvme   vfat     C232-A294                            /boot/efi
+├─nvme0n1p11                                            80M part nvme                                                 
+├─nvme0n1p12                                           512K part nvme                                                 
+├─nvme0n1p13                                            64M part nvme                                                 
+├─nvme0n1p14                                           400M part nvme                                                 
+└─nvme0n1p15                                         479.5M part nvme                                                 
+
+### NVME
+Node                  SN                   Model                                    Namespace Usage                      Format           FW Rev  
+--------------------- -------------------- ---------------------------------------- --------- -------------------------- ---------------- --------
+/dev/nvme0n1                                                                        1           0.00   B /   0.00   B      1   B +  0 B   
+
+### USB
+Bus 002 Device 002: ID 0bda:0489 Realtek Semiconductor Corp. 4-Port USB 3.0 Hub
+Bus 002 Device 001: ID 1d6b:0003 Linux Foundation 3.0 root hub
+Bus 001 Device 003: ID 13d3:3549 IMC Networks Bluetooth Radio
+Bus 001 Device 005: ID 04ca:0027 Lite-On Technology Corp. USB Multimedia Keyboard
+Bus 001 Device 004: ID 093a:2510 Pixart Imaging, Inc. Optical Mouse
+Bus 001 Device 002: ID 0bda:5489 Realtek Semiconductor Corp. 4-Port USB 2.0 Hub
+Bus 001 Device 001: ID 1d6b:0002 Linux Foundation 2.0 root hub
+
+### MOUNT
+/dev/nvme0n1p1 / ext4 rw,relatime
+proc /proc proc rw,relatime
+sysfs /sys sysfs rw,relatime
+none /dev devtmpfs rw,relatime,size=3752252k,nr_inodes=938063,mode=755
+securityfs /sys/kernel/security securityfs rw,nosuid,nodev,noexec,relatime
+selinuxfs /sys/fs/selinux selinuxfs rw,nosuid,noexec,relatime
+tmpfs /dev/shm tmpfs rw,nosuid,nodev
+devpts /dev/pts devpts rw,nosuid,noexec,relatime,gid=5,mode=620,ptmxmode=000
+tmpfs /run tmpfs rw,nosuid,nodev,size=1557992k,nr_inodes=819200,mode=755
+tmpfs /run/lock tmpfs rw,nosuid,nodev,noexec,relatime,size=5120k
+cgroup2 /sys/fs/cgroup cgroup2 rw,nosuid,nodev,noexec,relatime,nsdelegate,memory_recursiveprot
+pstore /sys/fs/pstore pstore rw,nosuid,nodev,noexec,relatime
+efivarfs /sys/firmware/efi/efivars efivarfs rw,nosuid,nodev,noexec,relatime
+bpf /sys/fs/bpf bpf rw,nosuid,nodev,noexec,relatime,mode=700
+systemd-1 /proc/sys/fs/binfmt_misc autofs rw,relatime,fd=30,pgrp=1,timeout=0,minproto=5,maxproto=5,direct
+hugetlbfs /dev/hugepages hugetlbfs rw,relatime,pagesize=2M
+mqueue /dev/mqueue mqueue rw,nosuid,nodev,noexec,relatime
+debugfs /sys/kernel/debug debugfs rw,nosuid,nodev,noexec,relatime
+tracefs /sys/kernel/tracing tracefs rw,nosuid,nodev,noexec,relatime
+fusectl /sys/fs/fuse/connections fusectl rw,nosuid,nodev,noexec,relatime
+configfs /sys/kernel/config configfs rw,nosuid,nodev,noexec,relatime
+none /run/credentials/systemd-sysusers.service ramfs ro,nosuid,nodev,noexec,relatime,mode=700
+/dev/loop0 /snap/bare/5 squashfs ro,nodev,relatime,errors=continue
+/dev/loop1 /snap/chromium/3393 squashfs ro,nodev,relatime,errors=continue
+/dev/loop2 /snap/core22/2412 squashfs ro,nodev,relatime,errors=continue
+/dev/loop3 /snap/core24/1588 squashfs ro,nodev,relatime,errors=continue
+/dev/loop4 /snap/cups/1171 squashfs ro,nodev,relatime,errors=continue
+/dev/loop5 /snap/gnome-46-2404/154 squashfs ro,nodev,relatime,errors=continue
+/dev/loop6 /snap/gtk-common-themes/1535 squashfs ro,nodev,relatime,errors=continue
+/dev/loop7 /snap/snapd/26383 squashfs ro,nodev,relatime,errors=continue
+/dev/loop8 /snap/mesa-2404/1166 squashfs ro,nodev,relatime,errors=continue
+/dev/nvme0n1p10 /boot/efi vfat rw,relatime,fmask=0022,dmask=0022,codepage=437,iocharset=iso8859-1,shortname=mixed,errors=remount-ro
+binfmt_misc /proc/sys/fs/binfmt_misc binfmt_misc rw,nosuid,nodev,noexec,relatime
+tmpfs[/snapd/ns] /run/snapd/ns tmpfs rw,nosuid,nodev,size=1557992k,nr_inodes=819200,mode=755
+nsfs[mnt:[4026534217]] /run/snapd/ns/cups.mnt nsfs rw
+tmpfs /run/user/1000 tmpfs rw,nosuid,nodev,relatime,size=778992k,nr_inodes=194748,mode=700,uid=1000,gid=1000
+gvfsd-fuse /run/user/1000/gvfs fuse.gvfsd-fuse rw,nosuid,nodev,relatime,user_id=1000,group_id=1000
+portal /run/user/1000/doc fuse.portal rw,nosuid,nodev,relatime,user_id=1000,group_id=1000
+
+### FSTAB
+/dev/root            /                     ext4           defaults                                     0 1
+UUID=C232-A294 /boot/efi vfat defaults 0 1

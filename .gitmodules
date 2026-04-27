@@ -1,0 +1,9 @@
+[submodule "smolVLA/docs/reference/seeed-lerobot"]
+	path = smolVLA/docs/reference/seeed-lerobot
+	url = https://github.com/Seeed-Projects/lerobot
+[submodule "smolVLA/lerobot"]
+	path = smolVLA/docs/reference/lerobot
+	url = https://github.com/huggingface/lerobot
+[submodule "smolVLA/reComputer-Jetson-for-Beginners"]
+	path = smolVLA/docs/reference/reComputer-Jetson-for-Beginners
+	url = https://github.com/Seeed-Projects/reComputer-Jetson-for-Beginners.git

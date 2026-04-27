@@ -1,0 +1,406 @@
+### HOST
+spark-8434
+2026. 04. 22. (수) 00:43:35 KST
+DEVICE_TYPE: dgx_spark
+
+### OS
+Distributor ID:	Ubuntu
+Description:	Ubuntu 24.04.4 LTS
+Release:	24.04
+Codename:	noble
+Linux spark-8434 6.17.0-1014-nvidia #14-Ubuntu SMP PREEMPT_DYNAMIC Tue Mar 17 19:01:40 UTC 2026 aarch64 aarch64 aarch64 GNU/Linux
+
+### CPU
+CPU 스케일링 MHz:                 100%
+최대 CPU MHz:                     3900.0000
+최소 CPU MHz:                     1378.0000
+CPU 스케일링 MHz:                 100%
+최대 CPU MHz:                     2808.0000
+최소 CPU MHz:                     338.0000
+NUMA 노드:                        1
+NUMA 노드0 CPU:                   0-19
+
+### Memory
+               총계         사용        여분      공유    버퍼/캐시    가용
+메모리:        121Gi       4.3Gi       110Gi        17Mi       8.2Gi       117Gi
+스  왑:           0B          0B          0B
+
+### GPU (nvidia-smi)
+Wed Apr 22 00:43:35 2026       
++-----------------------------------------------------------------------------------------+
+| NVIDIA-SMI 580.142                Driver Version: 580.142        CUDA Version: 13.0     |
++-----------------------------------------+------------------------+----------------------+
+| GPU  Name                 Persistence-M | Bus-Id          Disp.A | Volatile Uncorr. ECC |
+| Fan  Temp   Perf          Pwr:Usage/Cap |           Memory-Usage | GPU-Util  Compute M. |
+|                                         |                        |               MIG M. |
+|=========================================+========================+======================|
+|   0  NVIDIA GB10                    On  |   0000000F:01:00.0 Off |                  N/A |
+| N/A   38C    P8              4W /  N/A  | Not Supported          |      0%      Default |
+|                                         |                        |                  N/A |
++-----------------------------------------+------------------------+----------------------+
+
++-----------------------------------------------------------------------------------------+
+| Processes:                                                                              |
+|  GPU   GI   CI              PID   Type   Process name                        GPU Memory |
+|        ID   ID                                                               Usage      |
+|=========================================================================================|
+|    0   N/A  N/A          849322      G   /usr/lib/xorg/Xorg                       75MiB |
+|    0   N/A  N/A          849497      G   /usr/bin/gnome-shell                    136MiB |
++-----------------------------------------------------------------------------------------+
+
+### GPU Detail
+index, name, uuid, memory.total [MiB], memory.free [MiB], temperature.gpu, power.draw [W], driver_version
+0, NVIDIA GB10, GPU-286230e4-065d-1013-d2d2-a2356e78d31c, [N/A], [N/A], 38, 4.08 W, 580.142
+
+### GPU Topology
+	[4mGPU0	CPU Affinity	NUMA Affinity	GPU NUMA ID[0m
+GPU0	 X 	0-19	0		N/A
+
+Legend:
+
+  X    = Self
+  SYS  = Connection traversing PCIe as well as the SMP interconnect between NUMA nodes (e.g., QPI/UPI)
+  NODE = Connection traversing PCIe as well as the interconnect between PCIe Host Bridges within a NUMA node
+  PHB  = Connection traversing PCIe as well as a PCIe Host Bridge (typically the CPU)
+  PXB  = Connection traversing multiple PCIe bridges (without traversing the PCIe Host Bridge)
+  PIX  = Connection traversing at most a single PCIe bridge
+  NV#  = Connection traversing a bonded set of # NVLinks
+
+### CUDA
+nvcc not found
+{
+   "cuda" : {
+      "name" : "CUDA SDK",
+      "version" : "13.0.2"
+   },
+   "cuda_cccl" : {
+      "name" : "CUDA C++ Core Compute Libraries",
+      "version" : "13.0.85"
+   },
+   "cuda_crt" : {
+      "name" : "CUDA crt Compiler for CUDA applications",
+      "version" : "13.0.88"
+   },
+   "cuda_ctadvisor" : {
+      "name" : "CUDA Compile Time Advisor",
+      "version" : "13.0.85"
+   },
+   "cuda_cudart" : {
+      "name" : "CUDA Runtime (cudart)",
+      "version" : "13.0.96"
+   },
+   "cuda_culibos" : {
+      "name" : "CUDA DEV culibos is a Math Libraries",
+      "version" : "13.0.85"
+   },
+   "cuda_cuobjdump" : {
+      "name" : "cuobjdump",
+      "version" : "13.0.85"
+   },
+   "cuda_cupti" : {
+      "name" : "CUPTI",
+      "version" : "13.0.85"
+   },
+   "cuda_cuxxfilt" : {
+      "name" : "CUDA cu++ filt",
+      "version" : "13.0.85"
+   },
+   "cuda_gdb" : {
+      "name" : "CUDA GDB",
+      "version" : "13.0.85"
+   },
+   "cuda_nvcc" : {
+      "name" : "CUDA NVCC",
+      "version" : "13.0.88"
+   },
+   "cuda_nvdisasm" : {
+      "name" : "CUDA nvdisasm",
+      "version" : "13.0.85"
+   },
+   "cuda_nvml_dev" : {
+      "name" : "CUDA NVML Headers",
+      "version" : "13.0.87"
+   },
+   "cuda_nvprune" : {
+      "name" : "CUDA nvprune",
+      "version" : "13.0.85"
+   },
+   "cuda_nvrtc" : {
+      "name" : "CUDA NVRTC",
+      "version" : "13.0.88"
+   },
+   "cuda_nvtx" : {
+      "name" : "CUDA NVTX",
+      "version" : "13.0.85"
+   },
+   "cuda_profiler_api" : {
+      "name" : "CUDA Profiler API",
+      "version" : "13.0.85"
+   },
+   "cuda_sandbox_dev" : {
+      "name" : "NVIDIA Sandbox Utils",
+      "version" : "13.0.85"
+   },
+   "cuda_sanitizer_api" : {
+      "name" : "CUDA Compute Sanitizer API",
+      "version" : "13.0.85"
+   },
+   "fabricmanager" : {
+      "name" : "Fabric Manager",
+      "version" : "580.95.05"
+   },
+   "imex" : {
+      "name" : "Mapping GPU memory over NVLink",
+      "version" : "580.95.05"
+   },
+   "libcublas" : {
+      "name" : "CUDA cuBLAS",
+      "version" : "13.1.0.3"
+   },
+   "libcufft" : {
+      "name" : "CUDA cuFFT",
+      "version" : "12.0.0.61"
+   },
+   "libcufile" : {
+      "name" : "GPUDirect Storage (cufile)",
+      "version" : "1.15.1.6"
+   },
+   "libcurand" : {
+      "name" : "CUDA cuRAND",
+      "version" : "10.4.0.35"
+   },
+   "libcusolver" : {
+      "name" : "CUDA cuSOLVER",
+      "version" : "12.0.4.66"
+   },
+   "libcusparse" : {
+      "name" : "CUDA cuSPARSE",
+      "version" : "12.6.3.3"
+   },
+   "libnpp" : {
+      "name" : "CUDA NPP",
+      "version" : "13.0.1.2"
+   },
+   "libnvfatbin" : {
+      "name" : "Fatbin interaction library",
+      "version" : "13.0.85"
+   },
+   "libnvidia_nscq" : {
+      "name" : "NvSwitch Library",
+      "version" : "580.95.05"
+   },
+   "libnvjitlink" : {
+      "name" : "JIT Linker Library",
+      "version" : "13.0.88"
+   },
+   "libnvjpeg" : {
+      "name" : "CUDA nvJPEG",
+      "version" : "13.0.1.86"
+   },
+   "libnvptxcompiler" : {
+      "name" : "CUDA PTX compiler",
+      "version" : "13.0.88"
+   },
+   "libnvvm" : {
+      "name" : "NVVM",
+      "version" : "13.0.88"
+   },
+   "nsight_compute" : {
+      "name" : "Nsight Compute",
+      "version" : "2025.3.1.4"
+   },
+   "nsight_systems" : {
+      "name" : "Nsight Systems",
+      "version" : "2025.3.2.474"
+   },
+   "nvidia_driver" : {
+      "name" : "NVIDIA Linux Driver",
+      "version" : "580.95.05"
+   },
+   "nvidia_fs" : {
+      "name" : "NVIDIA file-system",
+      "version" : "2.26.6"
+   }
+}
+
+### cuDNN
+cuDNN not found
+
+### TensorRT
+TensorRT not found
+
+### PyTorch
+PyTorch not installed
+
+### Python
+Python 3.12.3
+pip3 not available
+
+### Conda Envs
+conda not available
+
+### ROS2
+ROS2 not found
+
+### Docker
+Docker not available
+
+
+### SSH
+ii  openssh-server 1:9.6p1-3ubuntu13.15 arm64        secure shell (SSH) server, for secure access from remote machines
+active
+disabled
+LISTEN 0      4096         0.0.0.0:22         0.0.0.0:*                                               
+LISTEN 0      4096            [::]:22            [::]:*                                               
+
+### LSBLK
+NAME        MODEL                      SERIAL           SIZE TYPE TRAN   FSTYPE   UUID                                 MOUNTPOINT
+loop0                                                     4K loop        squashfs                                      /snap/bare/5
+loop1                                                    69M loop        squashfs                                      /snap/core22/2412
+loop2                                                  61.9M loop        squashfs                                      /snap/core24/1500
+loop3                                                  61.9M loop        squashfs                                      /snap/core24/1588
+loop4                                                 265.2M loop        squashfs                                      /snap/firefox/8051
+loop6                                                   503M loop        squashfs                                      /snap/gnome-42-2204/245
+loop7                                                  15.5M loop        squashfs                                      /snap/firmware-updater/225
+loop8                                                 552.9M loop        squashfs                                      /snap/gnome-46-2404/154
+loop9                                                  15.6M loop        squashfs                                      /snap/firmware-updater/227
+loop10                                                 91.7M loop        squashfs                                      /snap/gtk-common-themes/1535
+loop11                                                174.6M loop        squashfs                                      /snap/mesa-2404/1166
+loop12                                                 12.2M loop        squashfs                                      /snap/snap-store/1217
+loop13                                                   10M loop        squashfs                                      /snap/snap-store/1271
+loop14                                                 41.8M loop        squashfs                                      /snap/snapd/26383
+loop15                                                  560K loop        squashfs                                      /snap/snapd-desktop-integration/359
+loop16                                                  560K loop        squashfs                                      /snap/snapd-desktop-integration/363
+loop17                                                219.1M loop        squashfs                                      /snap/thunderbird/1037
+loop18                                                  221M loop        squashfs                                      /snap/thunderbird/1045
+loop19                                                265.3M loop        squashfs                                      /snap/firefox/8105
+sda         MassStorageClass           000000001536       0B disk usb                                                  
+sdb         MassStorageClass           000000001536       0B disk usb                                                  
+nvme0n1     SAMSUNG MZALC4T0HBL1-00B07 S8C2NG0Y819458   3.7T disk nvme                                                 
+├─nvme0n1p1                                             298M part nvme   vfat     9DA2-3597                            /boot/efi
+└─nvme0n1p2                                             3.7T part nvme   ext4     d27bfd26-ff30-400e-9eca-9cdf73de9406 /
+
+### NVME
+Node                  Generic               SN                   Model                                    Namespace  Usage                      Format           FW Rev  
+--------------------- --------------------- -------------------- ---------------------------------------- ---------- -------------------------- ---------------- --------
+/dev/nvme0n1          /dev/ng0n1            S8C2NG0Y819458       SAMSUNG MZALC4T0HBL1-00B07               0x1        232.28  GB /   4.10  TB    512   B +  0 B   NXHB202Q
+
+### DF
+파일 시스템    형식      크기  사용  가용 사용% 마운트위치
+efivarfs       efivarfs  256K   21K  236K    8% /sys/firmware/efi/efivars
+/dev/nvme0n1p2 ext4      3.7T  215G  3.3T    7% /
+/dev/nvme0n1p1 vfat      298M  6.4M  292M    3% /boot/efi
+
+### USB
+Bus 001 Device 001: ID 1d6b:0002 Linux Foundation 2.0 root hub
+Bus 002 Device 001: ID 1d6b:0003 Linux Foundation 3.0 root hub
+Bus 003 Device 001: ID 1d6b:0002 Linux Foundation 2.0 root hub
+Bus 004 Device 001: ID 1d6b:0003 Linux Foundation 3.0 root hub
+Bus 005 Device 001: ID 1d6b:0002 Linux Foundation 2.0 root hub
+Bus 005 Device 002: ID 05e3:0610 Genesys Logic, Inc. Hub
+Bus 005 Device 003: ID 062a:4101 MosArt Semiconductor Corp. Wireless Keyboard/Mouse
+Bus 005 Device 005: ID 1d5c:7102 Fresco Logic Generic Billboard Device
+Bus 005 Device 006: ID 258a:002a SINO WEALTH ABKO K516 
+Bus 006 Device 001: ID 1d6b:0003 Linux Foundation 3.0 root hub
+Bus 006 Device 002: ID 05e3:0626 Genesys Logic, Inc. Hub
+Bus 006 Device 003: ID 05e3:0749 Genesys Logic, Inc. SD Card Reader and Writer
+Bus 007 Device 001: ID 1d6b:0002 Linux Foundation 2.0 root hub
+Bus 008 Device 001: ID 1d6b:0003 Linux Foundation 3.0 root hub
+Bus 009 Device 001: ID 1d6b:0002 Linux Foundation 2.0 root hub
+Bus 010 Device 001: ID 1d6b:0003 Linux Foundation 3.0 root hub
+Bus 011 Device 001: ID 1d6b:0002 Linux Foundation 2.0 root hub
+Bus 011 Device 002: ID 13d3:3630 IMC Networks Wireless_Device
+Bus 012 Device 001: ID 1d6b:0003 Linux Foundation 3.0 root hub
+
+### MOUNT
+
+### FSTAB
+/dev/disk/by-uuid/d27bfd26-ff30-400e-9eca-9cdf73de9406 / ext4 errors=remount-ro 0 1
+/dev/disk/by-uuid/9DA2-3597 /boot/efi vfat defaults 0 1
+
+### NETWORK INTERFACES
+1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536 qdisc noqueue state UNKNOWN group default qlen 1000
+    link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
+    inet 127.0.0.1/8 scope host lo
+       valid_lft forever preferred_lft forever
+    inet6 ::1/128 scope host noprefixroute 
+       valid_lft forever preferred_lft forever
+2: enP7s7: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc mq state UP group default qlen 1000
+    link/ether 4c:bb:47:2b:84:34 brd ff:ff:ff:ff:ff:ff
+    altname enP7p1s0
+    inet 192.168.0.7/24 brd 192.168.0.255 scope global dynamic noprefixroute enP7s7
+       valid_lft 7173sec preferred_lft 7173sec
+    inet6 fe80::49:d15d:35b5:491c/64 scope link noprefixroute 
+       valid_lft forever preferred_lft forever
+7: wlP9s9: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc noqueue state UP group default qlen 1000
+    link/ether f8:3d:c6:af:df:aa brd ff:ff:ff:ff:ff:ff
+    altname wlP9p1s0
+    inet 172.16.128.93/24 brd 172.16.128.255 scope global dynamic noprefixroute wlP9s9
+       valid_lft 1040sec preferred_lft 1040sec
+    inet6 fe80::fc2:8c4:d556:b7fa/64 scope link noprefixroute 
+       valid_lft forever preferred_lft forever
+8: docker0: <NO-CARRIER,BROADCAST,MULTICAST,UP> mtu 1500 qdisc noqueue state DOWN group default 
+    link/ether 52:5f:bc:c9:d2:48 brd ff:ff:ff:ff:ff:ff
+    inet 172.17.0.1/16 brd 172.17.255.255 scope global docker0
+       valid_lft forever preferred_lft forever
+
+### ROUTING TABLE
+default via 192.168.0.1 dev enP7s7 proto dhcp src 192.168.0.7 metric 100 
+default via 172.16.128.254 dev wlP9s9 proto dhcp src 172.16.128.93 metric 600 
+172.16.0.0/16 via 172.16.128.254 dev wlP9s9 
+172.16.128.0/24 dev wlP9s9 proto kernel scope link src 172.16.128.93 metric 600 
+172.17.0.0/16 dev docker0 proto kernel scope link src 172.17.0.1 linkdown 
+192.168.0.0/24 dev enP7s7 proto kernel scope link src 192.168.0.7 metric 100 
+
+### DNS
+# This is /run/systemd/resolve/stub-resolv.conf managed by man:systemd-resolved(8).
+# Do not edit.
+#
+# This file might be symlinked as /etc/resolv.conf. If you're looking at
+# /etc/resolv.conf and seeing this text, you have followed the symlink.
+#
+# This is a dynamic resolv.conf file for connecting local clients to the
+# internal DNS stub resolver of systemd-resolved. This file lists all
+# configured search domains.
+#
+# Run "resolvectl status" to see details about the uplink DNS servers
+# currently in use.
+#
+# Third party programs should typically not access this file directly, but only
+# through the symlink at /etc/resolv.conf. To manage man:resolv.conf(5) in a
+# different way, replace this symlink by a static file or a different symlink.
+#
+# See man:systemd-resolved.service(8) for details about the supported modes of
+# operation for /etc/resolv.conf.
+
+nameserver 127.0.0.53
+options edns0 trust-ad
+search .
+
+### OPEN PORTS (LISTEN)
+State  Recv-Q Send-Q Local Address:Port  Peer Address:PortProcess                                     
+LISTEN 0      4096       127.0.0.1:631        0.0.0.0:*                                               
+LISTEN 0      4096       127.0.0.1:11434      0.0.0.0:*                                               
+LISTEN 0      4096       127.0.0.1:11000      0.0.0.0:*                                               
+LISTEN 0      4096      127.0.0.54:53         0.0.0.0:*                                               
+LISTEN 0      4096         0.0.0.0:22         0.0.0.0:*                                               
+LISTEN 0      511        127.0.0.1:36839      0.0.0.0:*    users:(("node",pid=853346,fd=39))          
+LISTEN 0      4096       127.0.0.1:36827      0.0.0.0:*    users:(("code-61b3d0ab13",pid=853305,fd=9))
+LISTEN 0      4096   127.0.0.53%lo:53         0.0.0.0:*                                               
+LISTEN 0      4096           [::1]:631           [::]:*                                               
+LISTEN 0      4096            [::]:22            [::]:*                                               
+
+### HOSTNAME & HOSTS
+spark-8434
+127.0.0.1       localhost
+127.0.0.1       spark-8434  
+
+
+### PING TEST
+PING 8.8.8.8 (8.8.8.8) 56(84) bytes of data.
+
+--- 8.8.8.8 ping statistics ---
+2 packets transmitted, 0 received, 100% packet loss, time 1056ms
+
+[외부 인터넷 연결 실패]
+
