@@ -196,20 +196,111 @@ git submodule update --remote --merge
 
 ---
 
-## 7) 첫 이관 절차 (한 번만)
+## 7) 첫 클론 / 셋업 절차 (컴퓨터당 한 번)
 
-### 사용자 직접 수행
+### 7-1) 우분투 (개발용 컴퓨터)
 
-1. `git clone https://github.com/HY-LABA/Hylion.git` (두 컴퓨터 모두)
-2. `git checkout BG` (origin/BG 추적)
-3. `git submodule update --init --recursive` (reference 3개 받기)
-4. (선택) LABA5_Bootcamp 도 옆 디렉토리에 clone — 백업용
-   ```
-   cd ..
-   git clone https://github.com/BaboGaeguri/LABA5_Bootcamp.git
-   ```
+작업 위치는 사용자 홈 (`~`) 기준으로 가정한다. 다른 위치에 두려면 경로만 조정.
 
-### 일상 운영
+```bash
+# 0. 사전 확인 — git, ssh 키 (GitHub push 권한) 준비됐는지
+git --version
+ssh -T git@github.com    # (HTTPS 만 쓰면 생략 가능)
 
-5. Hylion/BG 에서 작업, 두 컴퓨터 사이는 git push/pull
-6. LABA5 백업이 필요하면 `pwsh smolVLA/scripts/sync_to_laba5.ps1` 실행
+# 1. Hylion 클론
+cd ~
+git clone https://github.com/HY-LABA/Hylion.git
+cd Hylion
+
+# 2. BG 브랜치로 전환 (origin/BG 자동 추적)
+git checkout BG
+
+# 3. reference submodule 3개 받기 (lerobot, seeed-lerobot, reComputer)
+#    수 GB 다운로드 + 시간 소요. 네트워크 좋은 곳에서 한 번만.
+git submodule update --init --recursive
+
+# 4. 받은 후 상태 확인
+git submodule status
+#   ba27aab... smolVLA/docs/reference/lerobot (...)
+#   bfcb505... smolVLA/docs/reference/reComputer-Jetson-for-Beginners (heads/main)
+#   0f39248... smolVLA/docs/reference/seeed-lerobot (heads/main)
+
+# 5. (선택, LABA5 백업 쓸 사람만) LABA5_Bootcamp 클론
+cd ~
+git clone https://github.com/BaboGaeguri/LABA5_Bootcamp.git
+#   기본 위치 ~/LABA5_Bootcamp 가 백업 스크립트의 default 다. 다른 위치면 매번 --laba5 로 지정.
+
+# 6. (선택) 백업 스크립트 실행 권한 확인
+cd ~/Hylion
+ls -l smolVLA/scripts/sync_to_laba5.sh
+#   -rwxr-xr-x ... 가 보이면 OK. 안 그러면: chmod +x smolVLA/scripts/sync_to_laba5.sh
+
+# 7. 백업 dry-run (실제 변경 없이 미리보기)
+bash smolVLA/scripts/sync_to_laba5.sh --dry-run
+```
+
+**Orin/하드웨어 세팅은 별도 문서:**
+- `smolVLA/docs/storage/04_devnetwork.md` — devPC ↔ Orin SSH (`~/.ssh/config` 등록)
+- `smolVLA/docs/storage/05_orin_venv_setting.md` — Orin venv / PyTorch 설치
+- `smolVLA/orin/scripts/setup_env.sh` — Orin 안에서 실행 (devPC 에서 실행 X)
+
+### 7-2) Windows (정리용 컴퓨터)
+
+PowerShell 사용. 명령어 동일, 경로 표기와 백업 스크립트만 다르다.
+
+```powershell
+# 1. Hylion 클론
+cd C:\Users\admin\Desktop
+git clone https://github.com/HY-LABA/Hylion.git
+cd Hylion
+
+# 2. BG 브랜치
+git checkout BG
+
+# 3. submodule
+git submodule update --init --recursive
+
+# 4. (선택) LABA5_Bootcamp 클론 — Hylion 옆 디렉토리에
+cd ..
+git clone https://github.com/BaboGaeguri/LABA5_Bootcamp.git
+#   기본 위치 C:\Users\<user>\Desktop\LABA5_Bootcamp 가 .ps1 의 default
+
+# 5. (선택) 백업 dry-run
+cd Hylion
+pwsh smolVLA/scripts/sync_to_laba5.ps1 -DryRun
+```
+
+### 7-3) 셋업 검증 체크리스트
+
+두 컴퓨터 어느 쪽이든 끝나면 아래 4가지 확인:
+
+- [ ] `git branch --show-current` → `BG`
+- [ ] `git status` → `Your branch is up to date with 'origin/BG'.` + working tree clean
+- [ ] `ls smolVLA/docs/reference/lerobot/README.md` 가 존재 (submodule 받아짐)
+- [ ] `git remote -v` → `origin https://github.com/HY-LABA/Hylion.git` 만 있음 (`laba5` remote 없음 — subtree 안 씀)
+
+---
+
+## 8) 일상 운영 요약
+
+```
+[작업 시작]
+  git pull origin BG          # 다른 컴퓨터에서 작업한 거 받기
+  (코드 작성, 문서 정리, Orin 테스트 ...)
+
+[작업 종료 / 컴퓨터 전환 / 매일 끝날 때]
+  git add . && git commit -m "..."
+  git push origin BG          # 두 컴퓨터 동기화의 진짜 채널
+
+[가끔, LABA5 백업하고 싶을 때]
+  bash smolVLA/scripts/sync_to_laba5.sh        # 우분투
+  pwsh smolVLA/scripts/sync_to_laba5.ps1       # Windows
+
+[가끔, lerobot upstream 변경 받고 싶을 때]
+  git submodule update --remote --merge
+  git add smolVLA/docs/reference/<changed>
+  git commit -m "submodule: bump <name> to <new SHA>"
+  git push origin BG
+
+[Hylion main 으로 산출물 올릴 때 — 4절 참조]
+```
