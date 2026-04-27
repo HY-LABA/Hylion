@@ -106,18 +106,33 @@
 - 잔여 리스크: HuggingFace 모델 라이선스·재배포 조건이 본 프로젝트(연구실 데모 / 추후 공개 여부) 와 충돌할 가능성 → smolvla_base 는 Apache 2.0 으로 확인됨 (본 문서 §6)
 - **완료 (2026-04-27)**: `05_hf_model_selection.md` 작성 완료. **결론: 정책 체크포인트는 `lerobot/smolvla_base` (450M) 고정, VLM 백본은 `HuggingFaceTB/SmolVLM2-500M-Video-Instruct` 고정, dtype 은 bfloat16 (코드 하드코딩).** 변종 변경 시 사전학습 가중치 호환 깨지므로 사실상 분기 여지 없음.
 
-### [ ] TODO-06: 파인튜닝 가능성 학습
+### [x] TODO-06: 파인튜닝 가능성 학습
 
 - 타입: study
-- DOD: 선정한 베이스 모델 기준 파인튜닝 절차(필요 데이터 양 추정 · 학습 스크립트 위치 · 하이퍼파라미터 기본값 · 체크포인트 저장 형식) 를 정리. DGX Spark 실측 자원(TODO-02) 기반으로 1회 파인튜닝 예상 소요 시간/메모리 점검. **산출물: `docs/lerobot_study/06_smolvla_finetune_feasibility.md` 작성 완료.**
+- DOD: 선정한 베이스 모델 기준 파인튜닝 절차(`lerobot-train` CLI · 하이퍼파라미터 기본값 · 체크포인트 저장 형식) 를 정리. DGX Spark 실측 자원(TODO-02) 기반으로 1회 파인튜닝 예상 소요 시간/메모리 점검. TODO-08 환경관리 결정사항 사전 정리 (venv vs conda 등). 04/06 마일스톤 학습 권장 명령 작성.
 - 구현 대상:
-  - `docs/lerobot_study/06_smolvla_finetune_feasibility.md` (신규) — 파인튜닝 절차, 하이퍼파라미터, DGX 자원 기반 예상 소요량
+  - `docs/lerobot_study/06_smolvla_finetune_feasibility.md` — DGX 실측 자원 요약, 환경관리 결정 사전 정리(§2), `lerobot-train` CLI 동작(§3), 체크포인트 저장 형식(§4), 학습 비용 추정(§5), 04/06 학습 권장값(§6)
 - 테스트: 없음
 - 참조:
-  - `docs/reference/lerobot/src/lerobot/scripts/train.py` (또는 동등한 학습 엔트리포인트)
-  - SmolVLA 논문 학습 절차 섹션
-- 제약: TODO-02·TODO-03·TODO-05 완료 후 진행
-- 잔여 리스크: DGX Spark VRAM 이 smolVLA 풀 파인튜닝에 부족할 가능성 → LoRA/PEFT 적용 검토 (자유도 축소는 TODO-11 결론에 따라 보류, Backlog #3 재검토 트리거 시 재고)
+  - `docs/reference/lerobot/src/lerobot/scripts/lerobot_train.py` (학습 엔트리포인트)
+  - `docs/reference/lerobot/src/lerobot/configs/train.py` (`TrainPipelineConfig` 디폴트)
+  - `docs/reference/lerobot/docs/source/smolvla.mdx` (공식 학습 예시)
+  - `docs/reference/lerobot/docs/source/peft_training.mdx` (PEFT/LoRA)
+  - SmolVLA 논문 (`arXiv:2506.01844`)
+  - `docs/storage/devices_snapshot/dgx_spark_env_snapshot_2026-04-27_2342.txt` (DGX 실측)
+- 제약: TODO-02·TODO-03·TODO-05 완료 후 진행 → 모두 충족됨
+- 잔여 리스크 (본 문서 §7):
+  - GB10 throughput 미확정 → TODO-09 1 step smoke test 후 갱신 필요
+  - CUDA 13 PyTorch 호환 → TODO-08 첫 검증 항목
+  - UMA 메모리 점유 분포 — 일반 dGPU VRAM 추정과 다름, `free -h` 병행 모니터링 필요
+  - Ollama 자원 경합 → 학습 시작 전 stop 권장
+  - DGX↔Orin PyTorch 버전 차이 → safetensors 호환성 TODO-10 검증
+- **완료 (2026-04-28)**: `06_smolvla_finetune_feasibility.md` 작성 완료. **결론 요약**:
+  - **환경**: Python 3.12.3 (시스템) + venv (conda 미설치, 본 프로젝트는 venv 가 효율적), PyTorch 는 CUDA 13 호환 wheel TODO-08 에서 검증
+  - **학습 비용 (200k step 기준)**: 40~110 시간 (GB10 throughput 미확정, 보수적 범위). UMA 121 GiB pool 로 S1/S3 모두 여유, S4 도 batch 조정 시 가능
+  - **체크포인트**: ~2.7 GB/checkpoint, 200k step 학습 시 약 27 GB (디스크 3.3 TB 대비 충분)
+  - **04 권장**: smolvla.mdx 공식 예시 그대로 (`batch_size=64, steps=20000, S1`)
+  - **06 권장**: 1차 S1 50k step → 부족 시 S3 + LR 절반 → 부족 시 LoRA. 도메인 시프트가 04 보다 커서 step 더 길게.
 
 ### [ ] TODO-07: 결정사항 — Walking RL 과 병렬학습 가능 여부
 
