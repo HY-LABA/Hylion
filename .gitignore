@@ -216,3 +216,19 @@ Legacy/
 .wav
 *no_pr*
 WORKLOG*
+
+# OS auto-generated
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# smolVLA capture artifacts (test outputs, not source)
+cam*.jpg
+cam*.png
+*.mp4
+
+# Secrets / keys (defense-in-depth, beyond .env above)
+*.key
+*.pem
+*.p12
+*.pfx
