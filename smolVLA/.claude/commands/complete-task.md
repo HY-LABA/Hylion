@@ -17,8 +17,8 @@ Copilot이 업데이트한 current_task.md를 읽고 spec에 반영한 뒤 histo
 4. 현재 날짜+시간을 확인한다. `date +%Y%m%d_%H%M`
 
 5. 개발자에게 Orin 배포 여부를 묻는다:
-   - "Orin에 배포할까요? (`bash deploy_orin.sh` 실행)" 라고 물어본다.
-   - OK가 나오면 `bash /home/babogaeguri/ros2_ws/src/LABA5_Bootcamp/smolVLA/deploy_orin.sh` 를 실행한다.
+   - "Orin에 배포할까요? (`bash smolVLA/scripts/deploy_orin.sh` 실행)" 라고 물어본다.
+   - OK가 나오면 Hylion 레포 루트에서 `bash smolVLA/scripts/deploy_orin.sh` 를 실행한다.
    - 거절하면 배포 없이 다음 단계로 진행한다.
 
 6. `docs/work_flow/context/current_task.md` 하단에 배포 결과를 추가한다:

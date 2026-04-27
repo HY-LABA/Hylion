@@ -50,7 +50,7 @@ conda env 방식은 폐기. `setup_env.sh`가 생성하는 venv를 사용.
 3. **GPU 스택 추가 설정**: `nvidia-container-toolkit`, 호스트 라이브러리 bind mount 경로 불일치 위험
 4. **lerobot editable 충돌**: `pip install -e` editable 설치 + 컨테이너 재시작 루프로 개발 속도 저하
 5. **디스크/메모리 비용**: `l4t-pytorch` 이미지 10–20GB, Unified Memory 환경에서 추론 지연 영향
-6. **배포 스크립트 충돌**: `deploy_orin.sh`는 rsync 구조 → 컨테이너 전환 시 이미지 빌드/푸시/풀로 재설계 필요
+6. **배포 스크립트 충돌**: `scripts/deploy_orin.sh`는 rsync 구조 → 컨테이너 전환 시 이미지 빌드/푸시/풀로 재설계 필요
 
 추가로 **NVIDIA가 2026-03부터 Jetson용 standalone iGPU 컨테이너 생산 중단** 발표. 현 시점에 컨테이너 경로 전환은 수명이 짧은 선택.
 
