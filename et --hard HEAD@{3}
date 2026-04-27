@@ -1,0 +1,36 @@
+[33mcda29e3[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mε1[m[33m, [m[1;31morigin/ε1[m[33m)[m HEAD@{0}: commit: EXCEPT WORKLOG 2
+[33mbd3988c[m HEAD@{1}: commit (merge): Merge origin/main into ε1 and resolve conflicts
+[33mbe6e6ee[m HEAD@{2}: reset: moving to HEAD
+[33mbe6e6ee[m HEAD@{3}: commit: gitignore updated
+[33mb34082a[m HEAD@{4}: commit: tts_clova
+[33m802b518[m HEAD@{5}: pull: Fast-forward
+[33m658b684[m HEAD@{6}: commit: real_voice
+[33mb650ebb[m HEAD@{7}: pull: Fast-forward
+[33m024191b[m HEAD@{8}: pull: Fast-forward
+[33m62e93ac[m HEAD@{9}: commit: delete_env
+[33m8cc3c77[m HEAD@{10}: commit: wakeword_v5
+[33m44f0fe1[m HEAD@{11}: commit: wakeword_v4
+[33m87e0f84[m HEAD@{12}: commit: wakeword_v3
+[33m7655a46[m HEAD@{13}: commit: wakeword_v2
+[33mc1ad000[m HEAD@{14}: commit: wakeword_2026.04.23
+[33me658cd9[m HEAD@{15}: commit: always_answer
+[33m7b51659[m HEAD@{16}: pull: Fast-forward
+[33m689fa71[m HEAD@{17}: commit: Record chat lip-sync push
+[33m3653953[m HEAD@{18}: commit: Add chat lip-sync speaker flow
+[33m127fe5c[m HEAD@{19}: pull: Fast-forward
+[33m22f4449[m HEAD@{20}: pull --tags origin ε1: Fast-forward
+[33m969ce62[m HEAD@{21}: commit: workload_updated
+[33m3970282[m HEAD@{22}: commit: Refactor Groq pipeline with dynamic schema and 3-stage fallback
+[33mde8041c[m HEAD@{23}: pull origin ε1: Fast-forward
+[33me8a181e[m HEAD@{24}: commit: Phase2 step updates: VAD/STT + handoff workflow
+[33m7de5236[m HEAD@{25}: pull --tags origin ε1: Fast-forward
+[33m48cfc27[m HEAD@{26}: pull origin ε1: Fast-forward
+[33mef2166d[m HEAD@{27}: pull --tags origin ε1: Fast-forward
+[33me9bde6c[m HEAD@{28}: pull --tags origin ε1: Fast-forward
+[33md94defa[m HEAD@{29}: commit: Phase0-1 complete, Phase2-2 recording + docs update
+[33m863e01c[m HEAD@{30}: commit: move files
+[33m6eb111d[m HEAD@{31}: commit: Add latest documentation updates
+[33m4e663e5[m[33m ([m[1;32mmain[m[33m)[m HEAD@{32}: checkout: moving from main to ε1
+[33m4e663e5[m[33m ([m[1;32mmain[m[33m)[m HEAD@{33}: commit: add docs
+[33m878f090[m[33m ([m[1;31morigin/BG[m[33m)[m HEAD@{34}: commit: Setting
+[33m44ca3ba[m HEAD@{35}: clone: from https://github.com/HY-LABA/Hylion.git
