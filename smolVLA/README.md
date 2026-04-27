@@ -32,16 +32,25 @@ smolVLA/
 │   │   ├── specs/                       # 에이전트 간 인계 스펙 (NN_*.md)
 │   │   │   ├── README.md
 │   │   │   ├── 00_template.md           # 스펙 파일 템플릿
-│   │   │   ├── 01_teleoptest.md         # (예시) 현재 진행 중인 스펙
-│   │   │   └── history/                 # 완료된 스펙 보관
+│   │   │   ├── BACKLOG.md               # 누적 백로그 (각 스펙의 Backlog 통합)
+│   │   │   ├── 02_dgx_setting.md        # (예시) 현재 진행 중인 스펙
+│   │   │   └── history/                 # 완료된 스펙 보관 (예: 01_teleoptest.md)
 │   │   └── context/                     # 현재 작업 컨텍스트 및 히스토리
 │   │       ├── current_task.md          # 현재 진행 중인 작업 상태
 │   │       ├── current_test.md          # 현재 테스트 상태
 │   │       └── history/                 # 완료된 task/test 히스토리
-│   ├── lerobot_study/                   # lerobot 코드 구조 분석 문서
+│   ├── lerobot_study/                   # lerobot/SmolVLA 학습 노트 (마일스톤 순서 prefix)
+│   │   ├── 00_lerobot_repo_overview.md
+│   │   ├── 01_lerobot_root_structure.md
+│   │   ├── 02_lerobot_src_structure.md
+│   │   ├── 03_smolvla_architecture.md           # TODO-03: SmolVLA 구조 + config 분기
+│   │   ├── 03b_smolvla_milestone_config_guide.md # TODO-03 보조: 마일스톤별 분기 가이드
+│   │   ├── 04_lerobot_dataset_structure.md      # TODO-04: 데이터셋 구조
+│   │   └── 05_hf_model_selection.md             # TODO-05: HF 모델 선택
 │   ├── reference/                       # 외부 참조 문서 + 읽기 전용 서브모듈
 │   │   ├── lerobot/                     # HuggingFace lerobot upstream submodule
 │   │   ├── reComputer-Jetson-for-Beginners/ # Seeed Jetson beginner reference submodule
+│   │   ├── seeed-lerobot/               # Seeed lerobot fork submodule
 │   │   ├── nvidia_official/             # NVIDIA PyTorch on Jetson 설치 공식 문서 (md+pdf)
 │   │   ├── seeedwiki/                   # Seeed Wiki 문서 한국어 번역 보관
 │   │   │   └── seeedwiki_so101.md       # SO-ARM100/101 + LeRobot 튜토리얼 번역
@@ -173,7 +182,7 @@ source ~/smolvla/.venv/bin/activate
 | `docs/reference/seeed-lerobot/` | Seeed lerobot fork submodule (수정 금지) |
 | `docs/reference/nvidia_official/` | NVIDIA PyTorch on Jetson 설치 공식 문서 (수정 금지) |
 | `docs/reference/seeedwiki/` | Seeed SO-101 위키 참조 문서 (수정 금지) |
-| `docs/lerobot_study/` | lerobot 코드 구조 분석 노트 (`lerobot_repo_overview`, `lerobot_root_structure`, `lerobot_src_structure`) |
+| `docs/lerobot_study/` | lerobot/SmolVLA 학습 노트 — 마일스톤 순서 prefix (`00_*`~`02_*` 사전 학습, `03_*`~`05_*` 학습 TODO 산출물, `03b_*` 는 동일 마일스톤 보조 문서) |
 | `docs/storage/` | 환경/장비 실측 기록 문서 |
 | `orin/` | Orin 배포 패키지 — curated lerobot + 예제 + 설치 스크립트 |
 
