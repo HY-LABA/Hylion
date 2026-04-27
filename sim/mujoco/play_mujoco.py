@@ -38,6 +38,7 @@ import numpy as np
 REPO_ROOT    = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
 DEFAULT_CKPT = os.path.join(REPO_ROOT, "checkpoints/biped/stage_d5_hylion_v6/best.pt")
 DEFAULT_URDF = os.path.join(REPO_ROOT, "sim/isaaclab/robot/hylion_v6.urdf")
+DEFAULT_MJCF = os.path.join(REPO_ROOT, "sim/isaaclab/robot/hylion_v6.xml")
 
 # IsaacLab env_cfg.py 기준 다리 joint 순서
 LEG_JOINTS = [
@@ -84,6 +85,24 @@ ACTION_SCALE = 0.25   # JointPositionActionCfg scale
 CONTROL_HZ   = 25
 SIM_DT       = 1.0 / 200.0
 N_SUBSTEPS   = 8      # decimation
+
+
+def build_mjcf_model(mjcf_path: str, effort_limit: float = DEFAULT_EFFORT_LIMIT):
+    """Hylion v6 MJCF (.xml) → MuJoCo model 직접 로드.
+    URDF 패칭 없이 네이티브 MuJoCo XML 로드.
+    """
+    try:
+        import mujoco
+    except ImportError:
+        raise ImportError("pip install mujoco")
+
+    model = mujoco.MjModel.from_xml_path(mjcf_path)
+    # effort_limit CLI 인자로 ctrlrange 오버라이드
+    for i in range(model.nu):
+        model.actuator_ctrlrange[i, 0] = -effort_limit
+        model.actuator_ctrlrange[i, 1] =  effort_limit
+    data = mujoco.MjData(model)
+    return model, data
 
 
 def build_mujoco_model(urdf_path: str, effort_limit: float = DEFAULT_EFFORT_LIMIT):
@@ -261,9 +280,13 @@ def run(args):
     kd           = args.kd
     effort_limit = args.effort_limit
 
-    # ── 모델 로드 ──
-    print(f"[SIM2SIM] Loading Hylion v6 URDF: {args.urdf}")
-    model, data = build_mujoco_model(args.urdf, effort_limit=effort_limit)
+    # ── 모델 로드 (MJCF 우선, 없으면 URDF) ──
+    if args.mjcf and os.path.isfile(args.mjcf):
+        print(f"[SIM2SIM] Loading Hylion v6 MJCF: {args.mjcf}")
+        model, data = build_mjcf_model(args.mjcf, effort_limit=effort_limit)
+    else:
+        print(f"[SIM2SIM] Loading Hylion v6 URDF: {args.urdf}")
+        model, data = build_mujoco_model(args.urdf, effort_limit=effort_limit)
     model.opt.timestep = SIM_DT
     print(f"[SIM2SIM] nq={model.nq}, nv={model.nv}, nu={model.nu}")
 
@@ -426,6 +449,8 @@ if __name__ == "__main__":
     # 경로
     parser.add_argument("--ckpt",         type=str,   default=DEFAULT_CKPT)
     parser.add_argument("--urdf",         type=str,   default=DEFAULT_URDF)
+    parser.add_argument("--mjcf",         type=str,   default=DEFAULT_MJCF,
+                        help="MJCF .xml 경로 (지정시 URDF 대신 사용)")
     # 속도 명령
     parser.add_argument("--vx",           type=float, default=0.0)
     parser.add_argument("--vy",           type=float, default=0.0)
