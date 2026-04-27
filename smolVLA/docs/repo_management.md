@@ -73,25 +73,41 @@ main                       smolVLA/ 폴더만 미러
 
 ### 3-2) Hylion/BG → LABA5_Bootcamp/main (smolVLA/ 폴더 단방향 백업)
 
-전용 스크립트 `smolVLA/scripts/sync_to_laba5.ps1` 로 한 번에 처리한다.
+전용 스크립트로 한 번에 처리한다. OS 별로 두 버전이 있고 동작은 동일하다.
 
-**기본 사용:**
+**Linux / macOS (개발용 컴퓨터, 우분투):**
+```bash
+# Hylion 루트에서 실행
+bash smolVLA/scripts/sync_to_laba5.sh
+
+# 옵션
+bash smolVLA/scripts/sync_to_laba5.sh --dry-run                  # 미리보기
+bash smolVLA/scripts/sync_to_laba5.sh --no-push                  # commit 만
+bash smolVLA/scripts/sync_to_laba5.sh --laba5 /path/to/LABA5     # 경로 지정 (기본 ~/LABA5_Bootcamp)
+```
+
+**Windows (정리용 컴퓨터):**
 ```powershell
 # Hylion 루트에서 실행
 pwsh smolVLA/scripts/sync_to_laba5.ps1
+
+# 옵션
+pwsh smolVLA/scripts/sync_to_laba5.ps1 -DryRun                   # 미리보기
+pwsh smolVLA/scripts/sync_to_laba5.ps1 -NoPush                   # commit 만
+pwsh smolVLA/scripts/sync_to_laba5.ps1 -Laba5Path 'C:\path\LABA5_Bootcamp'
 ```
 
-**옵션:**
-```powershell
-pwsh smolVLA/scripts/sync_to_laba5.ps1 -DryRun     # 미리보기 (실제 변경 없음)
-pwsh smolVLA/scripts/sync_to_laba5.ps1 -NoPush     # commit 만, push 안 함
-```
-
-**스크립트가 하는 일:**
-1. `Hylion/smolVLA/` → `LABA5_Bootcamp/smolVLA/` robocopy `/MIR` (거울 동기화)
+**스크립트가 하는 일 (양쪽 동일):**
+1. `Hylion/smolVLA/` → `LABA5_Bootcamp/smolVLA/` 미러 동기화
+   - Linux: `rsync -a --delete`
+   - Windows: `robocopy /MIR`
 2. submodule 폴더 제외: `lerobot`, `seeed-lerobot`, `reComputer-Jetson-for-Beginners`
 3. 위생 폴더 제외: `.git`, `.venv`, `__pycache__`, 캐시 디렉토리
 4. LABA5 측에서 `git add smolVLA/ && git commit && git push`
+
+**LABA5_Bootcamp 기본 위치:**
+- Linux: `~/LABA5_Bootcamp`
+- Windows: `C:\Users\<user>\Desktop\LABA5_Bootcamp` (Hylion 옆 디렉토리)
 
 **원칙 (단방향):**
 - LABA5 → Hylion 방향 sync 는 **하지 않는다.** 진짜 작업물은 항상 Hylion/BG 가 정답.

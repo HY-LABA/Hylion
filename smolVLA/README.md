@@ -14,7 +14,8 @@ smolVLA/
 ├── dev-connect.sh                       # VS Code Remote SSH로 Orin/DGX 동시 연결
 ├── deploy_orin.sh                       # devPC → Orin rsync 배포
 ├── scripts/                             # devPC 측 운영 스크립트
-│   └── sync_to_laba5.ps1                # Hylion/BG smolVLA → LABA5_Bootcamp 단방향 백업
+│   ├── sync_to_laba5.sh                 # Hylion/BG smolVLA → LABA5_Bootcamp 백업 (Linux/macOS)
+│   └── sync_to_laba5.ps1                # 같은 기능 (Windows)
 ├── .codex                               # Codex 설정
 ├── .github/
 │   └── copilot-instructions.md         # GitHub Copilot 컨텍스트
@@ -159,7 +160,8 @@ source ~/smolvla/.venv/bin/activate
 | `arm_2week_plan.md` | 2주 실행 계획, 마일스톤 |
 | `agent_plan.md` | agent 작업 계획 |
 | `deploy_orin.sh` | orin/ → Orin rsync (devPC에서 실행) |
-| `scripts/sync_to_laba5.ps1` | Hylion/BG smolVLA → LABA5_Bootcamp 단방향 백업 (devPC에서 실행) |
+| `scripts/sync_to_laba5.sh` | Hylion/BG smolVLA → LABA5_Bootcamp 단방향 백업 (Linux/macOS, 우분투) |
+| `scripts/sync_to_laba5.ps1` | 같은 기능 (Windows) |
 | `docs/repo_management.md` | Hylion 레포 운영 + 두 컴퓨터 동기화 + 메인 머지 흐름 + LABA5 단방향 백업 |
 | `docs/work_flow/` | 업무 과정 전체 기록 — specs + context 통합 관리 |
 | `docs/work_flow/specs/` | 에이전트 간 인계 스펙 (`NN_*.md`) — `/handoff-*`가 읽고, `/complete-*`가 결과 반영 |
