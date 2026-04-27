@@ -208,3 +208,11 @@ sim/isaaclab/usd/config.yaml
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+# Ignore all Legacy folders and their contents
+Legacy/
+
+.mp3
+.wav
+*no_pr*
+WORKLOG*
