@@ -1,0 +1,114 @@
+### HOST
+spark-8434
+2026-04-27 23:45:42 KST
+DEVICE_TYPE: dgx_spark
+
+### OS / Kernel / Hostname / Arch
+Linux spark-8434 6.17.0-1014-nvidia #14-Ubuntu SMP PREEMPT_DYNAMIC Tue Mar 17 19:01:40 UTC 2026 aarch64 aarch64 aarch64 GNU/Linux
+Distributor ID:	Ubuntu
+Description:	Ubuntu 24.04.4 LTS
+Release:	24.04
+Codename:	noble
+
+### CPU
+CPU(s):                                  20
+Model name:                              Cortex-X925
+CPU(s) scaling MHz:                      100%
+Model name:                              Cortex-A725
+CPU(s) scaling MHz:                      100%
+
+### Memory
+               total        used        free      shared  buff/cache   available
+Mem:           121Gi        31Gi        60Gi       128Mi        30Gi        90Gi
+Swap:             0B          0B          0B
+
+### GPU Query
+NVIDIA GB10, [N/A], 580.142
+
+### GPU (nvidia-smi)
+Mon Apr 27 23:45:42 2026
++-----------------------------------------------------------------------------------------+
+| NVIDIA-SMI 580.142                Driver Version: 580.142        CUDA Version: 13.0     |
++-----------------------------------------+------------------------+----------------------+
+| GPU  Name                 Persistence-M | Bus-Id          Disp.A | Volatile Uncorr. ECC |
+| Fan  Temp   Perf          Pwr:Usage/Cap |           Memory-Usage | GPU-Util  Compute M. |
+|                                         |                        |               MIG M. |
+|=========================================+========================+======================|
+|   0  NVIDIA GB10                    On  |   0000000F:01:00.0  On |                  N/A |
+| N/A   37C    P0              6W /  N/A  | Not Supported          |      0%      Default |
+|                                         |                        |                  N/A |
++-----------------------------------------+------------------------+----------------------+
+
++-----------------------------------------------------------------------------------------+
+| Processes:                                                                              |
+|  GPU   GI   CI              PID   Type   Process name                        GPU Memory |
+|        ID   ID                                                               Usage      |
+|=========================================================================================|
+|    0   N/A  N/A          849322      G   /usr/lib/xorg/Xorg                      112MiB |
+|    0   N/A  N/A          849497      G   /usr/bin/gnome-shell                    159MiB |
+|    0   N/A  N/A         1191774      G   .../8105/usr/lib/firefox/firefox        258MiB |
+|    0   N/A  N/A         2814697      C   ...Intelligence/.venv/bin/python       8525MiB |
+|    0   N/A  N/A         2979278      C   ...Intelligence/.venv/bin/python       4413MiB |
++-----------------------------------------------------------------------------------------+
+
+### CUDA SDK / nvcc
+nvcc: NVIDIA (R) Cuda compiler driver
+Copyright (c) 2005-2025 NVIDIA Corporation
+Built on Wed_Aug_20_01:57:39_PM_PDT_2025
+Cuda compilation tools, release 13.0, V13.0.88
+Build cuda_13.0.r13.0/compiler.36424714_0
+/usr/local/cuda/bin/nvcc
+
+### cuDNN
+not found
+
+### TensorRT
+not found
+
+### Python
+Python 3.12.3
+/usr/bin/python3
+
+### pip
+pip 24.0 from /usr/lib/python3/dist-packages/pip (python 3.12)
+
+### venv / conda
+venv ok
+conda not found
+
+### Docker
+Docker version 29.1.3, build f52814d
+
+### NVIDIA Container Toolkit
+NVIDIA Container Toolkit CLI version 1.19.0
+commit: ec7b4e2fa2caecad6d89be4a26029b831fe7503a
+
+### Disk
+Filesystem      Size  Used Avail Use% Mounted on
+tmpfs            13G  9.4M   13G   1% /run
+efivarfs        256K   21K  236K   8% /sys/firmware/efi/efivars
+/dev/nvme0n1p2  3.7T  228G  3.3T   7% /
+tmpfs            61G   20K   61G   1% /dev/shm
+tmpfs           5.0M  8.0K  5.0M   1% /run/lock
+/dev/nvme0n1p1  298M  6.4M  292M   3% /boot/efi
+tmpfs            13G  2.6M   13G   1% /run/user/1000
+
+### Block Devices
+sda             0B disk
+sdb             0B disk
+nvme0n1       3.7T disk
+|-nvme0n1p1   298M part /boot/efi
+`-nvme0n1p2   3.7T part /
+
+### Network
+inet 127.0.0.1/8 scope host lo
+inet 192.168.0.7/24 brd 192.168.0.255 scope global dynamic noprefixroute enP7s7
+inet 172.16.136.60/24 brd 172.16.136.255 scope global dynamic noprefixroute wlP9s9
+inet 172.17.0.1/16 brd 172.17.255.255 scope global docker0
+inet 100.121.174.9/32 scope global tailscale0
+
+### Running Services
+ollama.service loaded active running Ollama Service
+
+### Additional Check
+System python3 torch import: torch not found in system python3

@@ -42,7 +42,7 @@
 
 ## 4) DGX Spark 실측
 
-> 스냅샷: `smolVLA/docs/storage/devices_snapshot/dgx_spark_env_snapshot_2026-04-22_0043.txt`
+> 스냅샷: `smolVLA/docs/storage/devices_snapshot/dgx_spark_env_snapshot_2026-04-27_2342.txt`
 
 | 항목 | 실측값 | 비고 |
 |---|---|---|
@@ -50,11 +50,11 @@
 | OS | `Ubuntu 24.04.4 LTS` | |
 | 커널 | `6.17.0-1014-nvidia` | |
 | CPU | `aarch64` 20코어 | NUMA 1노드, Max 3900 / 2808 MHz (클러스터별) |
-| 메모리 | `121Gi` | 가용 약 110Gi (스냅샷 시점) |
+| 메모리 | 공식 `128 GB LPDDR5x`, Linux 실측 `121Gi` | UMA/coherent unified system memory. 스냅샷 시점 `MemAvailable` 약 90Gi, swap `0B` |
 | GPU 모델 | `NVIDIA GB10` | Grace Blackwell |
-| GPU 메모리 | Unified Memory | nvidia-smi에서 별도 VRAM 값 미제공 |
+| GPU 메모리 | 전용 VRAM 없음 | CPU/GPU가 동일 LPDDR5x 메모리 풀 공유. `nvidia-smi` VRAM 총량은 `[N/A]`/`Not Supported`가 정상 |
 | GPU 드라이버 | `580.142` | CUDA 13.0 지원 |
-| 저장장치 | NVMe `3.7T` | SAMSUNG MZALC4T0HBL1-00B07, 사용 215G / 3.7T |
+| 저장장치 | NVMe `3.7T` | 루트(`/`) 사용 228G / 가용 3.3T, 외장 SSD 미마운트 |
 
 ---
 

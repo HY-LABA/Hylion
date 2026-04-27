@@ -1,7 +1,7 @@
 # smolVLA 소프트웨어 현황 (현재 설정/실측)
 
 > 작성일: 2026-04-21  
-> 업데이트: 2026-04-23
+> 업데이트: 2026-04-27
 > 목적: 실제 설정된 소프트웨어 환경 값을 기록
 
 ## 1) 기본 개발 환경
@@ -67,26 +67,36 @@ JetPack 판별 근거:
 
 ## 5) DGX Spark 실측 소프트웨어 정보
 
-- 스냅샷 파일: `smolVLA/docs/storage/devices_snapshot/dgx_spark_env_snapshot_2026-04-22_0043.txt`
+- 스냅샷 파일: `smolVLA/docs/storage/devices_snapshot/dgx_spark_env_snapshot_2026-04-27_2342.txt`
 - OS: `Ubuntu 24.04.4 LTS`
 - 커널: `6.17.0-1014-nvidia`
 - CUDA:
-  - `nvcc`: PATH에 미탐지 (패키지로 설치됨, SDK `13.0.2`)
+  - `nvcc`: PATH 등록 및 동작 확인 (`Cuda compilation tools, release 13.0, V13.0.88`, `/usr/local/cuda/bin/nvcc`)
+  - `nvidia-smi` CUDA 표시: `13.0`
   - GPU 드라이버: `580.142`
 - cuDNN: 미탐지 (별도 설치 필요)
 - TensorRT: 미탐지 (별도 설치 필요)
-- PyTorch: 미설치
-- Python: `3.12.3` (pip3 미탐지)
+- PyTorch: 시스템 `python3` 기준 미설치
+- Python: `3.12.3`
+- pip: `24.0` (`/usr/lib/python3/dist-packages/pip`, Python 3.12)
+- venv: 사용 가능
 - conda: 미설치
-- Docker: 미탐지
+- Docker: 설치됨 (`29.1.3`)
+- NVIDIA Container Toolkit: 설치됨 (`1.19.0`)
 - ROS2: 미설치
-- 특이사항: 포트 `11434` 리슨 중 (Ollama 실행 중인 것으로 추정)
+- 특이사항:
+  - `ollama.service` 실행 중
+  - DGX Spark는 CPU와 integrated Blackwell GPU가 동일 LPDDR5x 풀을 공유하는 UMA 구조. GPU 전용 VRAM으로 기록하지 않음.
+  - 공식 메모리 사양은 `128 GB LPDDR5x unified system memory`; Linux 실측은 `121Gi`, 스냅샷 시점 `MemAvailable` 약 `90Gi`, swap `0B`.
+  - `nvidia-smi`에서 GPU 메모리 총량은 `[N/A]`, 상세 메모리 사용량은 `Not Supported`로 표시되며 UMA/iGPU 구조의 정상 표시로 취급.
+  - GPU 워크로드 가용 메모리 추정은 VRAM 총량이 아니라 OS `MemAvailable + SwapFree` 기준으로 기록.
 
 ## 6) 추가 확인 필요 항목
 
 - [x] Orin 시스템 소프트웨어 재검증 완료 (2026-04-23)
   - `nvcc -V` 정상 출력 (`release 12.6, V12.6.68`)
   - `ffmpeg` 설치 완료 (`4.4.2-0ubuntu0.22.04.1`)
-- [ ] DGX cuDNN / TensorRT 설치 필요 여부 확인
+- [x] DGX cuDNN / TensorRT 설치 상태 확인 (2026-04-27)
+  - `dpkg -l` 기준 cuDNN/TensorRT 모두 미탐지. TODO-06/07/08 진행 전 설치 필요 여부 결정 필요.
 - [ ] 학습 PC(DGX)와 Orin 간 모델 반입/실행 절차 확정
 - [ ] 외장 SSD 사용 시 데이터셋/체크포인트 경로 확정

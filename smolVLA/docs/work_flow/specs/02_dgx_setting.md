@@ -39,7 +39,7 @@
 - 제약: 4단계 새 레포 이관과 동일한 절차 적용
 - **완료**: 이관 완료 상태로 본 스펙 작성 시점에 확정. 현재 `c:\Users\admin\Desktop\Hylion\smolVLA` 레포가 신규 HYlion 레포 기준이며 Orin 측 `~/smolvla/` 도 동일 기준으로 운영 중.
 
-### [ ] TODO-02: DGX Spark 실측 재진행
+### [x] TODO-02: DGX Spark 실측 재진행
 
 - 타입: test
 - DOD: DGX Spark의 하드웨어/소프트웨어 실측값이 최신화되어 `docs/storage/03_software.md` (그리고 필요 시 `docs/storage/02_hardware.md`) 에 반영됨. 학습 환경 세팅(TODO-08)에 필요한 모든 정보(GPU 메모리, CUDA/cuDNN/TensorRT 상태, Python·pip 상태, 디스크 가용량, 외장 SSD 여부) 가 명확화됨.
@@ -59,6 +59,7 @@
 - 잔여 리스크:
   - 직전 스냅샷 시점 대비 IP 변경 가능성 → `~/.ssh/config` HostName 갱신 필요할 수 있음
   - cuDNN / TensorRT 미설치 상태 → TODO-08 (학습 환경 세팅) 에서 설치 결정 필요
+- **완료 (20260427_2355)**: 20단계 전 PASS. 주요 실측값: Ubuntu 24.04.4 / aarch64, CPU Cortex-X925+A725 20코어, RAM 121Gi (90Gi 가용), GPU NVIDIA GB10 UMA(VRAM N/A), 드라이버 580.142 / CUDA 13.0, Python 3.12.3, pip 24.0, venv 가용(conda 없음), Docker 29.1.3, NVIDIA Container Toolkit 1.19.0, 디스크 3.3T 가용, 외장 SSD 없음, Ollama 서비스 실행 중. cuDNN / TensorRT 미설치. 스냅샷: `docs/storage/devices_snapshot/dgx_spark_env_snapshot_2026-04-27_2342.txt` 저장. `03_software.md` · `02_hardware.md` DGX 섹션 업데이트 완료.
 
 > **학습 TODO 산출물 위치 공통 규칙**: 모든 학습(`타입: study`) TODO 의 산출물은 `docs/lerobot_study/` 하위에 마크다운 문서로 저장하며, 마일스톤 순서대로 prefix 라벨링한다 (예: `03_*`, `04_*`, `05_*`, `06_*`. 동일 마일스톤 내 보조 문서는 `03b_*` 처럼 알파벳 첨자 부여). 기존 문서(`00_lerobot_repo_overview.md`, `01_lerobot_root_structure.md`, `02_lerobot_src_structure.md`) 와 일관된 톤·구조를 유지한다. 본 스펙에는 결론 요약과 문서 경로만 기록한다.
 
@@ -203,12 +204,4 @@
 
 ---
 
-## Backlog
-
-> 스펙 진행 중 발견된 추후 개발 과제. 현재 워크플로우를 블로킹하지 않으나 향후 대응 필요.
-
-| # | 항목 | 발견 출처 | 우선순위 |
-|---|------|-----------|----------|
-| 1 | DGX Spark 학교 통신처 DHCP 예약 (MAC 제출) — IP 변동 시 SSH 단절 방지 | 04_devnetwork 8/9 | 중간 |
-| 2 | DGX↔Orin 직접 SSH 경로 (현재 devPC 경유 2-hop) — 체크포인트 전송 가속화 | TODO-10 사전 검토 | 낮음 |
-| 3 | 자유도 낮추기 재검토 — 풀 6 DOF 사이클 완주 후 VRAM 부족 / 추론 latency 초과 / 학습 수렴 실패 중 하나가 트리거되면 자유도 축소(gripper binary, wrist_roll 고정 등) 적용 가능성 재평가. 04_leftarmVLA 또는 06_biarm_VLA 진행 중 트리거 발생 시 본 항목 격상. | TODO-11 결론 | 낮음 (트리거 시 높음) |
+> Backlog → [docs/work_flow/specs/BACKLOG.md](BACKLOG.md) 로 이전 (2026-04-27)
