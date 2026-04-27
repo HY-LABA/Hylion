@@ -77,7 +77,7 @@
 - 잔여 리스크: 논문/블로그와 실제 코드 간 차이 가능성 — 코드 우선으로 정리
 - **완료 (2026-04-27)**: 두 문서로 산출물 분리 작성. `03_smolvla_architecture.md` 는 SmolVLA 일반 지식(재사용 가능), `03b_smolvla_milestone_config_guide.md` 는 본 프로젝트 마일스톤 03~07 의 분기 적용 방침. 마일스톤별 분기 변화는 `03b_smolvla_milestone_config_guide.md §3 한눈에 표` 에서 일괄 확인 가능.
 
-### [ ] TODO-04: 데이터셋 구조 학습
+### [x] TODO-04: 데이터셋 구조 학습
 
 - 타입: study
 - DOD: lerobot 데이터셋 포맷(LeRobotDataset 스키마, 에피소드/프레임/타임스탬프/관측·액션 키 규칙, 카메라/state/action shape) 을 본인 언어로 설명 가능한 수준으로 정리. SO-ARM teleop 으로 수집된 데이터가 어떤 키 구조로 저장되는지 식별 완료. 05_biarm_teleop_on_dgx 진입 시 결정해야 할 사항 체크리스트 정리.
