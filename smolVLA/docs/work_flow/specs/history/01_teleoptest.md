@@ -153,21 +153,4 @@
 
 ---
 
-## Backlog
-
-> 스펙 진행 중 발견된 추후 개발 과제. 현재 워크플로우를 블로킹하지 않으나 향후 대응 필요.
-
-| # | 항목 | 발견 출처 | 우선순위 |
-|---|------|-----------|----------|
-| 1 | SO-ARM USB 포트 고정을 위한 udev rule 검토 (`ttyACM*` 번호가 연결 순서에 따라 바뀜) — **20260427 포트 역전 실제 발생으로 우선순위 상향** | TODO-02 / TODO-03a | 높음 |
-| 2 | `lerobot-find-port` 대화형 스크립트 → 비대화형 SSH 실행 지원 방법 확인 | TODO-02 | 낮음 |
-| 3 | `orin/scripts/` 파일구조 재편: 레퍼런스(lerobot upstream·seeed-lerobot)에서 가져와 문법 수정한 스크립트와 신규 작성 스크립트를 디렉터리 또는 네이밍으로 명확히 구분 (예: `adapted/`, `custom/` 또는 접두사 규칙) — Copilot 구현 | TODO-02 | 중간 |
-| 4 | `laba` 사용자를 `dialout` 그룹에 추가 (`sudo usermod -aG dialout laba`) — 완료 (2026-04-26) | TODO-02 prod 검증 | 완료 |
-| 5 | rsync 배포 플로우 명문화 — devPC에서 코드 수정 후 Orin 배포까지의 절차를 `docs/` 또는 스크립트로 정리 (현재 암묵적으로 운영 중) | TODO-02 prod 검증 | 중간 |
-| 6 | `ImportError: cannot import name 'bi_openarm_follower' from 'lerobot.robots'` — 수정 완료 (2026-04-26) | TODO-02 prod 검증 | 완료 |
-| 7 | `lerobot-calibrate`는 `input()` 호출 대화형 스크립트 — 비대화형 SSH에서 EOFError 발생. 실제 calibration은 interactive 터미널(Remote SSH VSCode 또는 직접 접속)에서 실행 필요. 문서화 또는 주석 추가 고려 | TODO-02 prod 검증 | 낮음 |
-| 8 | motor encoder 진단 스크립트 구현 → **TODO-03a로 승격 (2026-04-27)** | TODO-03 prod 검증 | 완료 |
-| 9 | `포트 식별 → 저장 → encoder 진단` 통합 스크립트 개선 — 현재는 `lerobot-find-port` 결과를 수동 복사하여 `diagnose_motor_encoder.py --port`에 입력해야 함. 통합 시 수동 입력 실수 및 포트 역전 위험 감소 | TODO-03a prod 검증 | 낮음 |
-| 10 | follower `id_=3` (elbow_flex 추정) `Torque_Enable` write 실패 간헐 발생 — 최초 teleoperate 시도 시 루프 시작 불가, 재실행으로 복구됨. 원인 미확정 (케이블 접촉 불량, 모터 초기화 타이밍, firmware 이슈 가능성). 재현 조건 및 원인 조사 필요 | TODO-04 prod 검증 | 중간 |
-| 11 | Orin에 `v4l2-ctl` 미설치 — 카메라 장치 포맷·드라이버 확인 불가. `sudo apt install v4l-utils` 로 설치 가능. `setup_env.sh` 또는 설치 문서에 추가 고려 | TODO-05 prod 검증 | 낮음 |
-| 12 | OV5648 카메라 화각·포커스 실측값을 `docs/storage/02_hardware.md`에 반영 필요 — 화각: 수평 FOV 약 53°(68°는 대각), 포커스: Auto Focus(스펙 시트의 Fixed는 오류) | TODO-05 prod 검증 | 중간 |
+> Backlog → [docs/work_flow/specs/BACKLOG.md](../BACKLOG.md) 로 이전 (2026-04-27)
