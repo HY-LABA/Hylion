@@ -10,8 +10,10 @@
 #   baseline     policy 없이 PD만으로 기본자세 유지 (로봇이 서 있을 수 있는지 확인)
 #   diag         진단 출력 포함, 걷기 명령 vx=0.3 (obs/action/torque 매 25스텝 출력)
 #   walk         걷기 명령 vx=0.3, GUI 뷰어 포함
+#   walk_noise   obs 노이즈 + 학습 환경 마찰 중간값 (가장 현실적인 sim-to-sim)
 #   walk_hard    effort_limit=20으로 올려서 걷기 (토크 부족 가설 검증)
 #   walk_arm     armature 적용 + 걷기 (물리 매칭 강화)
+#   walk_full    obs_noise + armature + friction=0.8 (학습 환경 최대 모방)
 #   headless     GUI 없이 headless 실행 (SSH 환경)
 #   custom       아래 CUSTOM_* 변수 직접 수정 후 사용
 # ──────────────────────────────────────────────────────────────────────────────
@@ -90,6 +92,17 @@ case "$MODE" in
       --duration $DURATION
     ;;
 
+  walk_noise)
+    echo "[MODE] WALK_NOISE: obs 노이즈 + 마찰 0.8 (학습 환경 모방)"
+    python3 "$PY" \
+      --ckpt "$CKPT" --mjcf "$MJCF" \
+      --vx $VX --vy $VY --wz $WZ \
+      --kp $KP --kd $KD --effort-limit $EFFORT \
+      --obs-noise --friction 0.8 \
+      --duration $DURATION \
+      --diag 25
+    ;;
+
   walk_hard)
     echo "[MODE] WALK_HARD: effort_limit=20 (토크 부족 가설 검증)"
     python3 "$PY" \
@@ -110,7 +123,16 @@ case "$MODE" in
       --duration $DURATION \
       --diag 25
     ;;
-
+  walk_full)
+    echo "[MODE] WALK_FULL: obs_noise + armature + friction=0.8 (학습 환경 최대 모방)"
+    python3 "$PY" \
+      --ckpt "$CKPT" --mjcf "$MJCF" \
+      --vx $VX --vy $VY --wz $WZ \
+      --kp $KP --kd $KD --effort-limit $EFFORT \
+      --obs-noise --armature --friction 0.8 \
+      --duration $DURATION \
+      --diag 25
+    ;;
   headless)
     echo "[MODE] HEADLESS: GUI 없음 (SSH 환경)"
     python3 "$PY" \
@@ -134,7 +156,7 @@ case "$MODE" in
 
   *)
     echo "[ERROR] 알 수 없는 mode: $MODE"
-    echo "사용 가능한 mode: baseline | diag | walk | walk_hard | walk_arm | headless | custom"
+    echo "사용 가능한 mode: baseline | diag | walk | walk_noise | walk_hard | walk_arm | walk_full | headless | custom"
     exit 1
     ;;
 esac

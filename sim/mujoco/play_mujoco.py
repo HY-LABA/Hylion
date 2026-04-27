@@ -6,13 +6,13 @@
   kp=20, kd=2, effort_limit=6 Nm  (legs & ankles 동일)
   armature: hip/knee=0.007, ankle=0.002  (--armature 플래그로 활성화)
 
-obs 구성 (45-dim):
+obs 구성 (45-dim) — env_cfg.py ObservationsCfg 기준:
   [0:3]   velocity_commands  (vx, vy, wz)
-  [3:6]   base_ang_vel       (body frame)
-  [6:9]   projected_gravity  (body frame)
-  [9:21]  joint_pos_rel      (12 leg joints, default offset 제거)
-  [21:33] joint_vel          (12 leg joints)
-  [33:45] last_action        (12)
+  [3:6]   base_ang_vel       (body frame)  noise: Uniform ±0.3
+  [6:9]   projected_gravity  (body frame)  noise: Uniform ±0.05
+  [9:21]  joint_pos_rel      (12 leg joints, default offset 제거)  noise: Uniform ±0.05
+  [21:33] joint_vel          (12 leg joints)  noise: Uniform ±2.0
+  [33:45] last_action        (12)  noise: 없음
 
 action (12-dim):
   target_pos = default_pos + action * 0.25
@@ -20,11 +20,17 @@ action (12-dim):
 
 Physics:
   sim_dt=1/200 Hz, decimation=8  →  control Hz=25
+  바닥 마찰: static/dynamic 0.4~1.2 (env_cfg.py EventsCfg randomize_rigid_body_material)
+
+Termination (env_cfg.py TerminationsCfg):
+  base 기울기 > 0.78 rad (45°)  ← 학습 환경 기준
 
 주요 CLI 플래그:
   --effort-limit N   토크 한도 (default 6, 테스트: 20)
   --kp / --kd        PD 게인 (default 20 / 2)
   --armature         훈련 config의 armature 적용 (hip/knee=0.007, ankle=0.002)
+  --obs-noise        obs 노이즈 주입 (학습 환경과 동일한 UniformNoise)
+  --friction F       바닥 마찰 고정값 (default 0.8; 학습 범위: 0.4~1.2)
   --zero-action      policy 무시, PD가 default 자세만 유지 (기준선 측정)
   --diag N           N 스텝마다 obs/action/torque 진단 출력
 """
@@ -352,11 +358,28 @@ def run(args):
     print(f"[SIM2SIM] Command: vx={args.vx} vy={args.vy} wz={args.wz}")
     print(f"[SIM2SIM] KP={kp}, KD={kd}, effort_limit={effort_limit} Nm")
     print(f"[SIM2SIM] Control Hz={CONTROL_HZ}, substeps={N_SUBSTEPS}")
+    print(f"[SIM2SIM] obs_noise={'ON' if args.obs_noise else 'OFF'}, friction={args.friction}")
     if args.diag > 0:
         print(f"[SIM2SIM] Diagnostics every {args.diag} steps")
 
+    # ── 바닥 마찰 설정 (env_cfg.py: static/dynamic 0.4~1.2) ──────────────
+    # MJCF/URDF 로드 후 ground geom의 friction을 CLI 값으로 설정
+    import mujoco as _mj
+    gnd_id = _mj.mj_name2id(model, _mj.mjtObj.mjOBJ_GEOM, "ground")
+    if gnd_id >= 0:
+        model.geom_friction[gnd_id, 0] = args.friction   # sliding
+        model.geom_friction[gnd_id, 1] = args.friction * 0.1  # torsional
+        model.geom_friction[gnd_id, 2] = args.friction * 0.1  # rolling
+        print(f"[SIM2SIM] Ground friction set to {args.friction:.2f}")
+
     last_action = np.zeros(12, dtype=np.float32)
     total_steps = int(args.duration * CONTROL_HZ)
+
+    # ── obs 노이즈 (env_cfg.py ObservationsCfg UniformNoiseCfg 기준) ──────
+    # 학습 시 policy는 이 노이즈가 있는 obs를 받았으므로 sim-to-sim도 동일하게
+    rng = np.random.default_rng(seed=42)
+    def _uniform(lo, hi, size):
+        return rng.uniform(lo, hi, size).astype(np.float32) if args.obs_noise else np.zeros(size, np.float32)
 
     # 진단용 roll/pitch 계산 (body x/y 축의 중력 투영)
     def _pitch_deg(quat_wxyz):
@@ -371,10 +394,12 @@ def run(args):
             [  2*(x*y+w*z), 1-2*(x*x+z*z),   2*(y*z-w*x)],
             [  2*(x*z-w*y),   2*(y*z+w*x), 1-2*(x*x+y*y)],
         ], dtype=np.float32)
-        o_angvel = R.T @ data.qvel[3:6].astype(np.float32)
-        o_grav   = projected_gravity_vec(quat_wxyz)
-        o_qpos   = np.array([data.qpos[qi] for qi in qpos_ids], dtype=np.float32) - DEFAULT_JOINT_POS
-        o_qvel   = np.array([data.qvel[vi] for vi in qvel_ids], dtype=np.float32)
+        o_angvel = R.T @ data.qvel[3:6].astype(np.float32) + _uniform(-0.3,  0.3,  3)  # env_cfg noise
+        o_grav   = projected_gravity_vec(quat_wxyz)         + _uniform(-0.05, 0.05, 3)  # env_cfg noise
+        o_qpos   = np.array([data.qpos[qi] for qi in qpos_ids], dtype=np.float32) - DEFAULT_JOINT_POS \
+                   + _uniform(-0.05, 0.05, 12)  # env_cfg noise
+        o_qvel   = np.array([data.qvel[vi] for vi in qvel_ids], dtype=np.float32) \
+                   + _uniform(-2.0,  2.0,  12)  # env_cfg noise
         return np.concatenate([cmd, o_angvel, o_grav, o_qpos, o_qvel, last_action]).astype(np.float32)
 
     print(f"[SIM2SIM] Running {total_steps} steps ({args.duration}s) ...")
@@ -410,6 +435,15 @@ def run(args):
                 viewer.sync()
 
             hip_z = data.xpos[hip_bid, 2]
+
+            # ── Termination: IsaacLab env_cfg.py TerminationsCfg 기준 ────
+            # bad_orientation: base 기울기 > 0.78 rad (45°)
+            quat_wxyz = data.qpos[3:7].astype(np.float32)
+            grav_body = projected_gravity_vec(quat_wxyz)   # (0,0,-1) in world → body
+            tilt = float(np.arccos(np.clip(-grav_body[2], -1.0, 1.0)))  # 0 = upright
+            if tilt > 0.78:
+                print(f"[SIM2SIM] TILT at step {step} (tilt={np.degrees(tilt):.1f}°, threshold=44.7°)")
+                return
 
             if args.diag > 0 and step % args.diag == 0:
                 pitch = _pitch_deg(data.qpos[3:7].astype(np.float32))
@@ -475,6 +509,11 @@ if __name__ == "__main__":
     parser.add_argument("--device",       type=str,   default="cpu")
     parser.add_argument("--no-viewer",    action="store_true", dest="no_viewer",
                         help="Headless mode (no GUI, for SSH)")
+    # 학습 환경 매칭 플래그
+    parser.add_argument("--obs-noise",    action="store_true", dest="obs_noise",
+                        help="IsaacLab 학습 시 적용된 UniformNoise를 obs에 주입 (ang_vel±0.3, grav±0.05, qpos±0.05, qvel±2.0)")
+    parser.add_argument("--friction",     type=float, default=0.8, dest="friction",
+                        help="바닥 마찰 (default 0.8; 학습 환경 범위 0.4~1.2, 낮게: 0.4, 높게: 1.2)")
     args = parser.parse_args()
 
     if not args.zero_action and not os.path.isfile(args.ckpt):
