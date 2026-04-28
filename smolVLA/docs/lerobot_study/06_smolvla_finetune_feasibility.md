@@ -195,17 +195,20 @@ LoRA 사용 시 LR 권장 10× 증가: `--policy.optimizer_lr=1e-3`, `--policy.s
 - 기준: A100 80GB, 20k step, batch_size=64 (smolvla.mdx 예시)
 - 1 step ≈ 0.72 초 (A100 기준)
 
-### 5.2 DGX Spark (GB10) 추정
+### 5.2 DGX Spark (GB10) 실측
 
-GB10 의 정확한 학습 throughput 데이터는 미확보 (NVIDIA 공식 SmolVLA 벤치마크 없음). 보수적 추정:
+TODO-09b smoke test 실측 (2026-04-28, DGX Spark GB10, Walking RL 동시 실행 중, `batch_size=8`, `steps=1`):
 
-| 시나리오 | 1 step 추정 | 20k step 추정 시간 | 200k step 추정 시간 |
-|---|---|---|---|
-| GB10 ≈ A100 동급 (낙관) | 0.7~1.0 초 | 4~6 시간 | 40~55 시간 |
-| GB10 ≈ A100 70% (보수) | 1.0~1.5 초 | 6~8 시간 | 55~80 시간 |
-| GB10 ≈ A100 50% (비관) | 1.5~2.0 초 | 8~12 시간 | 80~110 시간 |
+| 측정 항목 | 값 | 비고 |
+|---|---:|---|
+| lerobot train step | 5.97 초/step | stdout progress 기준 |
+| 전체 smoke 소요 | 48 초 | preflight + dataset/model load + 1 train step 포함 |
+| loss | 0.545 | `log_freq=1` 출력 |
+| GPU util peak | 90% | `nvidia-smi` 1초 샘플링 |
+| GPU mem peak | N/A | GB10 UMA 구조로 `nvidia-smi memory.used/free` 가 `[N/A]` |
+| System RAM used peak | 48226 MiB | `free -m` 1초 샘플링 |
 
-**TODO-09 (학습 환경 세팅) 1 step smoke test 후 정확한 throughput 측정 필요**. 그 결과로 본 표 갱신.
+단일 1-step smoke 값은 모델/데이터셋 로드와 워밍업 영향이 커서 장시간 학습 throughput 을 그대로 대표하지 않는다. 현 smoke 조건(`batch_size=8`, Walking RL 동시 실행) 그대로 단순 환산하면 20k step 약 33시간, 200k step 약 332시간이다. 실제 학습 계획에는 batch size 증가, 캐시 워밍업 이후 평균 step time, Walking RL 자원 점유 변동을 반영해 재측정이 필요하다.
 
 ### 5.3 메모리 추정 (UMA 121 GiB pool)
 

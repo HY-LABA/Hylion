@@ -1,4 +1,5 @@
 #!/bin/bash
+set -e
 # devPC → DGX Spark 배포 스크립트
 # 실행 위치: devPC (어디서든)
 # 사용:    bash smolVLA/scripts/deploy_dgx.sh
@@ -16,6 +17,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 SMOLVLA_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
 echo "[deploy-dgx] dgx/ → ${DGX_HOST}:${DGX_DEST}/dgx/"
+ssh "${DGX_HOST}" "mkdir -p ${DGX_DEST}/dgx ${DGX_DEST}/docs/reference/lerobot"
 rsync -avz --delete \
     --exclude '.arm_finetune' \
     --exclude 'outputs' \

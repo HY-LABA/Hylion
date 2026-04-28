@@ -208,7 +208,7 @@
   - Orin 머신에 이미 배포된 `~/smolvla/.venv` 가 새 위치 `~/smolvla/orin/.hylion_arm` 와 다름 — Orin 재배포 + venv 재생성 필요 (구버전 venv 수동 정리 또는 `rm -rf`)
 - **완료 (2026-04-28)**: 스크립트 7개 + 문서 8개 작성/갱신 완료. `bash -n` syntax check 6개 모두 PASS. 실 실행 검증은 TODO-09b.
 
-### [ ] TODO-09b: 학습 환경 세팅 — DGX prod 검증
+### [x] TODO-09b: 학습 환경 세팅 — DGX prod 검증
 
 - 타입: test
 - DOD: TODO-09 작성 산출물이 DGX 에서 실제 동작함을 확인. setup → preflight → smoke test 순차 PASS, GB10 throughput 실측치 기록.
@@ -240,6 +240,7 @@
   - HF Hub 다운로드가 네트워크 상황에 따라 시간 길어질 수 있음
   - 첫 실행 시 GB10 capability 12.1 UserWarning 출력될 수 있으나 무시 가능 (`05_hf_model_selection.md` §3 / TODO-07 회신 참조)
   - lerobot extras (`smolvla`, `training`) 의 transformers / accelerate / wandb 가 PyTorch 2.10.0+cu130 과 호환 안 될 가능성 — 1 step smoke test 가 그 검증 역할
+- **완료 (2026-04-28)**: 전 단계 PASS (Codex 6 + 개발자 4). 주요 실측: `torch 2.10.0+cu130`, `CUDA: True`, `GPU: NVIDIA GB10`, preflight 전항목 PASS (RAM 76 GiB 가용, Ollama GPU 미점유). smoke_test: `loss 0.545`, `5.97 s/step`, 전체 소요 48초, GPU util peak 90%, RAM used peak 48226 MiB. `06_smolvla_finetune_feasibility.md §5.2` 갱신 완료. 테스트 중 `dgx/scripts/smoke_test.sh` 4건 수정 (venv 활성 순서, output dir 선생성 방지, `push_to_hub=false`, camera `rename_map`). `docs/storage/lerobot_upstream_check/04_dgx_lerobot_diff.md` 신규 작성.
 - **후행 작업 (TODO-09b 완료 후)**: `docs/storage/06_dgx_venv_setting.md` 신규 작성. 형식·범위는 `docs/storage/05_orin_venv_setting.md` 와 대칭으로:
   - DGX 실측 기반 venv 구성 (Python 3.12.3 시스템 / `~/smolvla/dgx/.arm_finetune` / PyTorch 2.10.0+cu130)
   - lerobot editable 설치 결과 + 실측 패키지 버전 표
@@ -248,7 +249,7 @@
   - cuDNN/NCCL wheel 번들 사용 근거 (시스템 별도 설치 X)
   - Walking RL 동시 점유 시 메모리 분배 관찰 결과 (해당 시점에 동시 진행 중이라면)
 
-### [ ] TODO-09c: 학습 환경 세팅 — Orin 배포 경로 마이그레이션 검증
+### [x] TODO-09c: 학습 환경 세팅 — Orin 배포 경로 마이그레이션 검증
 
 - 타입: test
 - DOD: TODO-09 부수 작업으로 Orin 측 배포 경로가 `~/smolvla/` → `~/smolvla/orin/` 으로 변경된 후, 옛 잔여 파일이 정리되고 새 venv 가 정상 동작함을 확인. teleop 동작이 기존과 동일한지 확인 (이미 검증된 01_teleoptest 기능 회귀 X).
@@ -282,6 +283,7 @@
   - 옛 venv 의 LD_LIBRARY_PATH 패치(cusparselt 우회) 가 새 venv 에 다시 적용돼야 함 — `setup_env.sh` 가 알아서 처리하지만 setup 출력에서 확인 필요
   - calibration JSON 파일 (`~/.cache/huggingface/lerobot/calibration/...`) 은 사용자 홈 캐시에 저장되어 있어 본 마이그레이션과 무관 — 그대로 유지됨
   - teleop 회귀 검증을 풀로 하려면 SO-ARM 양 팔 연결 + 물리 조작 필요. 본 TODO 에선 `--help` 출력만 minimal 검증 (calibration 재실행은 불필요)
+- **완료 (2026-04-28)**: 전 단계(Codex 5 + 개발자 6) PASS. 주요 우회 이슈: `dpkg` 중단 상태 → `sudo dpkg --configure -a` 후 재실행; `python3-venv` 미설치 → `virtualenv` fallback 동작; `libcusparseLt` 시스템 미설치 → venv activate LD_LIBRARY_PATH 패치 적용; `torchvision` 미설치 → 수동 wheel 설치(`torchvision-0.20.0a0+afc54f7-cp310-cp310-linux_aarch64.whl`). smoke_test.py PASS (`action shape: torch.Size([1, 6])`), teleop `--help` PASS. 새 경로 `~/smolvla/orin/` 확정.
 
 ### [ ] TODO-10: 배포 환경 세팅
 

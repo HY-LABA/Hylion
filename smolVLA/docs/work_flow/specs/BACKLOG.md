@@ -41,3 +41,7 @@
 | 4 | DGX Spark UMA 아키텍처 — `nvidia-smi memory.total [N/A]` 확인. TODO-07 병렬학습 자원 추정 시 시스템 RAM(121Gi) 기준으로 분석 필요. VRAM 독립 수치 없음에 유의. | TODO-02 prod 검증 | 중간 | 미완 |
 | 5 | Ollama 서비스 상시 실행 중 (`ollama.service`) — 학습(TODO-09) 실행 전 GPU/메모리 경합 여부 점검 및 필요 시 서비스 중단 절차 문서화 | TODO-02 prod 검증 | 중간 | 미완 |
 | 6 | `docs/storage/04_devnetwork.md` DGX IP 변경 반영 — 172.16.133.66 → 172.16.136.60 (무선, Orin과 동일 대역). `~/.ssh/config` 는 갱신 완료 (2026-04-27). | TODO-02 prod 검증 | 중간 | 미완 |
+| 7 | `torchvision` wheel 이 `setup_env.sh` 에서 자동 설치 안 됨 — 수동 안내만 출력되어 별도 설치 필요. `orin/scripts/setup_env.sh` 에 wheel 자동 설치 로직 추가 고려 (`docs/storage/others/torchvision-0.20.0a0+afc54f7-cp310-cp310-linux_aarch64.whl` 이미 존재). | TODO-09c prod 검증 | 중간 | 미완 |
+| 8 | Orin `dpkg` 중단 상태 발생 — `sudo dpkg --configure -a` 로 수동 복구 필요. 향후 `setup_env.sh` 앞단에 dpkg 상태 체크 추가 고려. | TODO-09c prod 검증 | 낮음 | 미완 |
+| 9 | `scripts/deploy_dgx.sh` 버그 2건: (1) DGX 측 대상 디렉터리 사전 생성 로직 없음 → rsync error 11 발생, (2) rsync 실패 후에도 exit code 0 반환 (마지막 `echo` 가 덮어씀). `ssh dgx "mkdir -p ~/smolvla/dgx ~/smolvla/docs/reference/lerobot"` 선행 실행 + `set -e` 또는 rsync 결과 명시적 체크 추가 필요. **TODO-09b 재테스트 전 반드시 수정.** | TODO-09b Codex 검증 | 높음 | 완료 (2026-04-28) |
+| 10 | `docs/storage/06_dgx_venv_setting.md` 신규 작성 — TODO-09b 완료 후 후행 작업. 형식은 `docs/storage/05_orin_venv_setting.md` 와 대칭. DGX venv 구성(Python 3.12.3 / `.arm_finetune` / PyTorch 2.10.0+cu130), lerobot editable 설치 실측, GB10 UserWarning 동작 검증, smoke test throughput 실측치, Walking RL 동시 점유 관찰 결과 포함. | TODO-09b 완료 후행 | 중간 | 미완 |
