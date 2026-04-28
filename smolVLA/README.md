@@ -14,6 +14,7 @@ smolVLA/
 ├── scripts/                             # devPC 측 운영 스크립트
 │   ├── deploy_orin.sh                   # devPC → Orin rsync 배포 (orin/)
 │   ├── deploy_dgx.sh                    # devPC → DGX rsync 배포 (dgx/ + docs/reference/lerobot/)
+│   ├── sync_ckpt_dgx_to_orin.sh         # DGX 학습 체크포인트 → Orin (devPC 경유 2-hop)
 │   ├── dev-connect.sh                   # VS Code Remote SSH로 Orin/DGX 동시 연결
 │   ├── sync_to_laba5.sh                 # Hylion/BG smolVLA → LABA5_Bootcamp 백업 (Linux/macOS)
 │   └── sync_to_laba5.ps1                # 같은 기능 (Windows)
@@ -105,7 +106,8 @@ smolVLA/
     └── scripts/
         ├── setup_train_env.sh           # venv + PyTorch 2.10.0+cu130 + lerobot editable
         ├── preflight_check.sh           # 학습 전 OOM/Walking RL 보호 게이트
-        └── smoke_test.sh                # lerobot-train --steps=1 검증
+        ├── smoke_test.sh                # lerobot-train --steps=1 검증
+        └── save_dummy_checkpoint.sh     # TODO-10b 검증용 dummy 체크포인트 생성
 ```
 
 ---
@@ -177,6 +179,7 @@ source ~/smolvla/orin/.hylion_arm/bin/activate
 | `agent_plan.md` | agent 작업 계획 |
 | `scripts/deploy_orin.sh` | orin/ → Orin rsync (devPC에서 실행) |
 | `scripts/deploy_dgx.sh` | dgx/ + docs/reference/lerobot/ → DGX rsync (devPC에서 실행) |
+| `scripts/sync_ckpt_dgx_to_orin.sh` | DGX 학습 체크포인트 → Orin (devPC 경유 2-hop, devPC에서 실행) |
 | `scripts/dev-connect.sh` | VS Code Remote SSH로 Orin/DGX 동시 연결 (devPC에서 실행) |
 | `scripts/sync_to_laba5.sh` | Hylion/BG smolVLA → LABA5_Bootcamp 단방향 백업 (Linux/macOS, 우분투) |
 | `scripts/sync_to_laba5.ps1` | 같은 기능 (Windows) |

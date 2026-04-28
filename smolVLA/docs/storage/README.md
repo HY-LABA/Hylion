@@ -13,7 +13,7 @@
 | 03 | [03_software.md](03_software.md) | 소프트웨어 실측/설정 현황 |
 | 04 | [04_devnetwork.md](04_devnetwork.md) | 개발 네트워크 설정 |
 | 05 | [05_orin_venv_setting.md](05_orin_venv_setting.md) | Orin 환경 세팅 기록 (venv `~/smolvla/orin/.hylion_arm`, PyTorch JP 6.0 wheel, torchvision 등) |
-| 06 | `06_dgx_venv_setting.md` (예정) | DGX Spark 학습 환경 세팅 기록 — TODO-09b 완료 후 작성 (venv `~/smolvla/dgx/.arm_finetune`, PyTorch 2.10.0+cu130, lerobot editable, GB10 throughput 실측 등). 작성 트리거: `docs/work_flow/specs/02_dgx_setting.md` TODO-09b |
+| 06 | [06_dgx_venv_setting.md](06_dgx_venv_setting.md) | DGX Spark 학습·배포 환경 세팅 기록 (venv `~/smolvla/dgx/.arm_finetune`, PyTorch 2.10.0+cu130, lerobot editable, TODO-09b smoke 실측치, §9 DGX→Orin 체크포인트 sync 절차 — TODO-10b 완료 시 실측치 누적) |
 
 ---
 

@@ -241,13 +241,7 @@
   - 첫 실행 시 GB10 capability 12.1 UserWarning 출력될 수 있으나 무시 가능 (`05_hf_model_selection.md` §3 / TODO-07 회신 참조)
   - lerobot extras (`smolvla`, `training`) 의 transformers / accelerate / wandb 가 PyTorch 2.10.0+cu130 과 호환 안 될 가능성 — 1 step smoke test 가 그 검증 역할
 - **완료 (2026-04-28)**: 전 단계 PASS (Codex 6 + 개발자 4). 주요 실측: `torch 2.10.0+cu130`, `CUDA: True`, `GPU: NVIDIA GB10`, preflight 전항목 PASS (RAM 76 GiB 가용, Ollama GPU 미점유). smoke_test: `loss 0.545`, `5.97 s/step`, 전체 소요 48초, GPU util peak 90%, RAM used peak 48226 MiB. `06_smolvla_finetune_feasibility.md §5.2` 갱신 완료. 테스트 중 `dgx/scripts/smoke_test.sh` 4건 수정 (venv 활성 순서, output dir 선생성 방지, `push_to_hub=false`, camera `rename_map`). `docs/storage/lerobot_upstream_check/04_dgx_lerobot_diff.md` 신규 작성.
-- **후행 작업 (TODO-09b 완료 후)**: `docs/storage/06_dgx_venv_setting.md` 신규 작성. 형식·범위는 `docs/storage/05_orin_venv_setting.md` 와 대칭으로:
-  - DGX 실측 기반 venv 구성 (Python 3.12.3 시스템 / `~/smolvla/dgx/.arm_finetune` / PyTorch 2.10.0+cu130)
-  - lerobot editable 설치 결과 + 실측 패키지 버전 표
-  - GB10 CUDA capability 12.1 UserWarning 동작 검증 결과
-  - smoke test 1 step throughput 실측치 (GPU util / mem peak / 소요 시간)
-  - cuDNN/NCCL wheel 번들 사용 근거 (시스템 별도 설치 X)
-  - Walking RL 동시 점유 시 메모리 분배 관찰 결과 (해당 시점에 동시 진행 중이라면)
+- **후행 작업 완료 (2026-04-28)**: `docs/storage/06_dgx_venv_setting.md` 신규 작성 완료 (`05_orin_venv_setting.md` 와 형제 구조). 9 절로 구성 — DGX/Orin 디렉터리 형제 구조, venv 선택 근거, 실측 설치 패키지, 환경변수 자동 적용, PyTorch 2.10.0+cu130 선택 근거, capability 12.1 UserWarning, setup_train_env.sh 동작, preflight 시나리오별 임계치, TODO-09b smoke 결과 (loss 0.545 / 5.97s/step / RAM peak 48 GiB), Walking RL 동시 점유 환경 관찰, 디스크 사용 추정, 잔여 리스크.
 
 ### [x] TODO-09c: 학습 환경 세팅 — Orin 배포 경로 마이그레이션 검증
 
@@ -285,20 +279,73 @@
   - teleop 회귀 검증을 풀로 하려면 SO-ARM 양 팔 연결 + 물리 조작 필요. 본 TODO 에선 `--help` 출력만 minimal 검증 (calibration 재실행은 불필요)
 - **완료 (2026-04-28)**: 전 단계(Codex 5 + 개발자 6) PASS. 주요 우회 이슈: `dpkg` 중단 상태 → `sudo dpkg --configure -a` 후 재실행; `python3-venv` 미설치 → `virtualenv` fallback 동작; `libcusparseLt` 시스템 미설치 → venv activate LD_LIBRARY_PATH 패치 적용; `torchvision` 미설치 → 수동 wheel 설치(`torchvision-0.20.0a0+afc54f7-cp310-cp310-linux_aarch64.whl`). smoke_test.py PASS (`action shape: torch.Size([1, 6])`), teleop `--help` PASS. 새 경로 `~/smolvla/orin/` 확정.
 
-### [ ] TODO-10: 배포 환경 세팅
+### [x] TODO-10: 배포 환경 세팅 — 스크립트 작성
 
 - 타입: task
-- DOD: DGX 에서 학습된 체크포인트가 Orin 으로 반입되어 추론 실행 가능함을 확인하는 절차/스크립트가 정리됨. 최소 1회 실 체크포인트(또는 사전학습 가중치) 로 DGX → Orin 반입 → Orin 에서 정책 로드 성공.
-- 구현 대상:
-  - `scripts/sync_checkpoint_dgx_to_orin.sh` 등 (위치는 기존 `scripts/` 구조에 맞춰 결정) — rsync 또는 scp 기반 체크포인트 복사 스크립트
-- 테스트: prod 검증
-  1. DGX 에서 dummy / 사전학습 체크포인트 준비
-  2. devPC 또는 DGX → Orin 으로 체크포인트 전송
-  3. Orin 에서 lerobot 추론 코드로 체크포인트 로드 → forward pass 성공
-- 제약: TODO-09 완료 후 진행. `03_smolvla_test_on_orin` 마일스톤과 일부 겹치므로 중복 작업 회피 — 본 TODO 는 "전송 경로 확정" 까지로 한정한다.
-- 잔여 리스크:
-  - DGX↔Orin 간 직접 SSH 미설정 시 devPC 경유 2-hop 필요 → 시간/대역폭 손실
-  - 체크포인트 포맷(safetensors / pickle) 과 Orin venv torch 버전 호환
+- DOD: DGX 에서 학습된 체크포인트가 Orin 으로 반입되어 추론 실행 가능함을 확인하는 절차/스크립트가 정리됨. prod 실 검증은 TODO-10b 에서 별도 진행.
+- 구현 대상 (2026-04-28 작성 완료):
+  - `scripts/sync_ckpt_dgx_to_orin.sh` — devPC 경유 2-hop 전송 (DGX → devPC 임시 → Orin). `--run` / `--step` / `--dry-run` 인자 지원. 자동 선택 시 DGX 의 가장 최근 run + last 체크포인트. Orin 측 도착 후 safetensors 헤더 minimal 검증
+  - `dgx/scripts/save_dummy_checkpoint.sh` — TODO-10b 검증용 dummy 체크포인트 생성 (`lerobot-train --steps=1 --save_checkpoint=true`). smoke_test.sh 와 책임 분리 (smoke_test 는 검증만, save_dummy 는 디스크 저장)
+  - `orin/examples/tutorial/smolvla/load_checkpoint_test.py` — 임의 체크포인트 경로 받아 `SmolVLAPolicy.from_pretrained` 로드 + 더미 forward. smoke_test.py 와 형제 (smoke_test 는 환경 검증, load_checkpoint_test 는 호환성 검증)
+- 테스트: 없음 (스크립트 작성 단계 — `bash -n` / `python -m py_compile` syntax check 통과. 실 실행 검증은 TODO-10b)
+- 제약: TODO-09 완료 후 진행 → 충족. `03_smolvla_test_on_orin` 마일스톤과 일부 겹치므로 중복 회피 — 본 TODO 는 "전송 경로 + 로드 검증 스크립트" 까지로 한정.
+- 설계 결정:
+  - **전송 경로**: devPC 경유 2-hop (`scripts/sync_ckpt_dgx_to_orin.sh`). 직접 SSH 미사용 — 현재 `~/.ssh/config` 그대로 사용 가능, repo_management 의 sync hub 패턴 일관성, IP 변동 대응 한 곳만
+  - **체크포인트 포맷**: PyTorch safetensors 직접 호환 (ONNX/TensorRT 변환 X). 07_biarm_deploy 단계에서 latency 부족 시 `torch.compile` 우선 검토, 그래도 부족하면 별도 TODO 로 ONNX 검토
+  - **bf16 호환**: DGX (cu130) 와 Orin (JP 6.0 wheel, cu126) 모두 bf16 지원. 실측 검증은 TODO-10b
+- 잔여 리스크 (TODO-10b 점검):
+  - lerobot SHA mismatch — DGX editable submodule SHA = Orin curated `orin/lerobot/` SHA 라야 모델 클래스 호환. orin/lerobot/ 트리밍이 SmolVLA policy 일부를 빠뜨렸으면 로드 실패
+  - DGX bf16 (cu130 환경) → Orin bf16 (cu126 + JP 6.0 wheel) 의 미세 numerical 차이 가능성 (로드는 OK 여도 출력값 차이)
+  - Orin 측 추론 시 `image_features` 키 매핑 — DGX 학습 시 `--rename_map` 사용 여부에 따라 키 이름이 달라질 수 있음 (load_checkpoint_test.py 의 `cfg.image_features` 가 자동 처리하나 실 환경 검증 필요)
+- **완료 (2026-04-28)**: 스크립트 3개 작성 완료. `bash -n` / `py_compile` 모두 PASS. 실 검증은 TODO-10b.
+
+### [ ] TODO-10b: 배포 환경 세팅 — DGX→Orin 체크포인트 전송 prod 검증
+
+- 타입: test
+- DOD: TODO-10 작성 산출물이 실제 동작함을 확인. dummy 체크포인트 생성 → DGX→Orin 전송 → Orin 로드 + forward pass 모두 PASS. bf16/safetensors 호환성 + lerobot SHA 호환성 검증.
+- 구현 대상: 없음 (검증·기록만)
+- 테스트: prod 검증 (DGX + Orin 양쪽 접속 필요)
+- 제약: TODO-09b (DGX 학습 환경 prod 검증) 및 TODO-09c (Orin 마이그레이션 검증) 완료 후 진행
+
+#### Codex 검증 (비대화형 SSH)
+
+| # | 단계 | 기대 결과 |
+|---|---|---|
+| 1 | devPC: `bash -n scripts/sync_ckpt_dgx_to_orin.sh` | syntax check 통과 |
+| 2 | devPC: `bash -n dgx/scripts/save_dummy_checkpoint.sh` | syntax check 통과 |
+| 3 | devPC: `python -m py_compile orin/examples/tutorial/smolvla/load_checkpoint_test.py` | syntax check 통과 |
+| 4 | devPC: `bash scripts/deploy_dgx.sh` | save_dummy_checkpoint.sh 가 DGX 에 배포됨 (rsync 정상 종료) |
+| 5 | devPC: `bash scripts/deploy_orin.sh` | load_checkpoint_test.py 가 Orin 에 배포됨 |
+| 6 | DGX: `ssh dgx "ls ~/smolvla/dgx/scripts/"` | `save_dummy_checkpoint.sh` 존재 |
+| 7 | Orin: `ssh orin "ls ~/smolvla/orin/examples/tutorial/smolvla/"` | `load_checkpoint_test.py` 존재 |
+| 8 | devPC: `bash scripts/sync_ckpt_dgx_to_orin.sh --dry-run` (TODO-10b #1 dummy 체크포인트 생성 후) | dry-run 모드 정상 종료, 전송 대상 파일 목록 출력 |
+
+#### 개발자 직접 검증 (대화형, 약 30~60 분 소요)
+
+| # | 단계 | 기대 결과 |
+|---|---|---|
+| 1 | DGX: `bash ~/smolvla/dgx/scripts/save_dummy_checkpoint.sh` | preflight PASS + 1 step 학습 + 체크포인트 저장 (`~/smolvla/dgx/outputs/train/dummy_ckpt/checkpoints/000001/pretrained_model/`). 약 5~15분 소요 |
+| 2 | DGX: `ssh dgx "ls -la ~/smolvla/dgx/outputs/train/dummy_ckpt/checkpoints/000001/pretrained_model/"` | `config.json`, `train_config.json`, `model.safetensors` (≈ 900 MB) 존재 |
+| 3 | devPC: `bash scripts/sync_ckpt_dgx_to_orin.sh --run dummy_ckpt` | DGX → devPC 임시 → Orin 2-hop 전송 정상 종료, Orin 측 safetensors 헤더 검증 PASS |
+| 4 | Orin: `ssh orin "ls -la ~/smolvla/orin/checkpoints/dummy_ckpt/000001/"` | safetensors 파일 크기가 DGX 측과 동일 |
+| 5 | Orin: `source ~/smolvla/orin/.hylion_arm/bin/activate && python ~/smolvla/orin/examples/tutorial/smolvla/load_checkpoint_test.py --ckpt-path ~/smolvla/orin/checkpoints/dummy_ckpt/000001/` | 4단계 모두 통과: 정책 로드 → config 출력 → forward pass → action shape `(1, 50, *)` 출력. exit code 0. **체크포인트 호환성 검증 PASS** |
+| 6 | Orin: 결과 기록 — DGX 학습 PyTorch 버전, Orin 추론 PyTorch 버전, action 출력 dtype, action range | 호환성 결과를 본 TODO 결론으로 정리 |
+
+- 잔여 리스크 (실행 중 점검):
+  - dummy_ckpt 1 step 학습은 의미 있는 가중치가 아니라 거의 사전학습 그대로. **수치 검증보다는 "로드/forward 가 에러 없이 돌아가는지" 가 핵심**
+  - lerobot SHA mismatch 발생 시 에러: `ImportError`, `KeyError` (state_dict 의 키 불일치). 발생 시 orin/lerobot/ 트리밍 재검토 필요
+  - HF Hub 다운로드 (smolvla_base + SmolVLM2 백본) 가 Orin 측에서도 발생할 수 있음 — 첫 실행 시 추가 5~15분
+- 후행 액션:
+  - 검증 결과로 본 TODO `[x]` 처리
+  - 04_leftarmVLA 진입 시 본 sync 스크립트로 실 학습 체크포인트 반입 가능
+  - latency 측정은 03_smolvla_test_on_orin 마일스톤에서 별도 진행
+  - **`docs/storage/06_dgx_venv_setting.md` 에 §10 "배포 환경 (DGX→Orin 체크포인트 전송)" 절 추가** — TODO-10b 완료 시 작성:
+    - 체크포인트 디렉터리 구조 (`outputs/train/<run>/checkpoints/<step>/pretrained_model/`) + 파일 크기 실측치
+    - 전송 경로: devPC 경유 2-hop (`scripts/sync_ckpt_dgx_to_orin.sh`) — 절차·인자·dry-run
+    - DGX bf16 (cu130) → Orin bf16 (cu126 + JP 6.0 wheel) 호환성 검증 결과 (action shape / dtype / range)
+    - lerobot SHA 호환성: DGX editable submodule SHA 와 Orin curated `orin/lerobot/` SHA 매칭 확인
+    - 첫 1회 실측치 (전송 시간, Orin 측 forward latency)
+    - 04_leftarmVLA 실 학습 진입 시 운영 절차 (사전 dry-run → 본 sync → load_checkpoint_test.py 사후 검증)
 
 ### [x] TODO-11: 결정사항 — 자유도 낮추기 가능 여부
 
