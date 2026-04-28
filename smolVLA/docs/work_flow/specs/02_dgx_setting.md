@@ -299,7 +299,7 @@
   - Orin 측 추론 시 `image_features` 키 매핑 — DGX 학습 시 `--rename_map` 사용 여부에 따라 키 이름이 달라질 수 있음 (load_checkpoint_test.py 의 `cfg.image_features` 가 자동 처리하나 실 환경 검증 필요)
 - **완료 (2026-04-28)**: 스크립트 3개 작성 완료. `bash -n` / `py_compile` 모두 PASS. 실 검증은 TODO-10b.
 
-### [ ] TODO-10b: 배포 환경 세팅 — DGX→Orin 체크포인트 전송 prod 검증
+### [x] TODO-10b: 배포 환경 세팅 — DGX→Orin 체크포인트 전송 prod 검증
 
 - 타입: test
 - DOD: TODO-10 작성 산출물이 실제 동작함을 확인. dummy 체크포인트 생성 → DGX→Orin 전송 → Orin 로드 + forward pass 모두 PASS. bf16/safetensors 호환성 + lerobot SHA 호환성 검증.
@@ -339,6 +339,7 @@
   - 검증 결과로 본 TODO `[x]` 처리
   - 04_leftarmVLA 진입 시 본 sync 스크립트로 실 학습 체크포인트 반입 가능
   - latency 측정은 03_smolvla_test_on_orin 마일스톤에서 별도 진행
+- **완료 (2026-04-28)**: 전 단계 PASS (Codex 8 + 개발자 6). 체크포인트 전송: DGX→devPC→Orin 2-hop, `model.safetensors` 906,712,520 bytes byte-exact 일치, 헤더 검증 PASS. Orin 로드: `SmolVLAPolicy.from_pretrained` 성공, forward PASS, action shape `(1, 50, 6)`. 호환성 실측: DGX `torch 2.10.0+cu130` → Orin `torch 2.5.0a0+nv24.08`, policy `bfloat16`, action `float32`, range `[-2.32, 2.64]`. lerobot SHA mismatch 없음, bf16 전송 이상 없음.
   - **`docs/storage/06_dgx_venv_setting.md` 에 §10 "배포 환경 (DGX→Orin 체크포인트 전송)" 절 추가** — TODO-10b 완료 시 작성:
     - 체크포인트 디렉터리 구조 (`outputs/train/<run>/checkpoints/<step>/pretrained_model/`) + 파일 크기 실측치
     - 전송 경로: devPC 경유 2-hop (`scripts/sync_ckpt_dgx_to_orin.sh`) — 절차·인자·dry-run
