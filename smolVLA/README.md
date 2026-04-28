@@ -12,7 +12,8 @@ smolVLA/
 ├── arm_2week_plan.md                    # 2주 실행 계획 및 마일스톤
 ├── agent_plan.md                        # agent 작업 계획
 ├── scripts/                             # devPC 측 운영 스크립트
-│   ├── deploy_orin.sh                   # devPC → Orin rsync 배포
+│   ├── deploy_orin.sh                   # devPC → Orin rsync 배포 (orin/)
+│   ├── deploy_dgx.sh                    # devPC → DGX rsync 배포 (dgx/ + docs/reference/lerobot/)
 │   ├── dev-connect.sh                   # VS Code Remote SSH로 Orin/DGX 동시 연결
 │   ├── sync_to_laba5.sh                 # Hylion/BG smolVLA → LABA5_Bootcamp 백업 (Linux/macOS)
 │   └── sync_to_laba5.ps1                # 같은 기능 (Windows)
@@ -75,30 +76,36 @@ smolVLA/
 │       │   └── todo.md
 │       └── others/                      # 수동 설치용 사전 빌드 wheel 등 보관
 │           └── torchvision-0.20.0a0+afc54f7-cp310-cp310-linux_aarch64.whl   # Seeed SharePoint JP 6.1&6.2 + PyTorch 2.5 대응
-└── orin/                                # Jetson Orin 배포 패키지
-    ├── pyproject.toml                   # Orin용 (torch>=2.5, Python>=3.10, smolvla extras)
-    ├── lerobot/                         # curated 추론 필수 모듈
-    │   ├── __init__.py, __version__.py, types.py
-    │   ├── cameras/{opencv,realsense,zmq}/
-    │   ├── configs/
-    │   ├── envs/
-    │   ├── model/
-    │   ├── motors/feetech/
-    │   ├── optim/
-    │   ├── policies/{smolvla,rtc}/
-    │   ├── processor/
-    │   ├── robots/so_follower/
-    │   ├── scripts/                     # lerobot_eval / lerobot_teleoperate / lerobot_train 등 18개 스크립트
-    │   ├── teleoperators/so_leader/
-    │   └── utils/
-    ├── calibration/                     # Orin에서 생성된 calibration 파일 보관 (rsync 배포 제외)
-    ├── examples/
-    │   └── tutorial/smolvla/
-    │       ├── smoke_test.py
-    │       └── using_smolvla_example.py
+├── orin/                                # Jetson Orin 배포 패키지 (추론)
+│   ├── pyproject.toml                   # Orin용 (torch>=2.5, Python>=3.10, smolvla extras)
+│   ├── lerobot/                         # curated 추론 필수 모듈
+│   │   ├── __init__.py, __version__.py, types.py
+│   │   ├── cameras/{opencv,realsense,zmq}/
+│   │   ├── configs/
+│   │   ├── envs/
+│   │   ├── model/
+│   │   ├── motors/feetech/
+│   │   ├── optim/
+│   │   ├── policies/{smolvla,rtc}/
+│   │   ├── processor/
+│   │   ├── robots/so_follower/
+│   │   ├── scripts/                     # lerobot_eval / lerobot_teleoperate / lerobot_train 등 18개 스크립트
+│   │   ├── teleoperators/so_leader/
+│   │   └── utils/
+│   ├── calibration/                     # Orin에서 생성된 calibration 파일 보관 (rsync 배포 제외)
+│   ├── examples/
+│   │   └── tutorial/smolvla/
+│   │       ├── smoke_test.py
+│   │       └── using_smolvla_example.py
+│   └── scripts/
+│       ├── run_teleoperate.sh           # SO-ARM calibrate·teleoperate 편의 스크립트
+│       └── setup_env.sh                 # Orin에서 실행 — venv + pip install
+└── dgx/                                 # DGX Spark 학습 환경 (orin/ 과 형제)
+    ├── README.md                        # 운영 체크리스트 + Walking RL 보호 원칙
     └── scripts/
-        ├── run_teleoperate.sh           # SO-ARM calibrate·teleoperate 편의 스크립트
-        └── setup_env.sh                 # Orin에서 실행 — venv + pip install
+        ├── setup_train_env.sh           # venv + PyTorch 2.10.0+cu130 + lerobot editable
+        ├── preflight_check.sh           # 학습 전 OOM/Walking RL 보호 게이트
+        └── smoke_test.sh                # lerobot-train --steps=1 검증
 ```
 
 ---
@@ -131,14 +138,14 @@ git submodule update --remote smolVLA/docs/reference/lerobot
 ./smolVLA/scripts/deploy_orin.sh
 ```
 
-`smolVLA/orin/` 전체를 Orin의 `~/smolvla/` 로 rsync 합니다.
+`smolVLA/orin/` 전체를 Orin의 `~/smolvla/orin/` 로 rsync 합니다 (dgx 와 형제 구조).
 
 **4. Orin에서 환경 재설치 (의존성이 바뀐 경우)**
 
 ```bash
 ssh orin
-rm -rf ~/smolvla/.venv
-bash ~/smolvla/scripts/setup_env.sh
+rm -rf ~/smolvla/orin/.hylion_arm
+bash ~/smolvla/orin/scripts/setup_env.sh
 ```
 
 ---
@@ -151,8 +158,8 @@ bash ~/smolvla/scripts/setup_env.sh
 
 # Orin
 ssh orin
-bash ~/smolvla/scripts/setup_env.sh
-source ~/smolvla/.venv/bin/activate
+bash ~/smolvla/orin/scripts/setup_env.sh
+source ~/smolvla/orin/.hylion_arm/bin/activate
 ```
 
 ---
@@ -169,6 +176,7 @@ source ~/smolvla/.venv/bin/activate
 | `arm_2week_plan.md` | 2주 실행 계획, 마일스톤 |
 | `agent_plan.md` | agent 작업 계획 |
 | `scripts/deploy_orin.sh` | orin/ → Orin rsync (devPC에서 실행) |
+| `scripts/deploy_dgx.sh` | dgx/ + docs/reference/lerobot/ → DGX rsync (devPC에서 실행) |
 | `scripts/dev-connect.sh` | VS Code Remote SSH로 Orin/DGX 동시 연결 (devPC에서 실행) |
 | `scripts/sync_to_laba5.sh` | Hylion/BG smolVLA → LABA5_Bootcamp 단방향 백업 (Linux/macOS, 우분투) |
 | `scripts/sync_to_laba5.ps1` | 같은 기능 (Windows) |
@@ -184,7 +192,8 @@ source ~/smolvla/.venv/bin/activate
 | `docs/reference/seeedwiki/` | Seeed SO-101 위키 참조 문서 (수정 금지) |
 | `docs/lerobot_study/` | lerobot/SmolVLA 학습 노트 — 마일스톤 순서 prefix (`00_*`~`02_*` 사전 학습, `03_*`~`05_*` 학습 TODO 산출물, `03b_*` 는 동일 마일스톤 보조 문서) |
 | `docs/storage/` | 환경/장비 실측 기록 문서 |
-| `orin/` | Orin 배포 패키지 — curated lerobot + 예제 + 설치 스크립트 |
+| `orin/` | Orin 배포 패키지 — curated lerobot + 예제 + 설치 스크립트 (추론) |
+| `dgx/` | DGX Spark 학습 환경 — venv setup + preflight + smoke test (학습) |
 
 ---
 

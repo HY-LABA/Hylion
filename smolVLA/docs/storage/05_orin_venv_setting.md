@@ -1,13 +1,33 @@
 # smolVLA Orin 환경 세팅 기록
 
-> 작성일: 2026-04-21 (최초) / 2026-04-23 (업데이트)
+> 작성일: 2026-04-21 (최초) / 2026-04-23 (업데이트) / 2026-04-28 (venv 위치·이름 변경 반영)
 > 목적: lerobot을 Orin에서 실행하기 위한 환경 구성 과정과 현재 상태를 기록
+> DGX 학습 환경 세팅은 별도 문서 `06_dgx_venv_setting.md` (TODO-09b 완료 후 작성 예정)
 
 ## 1) 개요
 
 - 실행 대상: Orin (JetPack 6.2.2, L4T R36.5.0, CUDA 12.6)
-- 환경 관리 방식: venv (`~/smolvla/.venv`)
+- 환경 관리 방식: venv (`~/smolvla/orin/.hylion_arm`, hidden) — DGX venv `~/smolvla/dgx/.arm_finetune` 과 형제 구조로 격리
 - 소프트웨어 실측 현황 근거: `docs/storage/03_software.md`
+
+### 디렉터리 형제 구조 (2026-04-28 변경)
+
+```
+/home/laba/smolvla/
+├── orin/                       # 추론 (본 문서)
+│   ├── .hylion_arm/            # ← venv (hidden, Python 3.10, JP 6.0 wheel)
+│   ├── lerobot/
+│   ├── scripts/
+│   └── ...
+└── dgx/                        # 학습 (06_dgx_venv_setting.md 예정)
+    ├── .arm_finetune/          # ← venv (hidden, Python 3.12, torch 2.10.0+cu130)
+    └── ...
+```
+
+이전 컨벤션 (`~/smolvla/.venv` 단일) 에서 `orin/`·`dgx/` 형제로 분리한 이유:
+- DGX 학습 환경 추가로 두 venv 가 같은 머신에 공존 가능 (실제 머신은 다르지만 동일 컨벤션 유지)
+- 디렉터리 이름이 venv 용도 (추론 vs 학습) 를 즉시 표현
+- rsync 배포 시 venv 자동 제외 (`--exclude '.hylion_arm'` / `--exclude '.arm_finetune'`)
 
 ## 2) venv 환경 구성 (2026-04-23 확정)
 
@@ -22,9 +42,9 @@ Seeed 튜토리얼은 `conda`를 권장하지만 이는 `ffmpeg=7.1.1`, `opencv>
 
 conda env 방식은 폐기. `setup_env.sh`가 생성하는 venv를 사용.
 
-- venv 경로: `~/smolvla/.venv`
+- venv 경로: `~/smolvla/orin/.hylion_arm`
 - Python 버전: `3.10` (JetPack 6.2.2 시스템 Python)
-- 설치 스크립트: `~/smolvla/scripts/setup_env.sh`
+- 설치 스크립트: `~/smolvla/orin/scripts/setup_env.sh`
 
 **실측 설치 패키지 (2026-04-23 기준):**
 
@@ -170,4 +190,4 @@ torch.backends.cudnn.version()          # cuDNN 확인
 
 추가 검증 (2026-04-23):
 - `torchvision.ops.nms` CUDA 실행 성공 (`0.20.0a0+afc54f7`)
-- `.venv/bin/python` 직접 실행으로 venv activate 없이도 CUDA 텐서 연산 성공
+- `~/smolvla/orin/.hylion_arm/bin/python` 직접 실행으로 venv activate 없이도 CUDA 텐서 연산 성공

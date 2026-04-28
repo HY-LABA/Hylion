@@ -39,7 +39,7 @@ JetPack 판별 근거:
 ## 3) 컨테이너/ML 런타임 상태
 
 - Docker 실행 중 컨테이너: 없음 (스냅샷 시점)
-- PyTorch: venv에 설치 (`~/smolvla/.venv`) — 시스템 패키지 아님
+- PyTorch: venv에 설치 (`~/smolvla/orin/.hylion_arm`) — 시스템 패키지 아님 (DGX venv `~/smolvla/dgx/.arm_finetune` 과 격리)
   - 설치 방식 및 패키지 버전 상세: `docs/storage/05_orin_venv_setting.md`
 
 ## 4) 노트북 의존성 실측 결과 (기록용)

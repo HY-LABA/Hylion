@@ -47,25 +47,24 @@
 | 표준성 | Python 표준 | 외부 도구 |
 | Orin 일관성 | ✅ Orin 도 venv | ❌ |
 
-**결론: venv 사용**. 본 프로젝트는 단일 환경, 시스템 Python 호환, CUDA 시스템 단 고정 → conda 의 장점이 활성화되지 않음. Orin 측 `~/smolvla/.venv` 와 운영 일관성도 유지.
+**결론: venv 사용**. 본 프로젝트는 단일 환경, 시스템 Python 호환, CUDA 시스템 단 고정 → conda 의 장점이 활성화되지 않음. Orin 측 `~/smolvla/orin/.hylion_arm` 와 형제 구조 (`~/smolvla/dgx/.arm_finetune`) 로 운영 일관성도 유지.
 
 > **검토 시나리오**: TODO-07 결과 Walking RL 과 SmolVLA 가 다른 PyTorch/CUDA 버전을 요구하면 conda 또는 컨테이너 필요. 그 경우 **Docker (이미 설치됨) + NVIDIA Container Toolkit** 으로 격리하는 것이 conda 보다 깔끔.
 
 ### 2.3 PyTorch 버전: CUDA 13 호환 wheel 확인 필요 (TODO-08 첫 검증)
 
-- DGX 의 CUDA SDK 13.0 / 드라이버 580.142 → 권장 PyTorch wheel 미확정
-- 후보:
-  - PyTorch 공식 안정 (`pip install torch`) — 최신은 CUDA 12.8 까지 지원, CUDA 13 미지원 가능성
-  - PyTorch nightly — `pip install --pre torch --index-url https://download.pytorch.org/whl/nightly/cu130` 형태로 시도
-  - 드라이버 580 은 **CUDA 12.x runtime 도 backward compatible** — 시스템 SDK 가 13.0 이라도 PyTorch wheel 은 cu128 사용 가능할 가능성 높음
-- TODO-08 진입 시 검증 절차:
-  1. `pip install torch` 후 `torch.cuda.is_available()`, `torch.version.cuda` 확인
-  2. 실패 시 nightly cu130 시도
-  3. 그래도 실패 시 cu128 stable 로 fallback (드라이버 backward compat)
+- **결정 (2026-04-28)**: **`torch==2.10.0+cu130`** (pip nvidia 공식 wheel) 사용 확정
+- 근거: TODO-07 회신(`docs/storage/others/walking_rl_smolvla_check_2026-04-28.md`) — Walking RL 트랙이 같은 DGX 에서 동일 wheel 동작 검증 완료
+- **GB10 CUDA capability 12.1 UserWarning**: PyTorch 공식 지원 범위(8.0~12.0) 밖이라 `UserWarning` 출력되나 기능 정상 — 무시 가능
+- cuDNN / NCCL 등은 PyTorch 의존성으로 자동 설치:
+  - `nvidia-cudnn-cu13==9.15.1.9`
+  - `nvidia-nccl-cu13==2.28.9`
+  - cuSPARSELt, nvSHMEM 등도 함께
+- 시스템 별도 설치 불필요
 
 ### 2.4 cuDNN / TensorRT 설치 여부
 
-- **cuDNN**: 학습 시 PyTorch 가 내부적으로 사용 (`torch.backends.cudnn.benchmark` 등). PyTorch wheel 이 cuDNN 을 번들로 포함하므로 **별도 시스템 설치 불필요** 가능성 높음. 미동작 시 system cuDNN 설치 (PyTorch 와 동일 CUDA 버전).
+- **cuDNN**: PyTorch wheel 의 `nvidia-cudnn-cu13==9.15.1.9` 자동 설치로 충족. 시스템 별도 설치 불필요 (TODO-07 회신 검증).
 - **TensorRT**: 학습엔 불필요. 배포(07_biarm_deploy) 시 Orin 에서 검토.
 
 ### 2.5 lerobot 설치 방식: pip install (editable 아님)
@@ -73,17 +72,20 @@
 - DGX 는 학습 전용 → orin/ 같은 코드 수정 안 함. PyPI 또는 GitHub release 에서 stable 설치.
 - 명령: `pip install 'lerobot[smolvla,training]'` — `[smolvla]` extra (transformers + peft) + `[training]` extra (accelerate + wandb).
 
-### 2.6 종합 — TODO-08 권장 결정
+### 2.6 종합 — TODO-08 결정 (2026-04-28 확정)
 
-| 항목 | 권장값 |
+| 항목 | 결정값 |
 |---|---|
 | Python | 시스템 3.12.3 |
 | 패키지 매니저 | venv |
-| venv 경로 | `/home/laba/smolvla/.venv` (Orin 과 동일 컨벤션) |
-| PyTorch | TODO-08 검증 후 결정 (cu128 stable 또는 cu130 nightly) |
-| cuDNN | PyTorch wheel 번들 사용 우선, 실패 시 시스템 설치 |
+| venv 경로 | `/home/laba/smolvla/dgx/.arm_finetune` (Walking RL `/home/laba/env_isaaclab/` 와 충돌 없음, Orin `~/smolvla/orin/.hylion_arm` 와 형제 구조) |
+| PyTorch | **`torch==2.10.0+cu130`** (nvidia 공식 wheel, Walking RL 과 동일) |
+| cuDNN | `nvidia-cudnn-cu13==9.15.1.9` (PyTorch wheel 번들) |
+| NCCL | `nvidia-nccl-cu13==2.28.9` (PyTorch wheel 번들) |
 | TensorRT | 학습 단계에서는 미설치 |
 | lerobot | `pip install 'lerobot[smolvla,training]'` |
+
+본 결정은 02_dgx_setting TODO-08 에 정식 반영 완료.
 
 ## 3) `lerobot-train` CLI 동작
 
@@ -316,13 +318,17 @@ LR 절반 (catastrophic forgetting 회피).
 ## 7) 잔여 리스크 / 후속 검증
 
 - **GB10 throughput 미확정** — TODO-09 1 step smoke test 후 §5.2 표 갱신 필요
-- **CUDA 13 PyTorch 호환** — TODO-08 첫 검증 항목. nightly 또는 cu128 fallback 필요할 수 있음
+- ~~**CUDA 13 PyTorch 호환**~~ — **해결됨 (2026-04-28)**. Walking RL 트랙이 `torch==2.10.0+cu130` 동작 검증 완료. GB10 capability 12.1 UserWarning 무시 가능
 - **UMA 메모리 점유 분포** — 일반 dGPU 의 VRAM 추정과 다름. nvidia-smi 가 의미 있는 값 안 줄 수 있어 `free -h` + Python 프로세스 RSS 모니터링 병행
-- **Ollama 자원 경합** — 학습 시작 전 `systemctl stop ollama` 또는 모델 unload (TODO-09 환경 세팅 시 확인)
-- **Orin 반입 호환성** — DGX 학습 PyTorch 버전과 Orin 추론 PyTorch 버전 차이가 safetensors 로드에 영향 있을 가능성 (보통 호환되지만 마이너 버전 차이 검증 필요, TODO-10 배포 환경 세팅 시)
+- **Walking RL 동시 점유** — Jupyter 커널 2개가 ~13 GB 낭비 중 (DETR 과제, Sleeping). **학습 시작 전 shutdown 필수** (`nvidia-smi --query-compute-apps=...`). Walking RL 본 훈련(2.5 GB) 자체는 SmolVLA 와 동시 점유 가능 추정
+- **스왑 0** — DGX 는 swap 비활성화. 메모리 초과 시 OOM Kill 즉시 발생. peak 사용량 안전 마진 필수 (Jupyter 정리 후 50~60 GiB 가용)
+- **Ollama** — 현재 GPU 미사용. `gemma3:27b` 로드 시 ~17 GB 순간 점유 위험 — 학습 전 상태 확인
+- **Orin 반입 호환성** — DGX (Python 3.12 + torch 2.10.0+cu130) 와 Orin (Python 3.10 + Jetson aarch64 wheel) 차이가 safetensors 로드에 영향 있을 가능성 (보통 호환되지만 마이너 버전 차이 검증 필요, TODO-10 배포 환경 세팅 시)
+- **lerobot extras 호환** — `pip install 'lerobot[smolvla,training]'` 시 transformers / accelerate / wandb 가 PyTorch 2.10.0+cu130 과 호환되는지 — TODO-09 1 step smoke test 로 확인
 
 ## 8) 변경 이력
 
 | 날짜 | 변경 |
 |---|---|
-| 2026-04-28 | 초안 작성. DGX 실측(2026-04-27) + lerobot-train CLI/체크포인트 형식/PEFT 정리. TODO-08 환경관리 결정 사전 정리 (venv 사용 결론). 04/06 학습 권장 명령 작성. |
+| 2026-04-28 (초기) | 초안 작성. DGX 실측(2026-04-27) + lerobot-train CLI/체크포인트 형식/PEFT 정리. TODO-08 환경관리 결정 사전 정리 (venv 사용 결론). 04/06 학습 권장 명령 작성. |
+| 2026-04-28 (갱신) | TODO-07 Walking RL 회신 반영. PyTorch 2.10.0+cu130 결정 확정 (§2.3, §2.6). Jupyter 커널 / Walking RL 동시 점유 / 스왑 0 잔여 리스크 추가 (§7). |

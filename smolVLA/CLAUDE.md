@@ -113,8 +113,8 @@ Backlog 테이블 형식 (상태 컬럼 포함):
 **핵심 맥락 (반드시 인지):**
 - 실행/검증은 항상 **Orin** (`laba@ubuntu`) 에서 수행. devPC는 코드 정리/문서화/배포 관리 전용.
 - devPC → Orin 접근: `ssh orin` (IP 기반, `~/.ssh/config` 등록)
-- Orin 코드 경로: `/home/laba/smolvla/` (rsync 배포 기준)
-- Orin venv: `/home/laba/smolvla/.venv` (`~/smolvla/.venv`)
+- Orin 코드 경로: `/home/laba/smolvla/orin/` (rsync 배포 기준 — dgx 와 형제 구조)
+- Orin venv: `/home/laba/smolvla/orin/.hylion_arm` (`~/smolvla/orin/.hylion_arm`) — DGX venv `~/smolvla/dgx/.arm_finetune` 과 격리
 
 ## Current Working Agreements
 

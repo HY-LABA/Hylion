@@ -3,7 +3,7 @@
 <!-- Claude Code와 개발자가 대화를 통해 함께 작성한다 -->
 
 > 목표: [한 줄 목표]  
-> 환경: [예: Orin JetPack 6.2, Python 3.10, venv `~/smolvla/.venv`]  
+> 환경: [예: Orin JetPack 6.2, Python 3.10, venv `~/smolvla/orin/.hylion_arm`]  
 > 접근: [예: devPC → `ssh orin` → Orin (`laba@ubuntu`)]  
 > 코드 경로: [예: Orin `/home/laba/smolvla/` (rsync 배포 기준)]  
 > 하드웨어: [예: SO-101 follower (12V) x1 + SO-101 leader (7.4V) x1]  

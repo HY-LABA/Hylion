@@ -14,7 +14,7 @@
 set -e
 
 SMOLVLA_DIR="$(cd "$(dirname "$0")/.." && pwd)"
-VENV_DIR="${SMOLVLA_DIR}/.venv"
+VENV_DIR="${SMOLVLA_DIR}/.hylion_arm"  # orin/.hylion_arm (hidden, orin 디렉터리 안). dgx/.arm_finetune 과 격리
 
 # Python 3.10 우선 (jp6/cu126 wheel이 cp310만 제공)
 if command -v python3.10 &>/dev/null; then
@@ -105,6 +105,7 @@ fi
 ACTIVATE_SCRIPT="${VENV_DIR}/bin/activate"
 if ! ldconfig -p 2>/dev/null | grep -q "libcusparseLt"; then
     CUSPARSELT_LIB="${VENV_DIR}/lib/python3.10/site-packages/nvidia/cusparselt/lib"
+    # NOTE: 본 경로는 venv 디렉터리 이름(.hylion_arm) 변경 시 함께 갱신 필요
     if [ -d "$CUSPARSELT_LIB" ] && ! grep -q "cusparselt" "$ACTIVATE_SCRIPT"; then
         echo "export LD_LIBRARY_PATH=${CUSPARSELT_LIB}:\$LD_LIBRARY_PATH" >> "$ACTIVATE_SCRIPT"
         echo "[setup] 경고: cusparselt 시스템 미설치. LD_LIBRARY_PATH 임시 패치 적용."

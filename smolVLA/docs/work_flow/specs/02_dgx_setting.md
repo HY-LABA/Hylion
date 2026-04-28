@@ -134,47 +134,154 @@
   - **04 권장**: smolvla.mdx 공식 예시 그대로 (`batch_size=64, steps=20000, S1`)
   - **06 권장**: 1차 S1 50k step → 부족 시 S3 + LR 절반 → 부족 시 LoRA. 도메인 시프트가 04 보다 커서 step 더 길게.
 
-### [ ] TODO-07: 결정사항 — Walking RL 과 병렬학습 가능 여부
+### [x] TODO-07: 결정사항 — Walking RL 과 병렬학습 가능 여부
 
 - 타입: study
 - DOD: DGX Spark 단일 장비에서 Walking RL 학습과 smolVLA 학습이 동시 진행 가능한지 결론(가능 / 부분 가능 / 불가) 과 근거(VRAM · CPU · I/O 점유율 추정) 가 본 스펙에 기록됨. 불가/부분 시 백업(연구실 PC) 활용 시나리오 명시.
 - 구현 대상: 없음
-- 테스트: TODO-02 실측치 기반 자원 점유율 추정으로 1차 결론. 필요 시 후행 단계(TODO-09 1 step 실행) 에서 nvidia-smi 모니터링으로 재검증.
-- 제약: TODO-02 완료 후 진행. **TODO-08(환경관리 결정) 보다 선행되어야 함** — DGX 단독 점유 / 공유 여부에 따라 환경 격리 방식(venv vs conda 격리 vs 컨테이너) 이 달라지기 때문.
-- 잔여 리스크: Walking RL 측 환경/일정에 대한 외부 의존 — 별도 트랙 담당자 확인 필요
+- 테스트: Walking RL 트랙 담당자 회신(`docs/storage/others/walking_rl_smolvla_check_2026-04-28.md`) 기반 결론.
+- 제약: TODO-02 완료 후 진행. TODO-08(환경관리 결정) 보다 선행되어야 함.
+- **결론 (2026-04-28)**: **부분 가능 — 시간대 분할 + Jupyter 커널 정리 조건부.** 격리 방식은 venv 분리만으로 충분 (Docker 컨테이너 불필요).
+- 근거 (회신 문서 기반):
+  - **PyTorch / CUDA**: Walking RL 이 `PyTorch 2.10.0+cu130` 사용 중. SmolVLA 도 동일 wheel 사용 권장 → wheel 호환성 확정 (TODO-08 PyTorch 검증 작업이 사실상 종결됨)
+  - **GB10 CUDA capability 12.1**: PyTorch 공식 지원 범위(8.0~12.0) 밖이지만 실제 동작 확인됨 (UserWarning 만 발생)
+  - **Python 환경**: Walking RL `/home/laba/env_isaaclab/` (uv 생성 venv). SmolVLA 는 `/home/laba/smolvla/dgx/.arm_finetune` 별도 경로로 충돌 없음
+  - **GPU 메모리 병목**:
+    - Walking RL 훈련: 2,490 MiB (가벼움)
+    - **Jupyter kernel 2개**: 12,938 MiB 낭비 중 (DETR 과제, Sleeping 상태) → **SmolVLA 학습 전 반드시 shutdown 필요**
+    - Jupyter 정리 후 안전 사용 가능 메모리: 50~60 GiB (Walking RL 훈련 중) / 70~80 GiB (Walking RL 종료 시)
+  - **Ollama**: 현재 GPU 미사용 (대기). 단, `gemma3:27b` 로드 시 ~17 GB 순간 점유 위험 — 학습 전 상태 확인 권장
+  - **CPU / 디스크 / I/O**: 여유 충분 (Walking RL CPU 1.7코어 / 20코어 중)
+  - **스왑 0**: OOM Kill 즉시 발생 — 안전 마진 필수
+- 운영 권장:
+  1. SmolVLA 학습 시작 전 Jupyter 커널 shutdown 확인 (`nvidia-smi --query-compute-apps=pid,process_name,used_memory --format=csv`)
+  2. Ollama `gemma3:27b` 미로드 상태 확인
+  3. Walking RL 동시 진행 시 SmolVLA 학습 batch_size 보수적 시작 (예: 32 → 단계적 증가)
+  4. Walking RL 훈련 종료 시간대에 SmolVLA 풀 학습(batch=64, S3 등) 진행 권장
+- 회신 문서: `docs/storage/others/walking_rl_smolvla_check_2026-04-28.md`
 
-### [ ] TODO-08: 환경관리 / 버전 호환성 결정
+### [x] TODO-08: 환경관리 / 버전 호환성 결정
 
 - 타입: task
-- DOD: DGX Spark 학습용 Python 환경 관리 방식(venv vs conda vs uv) 과 PyTorch/CUDA/cuDNN 버전 조합이 결정되어 본 스펙에 기록. Orin 추론 환경(`~/smolvla/.venv`, Python 3.10) 과의 학습→추론 호환성(체크포인트 호환, torch 버전 차이 영향) 도 명시.
+- DOD: DGX Spark 학습용 Python 환경 관리 방식 + PyTorch/CUDA/cuDNN 버전 조합이 결정되어 본 스펙에 기록. Orin 추론 환경(`~/smolvla/orin/.hylion_arm`, Python 3.10) 과의 학습→추론 호환성(체크포인트 호환, torch 버전 차이 영향) 명시.
 - 구현 대상: 없음 (결정은 본 스펙에 기록, 실제 설치는 TODO-09)
 - 테스트: 없음
-- 결정 항목:
-  1. Python 버전: DGX 시스템 3.12.3 사용 vs 3.10 별도 설치 (Orin 정합성)
-  2. 패키지 매니저: venv / conda / uv 중 선택 (TODO-07 결과에 따라 격리 강도 조정)
-  3. PyTorch 버전: DGX GPU 드라이버 580.142 / CUDA 13.0.2 호환 wheel 선정
-  4. cuDNN / TensorRT 설치 여부 (학습 단계에서는 cuDNN 만 필수, TensorRT 는 배포 단계 옵션)
-  5. lerobot 설치 방식: editable install vs pip install
-- 제약: TODO-02·TODO-07 완료 후 진행
-- 잔여 리스크:
-  - DGX 의 `nvidia/cu13` 계열과 lerobot upstream 의 권장 PyTorch 버전이 어긋날 가능성
-  - Orin venv (Python 3.10) 와 DGX (Python 3.12) 사이 체크포인트/직렬화 호환성 — 동일 버전 정렬이 안전
+- 제약: TODO-02·TODO-07 완료 후 진행 → 모두 충족
+- **결정 (2026-04-28)** — TODO-07 회신 (`docs/storage/others/walking_rl_smolvla_check_2026-04-28.md`) 의 Walking RL 환경과 정합 우선:
 
-### [ ] TODO-09: 학습 환경 세팅
+| 항목 | 결정값 | 근거 |
+|---|---|---|
+| Python 버전 | **시스템 3.12.3** | Walking RL 동일. 시스템 Python = lerobot `>=3.10` 호환. 추가 설치 불필요 |
+| 패키지 매니저 | **venv** | 단일 환경, conda 미설치, Walking RL 도 venv 사용. Orin `~/smolvla/orin/.hylion_arm` 와 형제 구조로 운영 일관성 |
+| venv 경로 | **`/home/laba/smolvla/dgx/.arm_finetune`** | Walking RL `/home/laba/env_isaaclab/` 와 충돌 없음, Orin venv (`~/smolvla/orin/.hylion_arm`) 와 형제 구조 |
+| PyTorch | **`torch==2.10.0+cu130`** (pip nvidia 공식 wheel) | Walking RL 동일 wheel 동작 검증됨. GB10 CUDA capability 12.1 UserWarning 발생하나 기능 정상 |
+| cuDNN | **`nvidia-cudnn-cu13==9.15.1.9` (PyTorch wheel 번들)** | 시스템 설치 불필요 — Walking RL 동일 |
+| NCCL / 기타 | **`nvidia-nccl-cu13==2.28.9` 등 PyTorch 의존성에 포함** | Walking RL 환경 동일 |
+| TensorRT | **미설치** | 학습 단계에서 불필요. 배포(07_biarm_deploy) 시 Orin 에서 검토 |
+| lerobot 설치 방식 | **`pip install 'lerobot[smolvla,training]'`** | DGX 는 학습 전용, 코드 수정 안 함. editable 불필요 |
+
+- Orin 호환성:
+  - DGX Python 3.12.3 + PyTorch 2.10.0+cu130 vs Orin Python 3.10 + PyTorch (Jetson aarch64 wheel)
+  - 체크포인트는 safetensors 포맷이라 Python/torch 마이너 버전 차이는 일반적으로 호환 — TODO-10 배포 환경 세팅 시 더미 체크포인트로 검증
+- 잔여 리스크 (TODO-09 진입 시 점검):
+  - SmolVLA 학습 시작 전 Jupyter 커널 shutdown / Ollama 상태 확인 (TODO-07 운영 권장 1·2 항목)
+  - lerobot extras (`smolvla`, `training`) 설치 시 transformers / accelerate / wandb 가 PyTorch 2.10.0+cu130 과 호환되는지 — 1 step smoke test 로 확인
+
+### [x] TODO-09: 학습 환경 세팅 — 스크립트 작성
 
 - 타입: task
-- DOD: DGX Spark 에서 lerobot 학습 스크립트가 실행 가능한 상태(스모크: 1 step 학습 통과). 환경 구성이 `dgx/scripts/setup_train_env.sh` (또는 동등한 위치) 로 재현 가능하게 스크립트화됨.
+- DOD: DGX Spark 에서 lerobot 학습 스크립트가 실행 가능하도록 환경 구성이 `dgx/scripts/setup_train_env.sh` 로 재현 가능하게 스크립트화됨. 1 step smoke test 검증은 TODO-09b 에서 별도 진행.
 - 구현 대상:
-  - `dgx/scripts/setup_train_env.sh` (신규) — TODO-08 결정 기반 설치 스크립트. PyTorch · lerobot · 데이터셋 의존성 · cuDNN(필요 시) 설치
-  - `dgx/pyproject.toml` 또는 `requirements-train.txt` (방식 결정 후) — 학습 의존성 고정
-- 테스트: prod 검증
-  1. setup 스크립트 실행 → 에러 없이 종료
-  2. `python -c "import torch; print(torch.cuda.is_available(), torch.cuda.get_device_name(0))"` → True / DGX GPU 표시
-  3. lerobot 학습 엔트리포인트 1 step 실행 (smoke) → loss 출력 확인
-- 제약: TODO-08 완료 후 진행. Orin 측 `orin/scripts/setup_env.sh` 의 구조를 참고하되 DGX 용으로 분리(`dgx/`)하여 작성한다 — Orin 환경에 영향 주지 않을 것.
+  - `dgx/README.md` — 운영 체크리스트 + Walking RL 보호 원칙 + 학습 가이드 + 폴더 구조 (옵션 C: scripts/ + runs/ + outputs/)
+  - `dgx/scripts/setup_train_env.sh` — TODO-08 결정 기반 설치. venv 생성 (`dgx/.arm_finetune` 안쪽 격리) → PyTorch 2.10.0+cu130 → lerobot editable (`docs/reference/lerobot/`) → 환경변수 자동 적용 (`HF_HOME`, `PYTORCH_CUDA_ALLOC_CONF`, `CUDA_VISIBLE_DEVICES`)
+  - `dgx/scripts/preflight_check.sh` — 학습 전 OOM/Walking RL 보호 게이트. 시나리오별 메모리 임계치(smoke 20GB / s1 35GB / s3 65GB / lora 28GB) + 안전 마진 10GB. Walking RL 프로세스 관찰만 (절대 kill X)
+  - `dgx/scripts/smoke_test.sh` — `lerobot-train --policy.path=lerobot/smolvla_base --dataset.repo_id=lerobot/svla_so100_pickplace --steps=1` 실행. nvidia-smi 5초 간격 샘플링으로 자원 점유 기록
+  - `dgx/runs/README.md` — 마일스톤별 학습 실행 자료 보관 안내 (04 진입 시 채움)
+  - `scripts/deploy_dgx.sh` — devPC → DGX rsync 배포. `dgx/` + `docs/reference/lerobot/` 동기화 (`dgx/.arm_finetune`, `dgx/outputs` 제외)
+- 부수 작업: orin/ 도 동일한 형제 구조 적용
+  - `orin/.hylion_arm` (orin 디렉터리 안쪽, hidden) 로 venv 위치 명시화
+  - `scripts/deploy_orin.sh` Orin 측 배포 경로를 `~/smolvla/` → `~/smolvla/orin/` 로 변경 (dgx/ 와 형제)
+  - 모든 운영/현재 스펙 문서의 venv 경로 갱신 (`README.md`, `CLAUDE.md`, `docs/storage/03_software.md`, `docs/storage/05_orin_venv_setting.md`, `docs/storage/logs/todo.md`, `docs/work_flow/specs/00_template.md`, `06_smolvla_finetune_feasibility.md`). history 는 보존 (과거 시점 사실)
+- 테스트: 없음 (스크립트 작성 단계 — `bash -n` syntax check 통과 확인. 실제 실행 검증은 TODO-09b)
+- 제약: TODO-08 완료 후 진행 → 충족. Orin 측 `orin/scripts/setup_env.sh` 의 구조를 참고하되 DGX 용으로 분리(`dgx/`).
+- 잔여 리스크 (TODO-09b 검증 시 점검):
+  - Orin 머신에 이미 배포된 `~/smolvla/.venv` 가 새 위치 `~/smolvla/orin/.hylion_arm` 와 다름 — Orin 재배포 + venv 재생성 필요 (구버전 venv 수동 정리 또는 `rm -rf`)
+- **완료 (2026-04-28)**: 스크립트 7개 + 문서 8개 작성/갱신 완료. `bash -n` syntax check 6개 모두 PASS. 실 실행 검증은 TODO-09b.
+
+### [ ] TODO-09b: 학습 환경 세팅 — DGX prod 검증
+
+- 타입: test
+- DOD: TODO-09 작성 산출물이 DGX 에서 실제 동작함을 확인. setup → preflight → smoke test 순차 PASS, GB10 throughput 실측치 기록.
+- 구현 대상: 없음 (검증·기록만)
+- 테스트: prod 검증 (DGX 접속 필요)
+
+#### Codex 검증 (비대화형 SSH)
+
+| # | 단계 | 기대 결과 |
+|---|---|---|
+| 1 | devPC: `bash scripts/deploy_dgx.sh` | rsync 정상 종료, DGX 측 `~/smolvla/dgx/` 와 `~/smolvla/docs/reference/lerobot/` 갱신 |
+| 2 | DGX: `bash -n ~/smolvla/dgx/scripts/setup_train_env.sh` | syntax check 통과 |
+| 3 | DGX: `bash -n ~/smolvla/dgx/scripts/preflight_check.sh` | syntax check 통과 |
+| 4 | DGX: `bash -n ~/smolvla/dgx/scripts/smoke_test.sh` | syntax check 통과 |
+| 5 | DGX: `ls ~/smolvla/dgx/scripts/` | 3개 스크립트 (setup_train_env, preflight_check, smoke_test) 존재 확인 |
+| 6 | DGX: `ls ~/smolvla/docs/reference/lerobot/src/lerobot/policies/smolvla/` | submodule 정상 배포 (configuration_smolvla.py 등 5개 파일) |
+
+#### 개발자 직접 검증 (대화형, 약 30~60 분 소요)
+
+| # | 단계 | 기대 결과 |
+|---|---|---|
+| 1 | DGX: `bash ~/smolvla/dgx/scripts/setup_train_env.sh` | venv 생성, PyTorch 2.10.0+cu130 설치, lerobot editable 설치, 검증 출력에 `torch.cuda.is_available()=True` + `GPU name: NVIDIA GB10` + `lerobot import OK` |
+| 2 | DGX: `source ~/smolvla/dgx/.arm_finetune/bin/activate && bash ~/smolvla/dgx/scripts/preflight_check.sh smoke` | preflight PASS (HF_HOME / venv / 메모리 / Walking RL / Ollama / 디스크 모두 PASS) |
+| 3 | DGX: `bash ~/smolvla/dgx/scripts/smoke_test.sh` | preflight 자동 통과 + lerobot-train 1 step 통과 (loss 값 출력, exit code 0). HF Hub 다운로드 약 5~15분 + 학습 1~3분 |
+| 4 | DGX: smoke_test 출력의 GPU util peak / GPU mem peak / 소요 시간 기록 | 결과를 `06_smolvla_finetune_feasibility.md §5.2` 표에 갱신 |
+
+- 제약: TODO-09 완료 후 진행 → 충족. **Walking RL 프로세스(env_isaaclab) 절대 건드리지 말 것.** preflight FAIL 시 본인 다른 프로세스만 정리 (Jupyter 커널, 본인 Ollama 등).
 - 잔여 리스크:
-  - DGX 디스크 용량 부족 시 사전학습 가중치/데이터셋 캐시 위치 분리 필요 (`HF_HOME`, `LEROBOT_HOME`)
-  - Ollama (포트 11434) 등 기존 서비스와 GPU 메모리 경합 → 학습 시 종료 필요 여부 점검
+  - HF Hub 다운로드가 네트워크 상황에 따라 시간 길어질 수 있음
+  - 첫 실행 시 GB10 capability 12.1 UserWarning 출력될 수 있으나 무시 가능 (`05_hf_model_selection.md` §3 / TODO-07 회신 참조)
+  - lerobot extras (`smolvla`, `training`) 의 transformers / accelerate / wandb 가 PyTorch 2.10.0+cu130 과 호환 안 될 가능성 — 1 step smoke test 가 그 검증 역할
+- **후행 작업 (TODO-09b 완료 후)**: `docs/storage/06_dgx_venv_setting.md` 신규 작성. 형식·범위는 `docs/storage/05_orin_venv_setting.md` 와 대칭으로:
+  - DGX 실측 기반 venv 구성 (Python 3.12.3 시스템 / `~/smolvla/dgx/.arm_finetune` / PyTorch 2.10.0+cu130)
+  - lerobot editable 설치 결과 + 실측 패키지 버전 표
+  - GB10 CUDA capability 12.1 UserWarning 동작 검증 결과
+  - smoke test 1 step throughput 실측치 (GPU util / mem peak / 소요 시간)
+  - cuDNN/NCCL wheel 번들 사용 근거 (시스템 별도 설치 X)
+  - Walking RL 동시 점유 시 메모리 분배 관찰 결과 (해당 시점에 동시 진행 중이라면)
+
+### [ ] TODO-09c: 학습 환경 세팅 — Orin 배포 경로 마이그레이션 검증
+
+- 타입: test
+- DOD: TODO-09 부수 작업으로 Orin 측 배포 경로가 `~/smolvla/` → `~/smolvla/orin/` 으로 변경된 후, 옛 잔여 파일이 정리되고 새 venv 가 정상 동작함을 확인. teleop 동작이 기존과 동일한지 확인 (이미 검증된 01_teleoptest 기능 회귀 X).
+- 구현 대상: 없음 (검증·정리만)
+- 테스트: prod 검증 (Orin 접속 필요)
+- 배경: `scripts/deploy_orin.sh` 의 배포 대상 경로가 변경되었으나, 이전 배포로 Orin 머신에 옛 경로 잔존 가능성 있음. rsync 는 새 경로만 동기화하므로 옛 파일 자동 삭제 X.
+
+#### Codex 검증 (비대화형 SSH)
+
+| # | 단계 | 기대 결과 |
+|---|---|---|
+| 1 | devPC: `bash scripts/deploy_orin.sh` | rsync 정상 종료, `~/smolvla/orin/` 새로 생성/갱신 |
+| 2 | Orin: `ls ~/smolvla/` | `orin/` 디렉터리 존재. 옛 잔여물 (`lerobot/`, `scripts/`, `calibration/`, `examples/`, `pyproject.toml`) 식별 |
+| 3 | Orin: `ls ~/smolvla/orin/scripts/` | `setup_env.sh`, `run_teleoperate.sh` 존재 |
+| 4 | Orin: `ls ~/smolvla/orin/lerobot/policies/smolvla/` | `configuration_smolvla.py` 등 정책 파일 존재 |
+| 5 | Orin: `bash -n ~/smolvla/orin/scripts/setup_env.sh` | syntax check 통과 |
+
+#### 개발자 직접 검증 (대화형, 약 20~40 분 소요)
+
+| # | 단계 | 기대 결과 |
+|---|---|---|
+| 1 | Orin: `deactivate 2>/dev/null \|\| true` (옛 venv 활성 상태면 해제) | 영향 없음 |
+| 2 | Orin: 옛 잔여물 삭제 — `rm -rf ~/smolvla/.venv ~/smolvla/lerobot ~/smolvla/scripts ~/smolvla/calibration ~/smolvla/examples` 와 `rm -f ~/smolvla/pyproject.toml ~/smolvla/README.md` (Codex 검증 #2 에서 식별된 항목만) | 옛 파일 모두 제거 |
+| 3 | Orin: `ls ~/smolvla/` | `orin/`, `dgx/`(있다면), `docs/`(있다면) 만 남음 |
+| 4 | Orin: `bash ~/smolvla/orin/scripts/setup_env.sh` | 새 venv `~/smolvla/orin/.hylion_arm` 생성, PyTorch + lerobot 설치, CUDA 검증 PASS |
+| 5 | Orin: `source ~/smolvla/orin/.hylion_arm/bin/activate && python ~/smolvla/orin/examples/tutorial/smolvla/smoke_test.py` | smolVLA 모델 로드 + forward pass 성공 (01_teleoptest TODO-01 동등 검증) |
+| 6 | Orin: `bash ~/smolvla/orin/scripts/run_teleoperate.sh --help` | help 출력 정상 (포트 인자 등) — teleop 회귀 검증의 minimal 단계 |
+
+- 제약: TODO-09 완료 후 진행 → 충족.
+- 잔여 리스크:
+  - 옛 venv 의 LD_LIBRARY_PATH 패치(cusparselt 우회) 가 새 venv 에 다시 적용돼야 함 — `setup_env.sh` 가 알아서 처리하지만 setup 출력에서 확인 필요
+  - calibration JSON 파일 (`~/.cache/huggingface/lerobot/calibration/...`) 은 사용자 홈 캐시에 저장되어 있어 본 마이그레이션과 무관 — 그대로 유지됨
+  - teleop 회귀 검증을 풀로 하려면 SO-ARM 양 팔 연결 + 물리 조작 필요. 본 TODO 에선 `--help` 출력만 minimal 검증 (calibration 재실행은 불필요)
 
 ### [ ] TODO-10: 배포 환경 세팅
 
