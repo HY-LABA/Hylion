@@ -80,7 +80,7 @@
   - 자유도 낮추기 가능 여부?
   - 양 팔 가능 여부?
 
-### [ ] 03_smolvla_test_on_orin
+### [x] 03_smolvla_test_on_orin
 
 - 목표: Orin 위에서 사전학습 smolVLA 추론 동작 확인
 

@@ -48,10 +48,10 @@
 
 ---
 
-## [03_smolvla_test_on_orin](03_smolvla_test_on_orin.md)
+## [03_smolvla_test_on_orin](history/03_smolvla_test_on_orin.md)
 
 > 목표: Orin 위에서 사전학습 smolVLA(`lerobot/smolvla_base`) 가 하드웨어와 함께 정상 동작하는지 검증
-> 작성: 2026-04-29
+> 작성: 2026-04-29 | 완료: 2026-04-29
 
 | # | 항목 | 발견 출처 | 우선순위 | 상태 |
 |---|------|-----------|----------|------|
