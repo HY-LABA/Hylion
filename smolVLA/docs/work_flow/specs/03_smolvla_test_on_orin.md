@@ -1,0 +1,153 @@
+# 20260429_smolvla_test_on_orin
+<!-- Claude Code + 개발자 협업 작성 -->
+
+> 목표: Orin 위에서 사전학습된 smolVLA (`lerobot/smolvla_base`) 가 하드웨어와 함께 정상 동작하는지 검증
+> 환경: Orin JetPack 6.2 | Python 3.10 | venv `~/smolvla/orin/.hylion_arm`
+> 접근: devPC (`babogaeguri@babogaeguri-950QED`) → `ssh orin` → Orin (`laba@ubuntu`)
+> Orin 코드 경로: `/home/laba/smolvla/orin/` (rsync 배포 기준)
+> 학습 대상: 없음 (추론 전용 검증). 사전학습 가중치 그대로 forward
+> 작성: 2026-04-29
+
+---
+
+## 참고 레퍼런스
+
+- `docs/reference/lerobot/src/lerobot/policies/smolvla/` — SmolVLA 정책 구현 (configuration, modeling, processor)
+- `docs/reference/lerobot/src/lerobot/robots/bi_so_follower/` — 양팔 SO follower 코드 (TODO-02 양팔 데이터셋 분석 시 참조)
+- `docs/reference/lerobot/src/lerobot/teleoperators/bi_so_leader/` — 양팔 SO leader 코드 (TODO-02 양팔 데이터셋 분석 시 참조)
+- `docs/reference/seeed-lerobot/src/lerobot/robots/bi_so_follower/` — Seeed fork 양팔 SO follower 코드 (TODO-02 비교 검토)
+- `docs/reference/seeed-lerobot/src/lerobot/teleoperators/bi_so_leader/` — Seeed fork 양팔 SO leader 코드 (TODO-02 비교 검토)
+- `docs/lerobot_study/03_smolvla_architecture.md` — SmolVLA 일반 구조 (입력 포맷, forward 흐름)
+- `docs/lerobot_study/03b_smolvla_milestone_config_guide.md` §2 `03_smolvla_test_on_orin` — 본 마일스톤 config 분기 가이드 (B1 / 모두 기본값 / `compile_model=False`)
+- `docs/lerobot_study/04_lerobot_dataset_structure.md` — LeRobotDataset 키 컨벤션 (TODO-02 산출물 작성 기준)
+- `docs/lerobot_study/05_hf_model_selection.md` — `lerobot/smolvla_base` 가 본 프로젝트 정책 체크포인트로 확정됨 (TODO-01 가중치 검증 기준)
+- `docs/storage/05_orin_venv_setting.md` — Orin venv 구성 (PyTorch JP 6.0 wheel, bf16 지원)
+- HuggingFace `lerobot/smolvla_base` 모델 카드 — 사전학습 가중치 출처
+- HuggingFace `lerobot/svla_so100_pickplace` 데이터셋 — 사전학습 데이터셋 (TODO-02 단일팔 분석 기준)
+- `arm_2week_plan.md` — `03_smolvla_test_on_orin` 마일스톤 정의
+
+## 레퍼런스 활용 규칙
+
+- 레퍼런스에 동일하거나 유사한 구현이 있으면 반드시 그것을 기반으로 작성한다.
+- 레퍼런스에 없는 새로운 스크립트·함수·클래스를 만들어야 할 경우, 구현 전에 반드시 사용자에게 설명하고 확인을 받은 뒤 진행한다.
+
+---
+
+## 본 마일스톤의 위치
+
+`arm_2week_plan.md` 의 03 마일스톤은 **사전학습 smolVLA 가 Orin 에서 하드웨어와 함께 잘 동작하는지 검증** 하는 단계.
+
+- 학습 안 함, 추론만
+- 가중치는 `lerobot/smolvla_base` 그대로 사용 (`03b_smolvla_milestone_config_guide.md §2` 의 B1)
+- 본 마일스톤의 산출물 (latency / VRAM / 학습 환경 미러링 결과) 은 04~07 의 자원·튜닝 기준선이 된다
+- **04_leftarmVLA 와의 차이**: 04 는 SO-ARM 의 배치·시작 각도가 본래 사전학습 분포(`svla_so100_pickplace`) 와 달라지는 단계. 03 은 그 직전 단계로, **가능한 한 사전학습 환경에 가깝게** Orin 추론 환경을 구성해 모델이 의도대로 동작하는지부터 확인한다.
+
+---
+
+## Todo
+
+### [ ] TODO-01: `lerobot/smolvla_base` 사전학습 가중치 검증
+
+- 타입: study
+- DOD: HuggingFace `lerobot/smolvla_base` 의 모델 카드와 safetensors 의 실제 파라미터 키를 검토하여, **expert layer (action expert) 가중치가 진짜로 포함되어 있음** 을 확인. 학습 흔적(`config.json` 의 `train_expert_only`, `freeze_vision_encoder`, `load_vlm_weights` 등) 을 정리하여 본 모델이 어떤 시나리오(S1~S4) 로 학습되었는지 추정. 본 결과를 `docs/lerobot_study/05_hf_model_selection.md` 와 일관되게 보충 정리.
+- 구현 대상:
+  - `docs/lerobot_study/07_smolvla_base_weight_inspection.md` — safetensors 키 dump (vlm / expert / state_proj / action_in_proj / action_out_proj 등 카테고리별 파라미터 수), config.json 분석, 학습 시나리오 추정, expert 포함 여부 결론
+- 테스트: 없음 (자가 검증 — 문서 작성으로 대체)
+- 참조:
+  - HuggingFace `lerobot/smolvla_base` (모델 카드, config.json, model.safetensors)
+  - `docs/reference/lerobot/src/lerobot/policies/smolvla/modeling_smolvla.py` (모듈 구조 — vlm / lm_expert / state_proj / action_in_proj / action_out_proj / action_time_mlp)
+  - `docs/lerobot_study/03_smolvla_architecture.md` §A·§B (학습 시나리오 / 가중치 출처)
+  - `docs/lerobot_study/05_hf_model_selection.md` §6 (모델 라이선스·재배포)
+- 제약: 가중치 파일은 다운로드 후 키만 inspect (전체 파라미터 값은 검토 불필요). 다운로드는 Orin 또는 devPC 어느 쪽이어도 무방하나, 캐시 활용 측면에서 Orin 에서 1회 받아두는 편이 효율적
+- 잔여 리스크:
+  - 모델 카드에 학습 시나리오 명시가 부족할 가능성 → 그 경우 코드 구조 + 파라미터 수로 추정
+  - safetensors 키 dump 결과가 `modeling_smolvla.py` 의 모듈명과 정확히 일치하지 않을 가능성 (HuggingFace 저장 시 prefix 변형) → 키 prefix 매핑 작업 포함
+
+### [ ] TODO-02: `svla_so100_pickplace` (단일팔) + 양팔 SO 데이터셋 구조 분석
+
+- 타입: study
+- DOD: 본 마일스톤(03) 과 후속 마일스톤(04 / 06) 의 데이터셋 구조 비교를 위한 산출물 작성. **사전학습 분포에 가까운 03 추론 환경의 입력 스펙(카메라 키 개수·이름·해상도, state·action dim, fps, 에피소드 수 등) 확정** 이 핵심 결과물.
+- 구현 대상:
+  - `docs/lerobot_study/07b_smolvla_pretrain_dataset_structure.md` — 두 섹션:
+    1. **단일팔** (`lerobot/svla_so100_pickplace`) — HuggingFace 데이터셋의 meta.json / info.json / 첫 에피소드 샘플 검토. 카메라 키 개수·이름, image shape, state·action dim, fps, 에피소드 수, 태스크 instruction. 03 추론 환경 입력 스펙의 기준
+    2. **양팔** (`docs/reference/lerobot/src/lerobot/robots/bi_so_follower/` + `docs/reference/seeed-lerobot/src/lerobot/robots/bi_so_follower/`) — 두 fork 의 양팔 follower / leader 코드를 비교 검토. 양팔의 state·action dim (12 DOF? 분리 키?), 카메라 키 컨벤션, 데이터셋 키 명명 규칙. 06_biarm_VLA 진입 시 결정해야 할 사항 정리
+  - **`empty_cameras` 동작 분석 한 절 포함**: 사전학습 분포(N대) 와 추론 환경 카메라 수(M대) 가 다를 때 `empty_cameras=N-M` 으로 더미 이미지를 채워 forward 가 가능하다는 것은 코드(`configuration_smolvla.py:123-130`, `modeling_smolvla.py:448-449`) 로 확인됨. 다만 **그 상태로 학습이 잘 수렴하는지** 는 03 에서 직접 학습 검증을 못 함 → 04_leftarmVLA 진입 시 검증 항목으로 위임. 본 절은 코드·문헌 분석 수준에서 `smolvla_aloha_sim` (3대 가정 + 더미) 의 선례와 본 프로젝트(2대 / 3대) 의 차이를 정리
+- 테스트: 없음
+- 참조:
+  - HuggingFace `lerobot/svla_so100_pickplace` (단일팔 데이터셋)
+  - `docs/reference/lerobot/src/lerobot/robots/bi_so_follower/` + `bi_so_leader/` (양팔 upstream)
+  - `docs/reference/seeed-lerobot/src/lerobot/robots/bi_so_follower/` + `bi_so_leader/` (양팔 Seeed fork)
+  - `docs/lerobot_study/04_lerobot_dataset_structure.md` (LeRobotDataset 키 컨벤션)
+  - `docs/reference/lerobot/src/lerobot/policies/smolvla/configuration_smolvla.py:44-49, 123-130` (`resize_imgs_with_padding`, `empty_cameras`)
+  - `docs/reference/lerobot/src/lerobot/policies/smolvla/modeling_smolvla.py:421-449` (image_features 처리 흐름)
+- 제약: 양팔 데이터셋의 경우 HuggingFace Hub 에 본 프로젝트와 동일 구성의 공식 양팔 SO 데이터셋이 없을 수 있음 → 그 경우 코드(robots/teleoperators 의 state/action 정의) 만으로 분석. 추정과 사실 구분하여 기록
+- 잔여 리스크:
+  - lerobot upstream 과 seeed-lerobot fork 의 양팔 구현 차이가 클 경우 06 결정에 영향 → 차이점을 명시적으로 정리
+  - 사전학습 데이터셋 카메라 수 < 04(2대) 일 경우, 04 학습 시 카메라 수 매칭(추가 카메라 입력) 으로 도메인 시프트 발생 → 04 진입 시 트리거할 후속 결정 사항으로 본 문서 §끝에 체크리스트로 남김
+
+### [ ] TODO-03: Orin 추론 환경 구성 — 학습 환경 미러링
+
+- 타입: task
+- DOD: TODO-02 산출물의 단일팔 데이터셋 입력 스펙(카메라 키 개수·이름·shape, state dim, language instruction) 에 정확히 맞춘 더미 입력 생성기 + smolvla_base 추론 래퍼가 작성됨. `compile_model=False`, `num_steps=10`, `n_action_steps=50` (모두 사전학습 분포에 일치하는 기본값) 로 forward pass 1회 가능.
+- 구현 대상:
+  - `orin/examples/tutorial/smolvla/inference_baseline.py` — TODO-02 산출물 기반 더미 입력 생성기 + `SmolVLAPolicy.from_pretrained("lerobot/smolvla_base")` 로딩 + `select_action` 1회 호출 + action shape / dtype / range 출력. 기존 `smoke_test.py` (환경 검증) / `load_checkpoint_test.py` (임의 ckpt 호환성 검증) 와 형제 — 본 스크립트는 **사전학습 분포에 미러링된 입력으로 baseline 동작 확인** 이 책임.
+- 테스트: 없음 (스크립트 작성 단계 — `python -m py_compile` syntax check 통과. 실 실행 검증은 TODO-05)
+- 제약: 카메라 키 이름·개수는 TODO-02 의 `svla_so100_pickplace` 분석 결과를 그대로 사용 (추측 금지). 사전학습 분포와 다른 부분 (예: SO-ARM 시작 각도, 책상 vs 토르소 부착 좌표계) 은 본 마일스톤 범위에서 건드리지 않음 — 그건 04 의 책임.
+- 잔여 리스크:
+  - `lerobot/smolvla_base` 첫 다운로드 시 네트워크 시간 (Orin 측 기준 5~15분) — TODO-09b / TODO-10b 에서 이미 다운로드되었으면 캐시 재활용
+  - language instruction 의 정확한 문자열 — 사전학습 분포와 동일하게 맞춰야 의미 있음 (TODO-02 에서 `single_task` 필드 확인 필요)
+
+### [ ] TODO-04: Orin latency / VRAM(UMA) 측정 스크립트 작성
+
+- 타입: task
+- DOD: TODO-03 의 inference_baseline.py 를 확장(또는 sibling 스크립트) 하여, warmup N회 + 측정 N회 forward 로 latency 분포(p50 / p95) + RAM(UMA) peak 측정. `num_steps∈{10, 5}` 두 설정 비교. 결과는 JSON 으로 저장하여 후속 분석/문서화 용이하게.
+- 구현 대상:
+  - `orin/examples/tutorial/smolvla/measure_latency.py` — argparse (`--num-steps`, `--warmup`, `--repeats`, `--output-json`) 지원. `time.perf_counter()` 기반 latency, `psutil` (또는 `tegrastats` 후처리) 으로 RAM peak. `torch.cuda.synchronize()` 호출로 GPU 측정 정확도 보장.
+- 테스트: 없음 (스크립트 작성 단계 — `python -m py_compile` syntax check 통과. 실 실행 검증은 TODO-05)
+- 제약: TODO-03 완료 후 진행 (입력 미러링 로직 재사용). 측정 자체는 더미 입력이라 호출 패턴만 평가됨 (실제 실시간 제어 latency 와 차이 가능 — 이는 07_biarm_deploy 단계에서 RTC + 실 카메라 입력으로 재측정).
+- 잔여 리스크:
+  - Orin UMA 메모리는 GPU/CPU 공유라 `torch.cuda.memory_*` 만으로는 부족 — 시스템 메모리(`free -h`) 병행 필요
+  - GB10/Orin 의 첫 forward 는 cuDNN benchmark / kernel autotuning 으로 매우 느릴 수 있음 → warmup 회수 충분히 (예: 10회)
+
+### [ ] TODO-05: Orin prod 검증 — 측정 + 결과 문서화
+
+- 타입: test
+- DOD: TODO-03·04 산출물이 Orin 에서 실제 동작함을 확인. inference_baseline.py forward PASS, measure_latency.py 두 설정(`num_steps=10`, `num_steps=5`) 측정 완료. 결과를 `docs/storage/07_smolvla_base_test_results.md` 로 정리.
+- 구현 대상:
+  - `docs/storage/07_smolvla_base_test_results.md` — 신규 작성. 형식은 `docs/storage/06_dgx_venv_setting.md` 와 대칭 (절 단위 구성). 포함 내용:
+    - §1 본 문서의 위치 (03 마일스톤 prod 검증 결과)
+    - §2 추론 환경 미러링 — TODO-02 의 사전학습 데이터셋 입력 스펙과 Orin 추론 환경의 입력 매칭 표
+    - §3 inference_baseline.py 실행 결과 (action shape, dtype, range)
+    - §4 latency 측정 (`num_steps=10` / `num_steps=5` 비교 표 — p50, p95, RAM peak)
+    - §5 04_leftarmVLA 진입 시 자원·튜닝 기준선 (실시간 제어 임계치 대비 latency 여유 / VRAM 여유)
+    - §6 잔여 리스크 — 더미 입력 vs 실 카메라 입력 차이, RTC 미평가 (07 단계로 위임)
+- 테스트: prod 검증 (Orin 접속 필요)
+
+#### Codex 검증 (비대화형 SSH)
+
+| # | 단계 | 기대 결과 |
+|---|---|---|
+| 1 | devPC: `bash scripts/deploy_orin.sh` | rsync 정상 종료, Orin 측 `~/smolvla/orin/examples/tutorial/smolvla/` 갱신 |
+| 2 | devPC: `python -m py_compile orin/examples/tutorial/smolvla/inference_baseline.py` | syntax check 통과 |
+| 3 | devPC: `python -m py_compile orin/examples/tutorial/smolvla/measure_latency.py` | syntax check 통과 |
+| 4 | Orin: `ssh orin "ls ~/smolvla/orin/examples/tutorial/smolvla/"` | `inference_baseline.py`, `measure_latency.py` 존재 |
+
+#### 개발자 직접 검증 (대화형, 약 30~60 분 소요)
+
+| # | 단계 | 기대 결과 |
+|---|---|---|
+| 1 | Orin: `source ~/smolvla/orin/.hylion_arm/bin/activate && python ~/smolvla/orin/examples/tutorial/smolvla/inference_baseline.py` | 정책 로드 → forward pass 통과 → action shape (1, 50, *) 출력. exit code 0. 첫 실행 시 HF Hub 다운로드 5~15분 |
+| 2 | Orin: `python ~/smolvla/orin/examples/tutorial/smolvla/measure_latency.py --num-steps 10 --warmup 10 --repeats 50 --output-json /tmp/latency_n10.json` | latency p50/p95 + RAM peak 출력, JSON 저장. exit code 0 |
+| 3 | Orin: `python ~/smolvla/orin/examples/tutorial/smolvla/measure_latency.py --num-steps 5 --warmup 10 --repeats 50 --output-json /tmp/latency_n5.json` | 동일 형식 결과, num_steps=10 대비 latency 감소 확인 |
+| 4 | devPC: `scp orin:/tmp/latency_n10.json /tmp/ && scp orin:/tmp/latency_n5.json /tmp/` | JSON 파일 devPC 로 회수 |
+| 5 | devPC: 회수된 JSON 으로 `docs/storage/07_smolvla_base_test_results.md` §3·§4 채움 | 표 완성 |
+
+- 제약: TODO-03·04 완료 후 진행. 첫 forward 는 매우 느릴 수 있으므로 warmup 충분히. Orin UMA 특성상 GPU 메모리 단독 측정 불가 — 시스템 메모리도 함께 기록.
+- 잔여 리스크:
+  - HF Hub 다운로드 네트워크 변동
+  - GB10 capability 12.1 UserWarning 출력 가능 (TODO-09b 와 동일 — 무시 가능)
+  - 더미 입력은 실 카메라 분포와 다름 → 본 측정은 "코드 경로 자원 점유" 의 baseline 일 뿐, 실 카메라 입력 latency 는 04 학습 후 별도 검증
+
+---
+
+> Backlog → [docs/work_flow/specs/BACKLOG.md](BACKLOG.md) 에 본 스펙 섹션을 추가하여 운영

@@ -28,10 +28,10 @@
 
 ---
 
-## [02_dgx_setting](02_dgx_setting.md)
+## [02_dgx_setting](history/02_dgx_setting.md)
 
 > 목표: DGX Spark 학습 환경 구축 + smolVLA 학습/배포 가능성 결정  
-> 작성: 2026-04-27 | TODO-02 완료: 2026-04-27
+> 작성: 2026-04-27 | 완료: 2026-04-29
 
 | # | 항목 | 발견 출처 | 우선순위 | 상태 |
 |---|------|-----------|----------|------|
@@ -45,3 +45,13 @@
 | 8 | Orin `dpkg` 중단 상태 발생 — `sudo dpkg --configure -a` 로 수동 복구 필요. 향후 `setup_env.sh` 앞단에 dpkg 상태 체크 추가 고려. | TODO-09c prod 검증 | 낮음 | 미완 |
 | 9 | `scripts/deploy_dgx.sh` 버그 2건: (1) DGX 측 대상 디렉터리 사전 생성 로직 없음 → rsync error 11 발생, (2) rsync 실패 후에도 exit code 0 반환 (마지막 `echo` 가 덮어씀). `ssh dgx "mkdir -p ~/smolvla/dgx ~/smolvla/docs/reference/lerobot"` 선행 실행 + `set -e` 또는 rsync 결과 명시적 체크 추가 필요. **TODO-09b 재테스트 전 반드시 수정.** | TODO-09b Codex 검증 | 높음 | 완료 (2026-04-28) |
 | 10 | `docs/storage/06_dgx_venv_setting.md` 신규 작성 — TODO-09b 완료 후 후행 작업. 형식은 `docs/storage/05_orin_venv_setting.md` 와 대칭. DGX venv 구성(Python 3.12.3 / `.arm_finetune` / PyTorch 2.10.0+cu130), lerobot editable 설치 실측, GB10 UserWarning 동작 검증, smoke test throughput 실측치, Walking RL 동시 점유 관찰 결과 포함. | TODO-09b 완료 후행 | 중간 | 미완 |
+
+---
+
+## [03_smolvla_test_on_orin](03_smolvla_test_on_orin.md)
+
+> 목표: Orin 위에서 사전학습 smolVLA(`lerobot/smolvla_base`) 가 하드웨어와 함께 정상 동작하는지 검증
+> 작성: 2026-04-29
+
+| # | 항목 | 발견 출처 | 우선순위 | 상태 |
+|---|------|-----------|----------|------|
