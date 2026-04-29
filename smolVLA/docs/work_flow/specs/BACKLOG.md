@@ -57,7 +57,12 @@
 |---|------|-----------|----------|------|
 | 1 | smolvla_base 학습 카메라 키(`camera1/2/3`)와 svla_so100_pickplace 데이터셋 카메라 키(`top/wrist`) 불일치 — 실 하드웨어 배포(04) 시 카메라 키 매핑 결정 필요 | TODO-02 분석 | 높음 | 미완 |
 | 2 | `empty_cameras` 더미 패딩으로 카메라 수 불일치 forward 가능하나 학습 수렴 보장 없음 — 04_leftarmVLA 진입 시 실 검증 필요 | TODO-02 분석 | 높음 | 미완 |
-| 3 | inference_baseline.py 실 실행 검증 미완 — TODO-05 prod 실행 시 `ModuleNotFoundError: No module named 'orin'` 발생. PYTHONPATH 수정 후 재테스트 필요 | TODO-03 / TODO-05 | 높음 | 미완 |
-| 4 | measure_latency.py 실 실행 검증 미완 — TODO-05 prod 실행 시 동일 `ModuleNotFoundError` 발생. PYTHONPATH 수정 후 재테스트 필요 | TODO-04 / TODO-05 | 높음 | 미완 |
-| 5 | 실행 명령에 PYTHONPATH 미포함 — `from orin.lerobot...` import 사용 스크립트가 직접 실행(`python ~/smolvla/orin/examples/...`) 시 `/home/laba/smolvla` 가 `sys.path` 에 없어 실패. 수정 방향: 실행 명령 앞 `PYTHONPATH=/home/laba/smolvla` 추가 또는 `orin/pyproject.toml` editable install 방식 검토 | TODO-05 prod 검증 | 높음 | 미완 |
-| 6 | `docs/storage/07_smolvla_base_test_results.md` 미작성 — TODO-05 Orin 실행 FAIL 로 inference 출력·latency JSON 없음. PYTHONPATH 수정 후 재실행 시 작성 | TODO-05 | 높음 | 미완 |
+| 3 | inference_baseline.py 실 실행 검증 미완 — TODO-05 prod 실행 시 `ModuleNotFoundError: No module named 'orin'` 발생. TODO-06 으로 코드 수정 완료, prod 검증은 TODO-06b 가 수행 | TODO-03 / TODO-05 | 높음 | 코드 수정 완료 (2026-04-29) — prod 검증 대기 |
+| 4 | measure_latency.py 실 실행 검증 미완 — TODO-05 prod 실행 시 동일 `ModuleNotFoundError` 발생. TODO-06 으로 코드 수정 완료, prod 검증은 TODO-06b 가 수행 | TODO-04 / TODO-05 | 높음 | 코드 수정 완료 (2026-04-29) — prod 검증 대기 |
+| 5 | `from orin.lerobot...` 임포트 일탈 — TODO-06 으로 4줄 수정 + 회귀 grep PASS (0건). 사전 점검에서 obs 구조 / 헬퍼 사용 / 카메라 키 처리 전반이 모델 forward 기대와 어긋남을 발견 → 두 파일 `smoke_test.py` 패턴으로 전면 재작성 | TODO-05 prod 검증 | 높음 | 완료 (2026-04-29) |
+| 6 | `docs/storage/07_smolvla_base_test_results.md` 미작성 — TODO-06b 에서 작성 | TODO-05 | 높음 | TODO-06b owned |
+| 7 | 04 진입 시 데이터 분포 기반 action 클램프 도입 검토 — 03 의 hardware-in-the-loop 검증(TODO-07b) 에서는 모터 토크 한계 + `n_action_steps=5` 만으로 안전 확보. 04 학습 데이터의 action 분포가 확보되면 95%ile 기반 클램프 추가하여 추론 단 안전 마진 강화 | TODO-07 안전 장치 (ii) | 중간 | 미완 |
+| 8 | `make_pre_post_processors(policy.config, pretrained_path=MODEL_ID, ...)` 가 HF Hub 에서 preprocessor config 를 받아오는데, smolvla_base 가 이 파일을 게시했는지 미확인 — TODO-06b prod 실행 시 검증 필요. 없으면 fallback 으로 `make_pre_post_processors(policy.config)` (인자 없이) 또는 `make_smolvla_pre_post_processors(policy.config)` 직접 호출 시도 | TODO-06 작업 중 식별 | 중간 (TODO-06b 트리거 시 높음) | 미완 |
+| 9 | `policy.config.num_steps` runtime override 가 forward 시 정상 반영되는지 미검증 — `modeling_smolvla.py` 가 매번 `self.config.num_steps` 를 읽으므로 동작 예상되나 TODO-06b prod 실행 시 num_steps∈{10,5} 두 결과의 latency 차이로 실 검증 | TODO-06 작업 중 식별 | 중간 | 미완 |
+| 10 | `policy.config.n_action_steps = 5` 가 select_action 의 queue 동작에 정상 반영되는지 미검증 — TODO-07b dry-run JSON 의 step 0~4 action 값이 동일 chunk 출처인지(queue OK) 또는 매 step 새 forward 출처인지(queue 미동작) 검토. queue 미동작 시 hil_inference.py 의 메인 루프가 매번 forward 를 새로 호출하는 셈이라 안전 장치 (iii) 의 의미 약화 → 별도 처리 필요 | TODO-07 작업 중 식별 | 중간 (TODO-07b 트리거 시 높음) | 미완 |
+| 11 | 카메라 슬롯 임의 매핑 (`top → camera1`, `wrist → camera2`) 의 사전학습 분포 의미 미확인 — smolvla_base config 는 `camera1/2/3` 키만 알고 그것이 의미적으로 top 인지 wrist 인지 모름. 03 단계는 정성 검증이라 OK 이나 04 진입 시 데이터 수집 단계에서 사전학습 분포 의미와 어긋나면 재정렬 필요 | TODO-07 작업 중 식별 | 낮음 (04 트리거 시 중간) | 미완 |

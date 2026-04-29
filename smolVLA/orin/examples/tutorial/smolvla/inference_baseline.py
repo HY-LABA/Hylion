@@ -1,47 +1,59 @@
+"""smolvla_base 사전학습 모델 forward baseline 검증.
+
+03_smolvla_test_on_orin TODO-03 의 책임 — 사전학습 분포에 미러링된 입력으로
+1회 forward 가 정상 동작하는지 확인. 카메라 키 / state dim 등은
+model.config.input_features 에서 자동 추출하여 사전학습 분포와 일치 보장.
+
+기본 동작 검증만 수행 — latency / VRAM 정량 측정은 measure_latency.py 가 책임.
+"""
+
+import numpy as np
 import torch
-from orin.lerobot.policies.smolvla import SmolVLAPolicy
-from orin.lerobot.policies.smolvla import make_smolvla_pre_post_processors
 
-# Device
+from lerobot.policies.smolvla import SmolVLAPolicy
+from lerobot.policies import make_pre_post_processors
+from lerobot.policies.utils import prepare_observation_for_inference
+
 DEVICE = "cuda"
+MODEL_ID = "lerobot/smolvla_base"
+TASK = "Pick up the cube and place it in the box."
+ROBOT_TYPE = "so100_follower"
 
-# Model loading
-policy = SmolVLAPolicy.from_pretrained("lerobot/smolvla_base")
+print(f"[load] {MODEL_ID}")
+policy = SmolVLAPolicy.from_pretrained(MODEL_ID).to(DEVICE)
+policy.eval()
 
-# Dummy input spec (from current_task.md)
-# Camera keys: observation.images.camera1, camera2, camera3
-# Image shape: [1, 3, 480, 640] (B=1, C=3, H=480, W=640)
-# State key: observation.state, shape: [1, 6]
-# Language instruction: "Pick up the cube and place it in the box."
+print("[input_features]")
+for k, v in policy.config.input_features.items():
+    print(f"  {k}: {v}")
 
-obs = {
-    "observation": {
-        "images": {
-            "camera1": torch.zeros((1, 3, 480, 640), dtype=torch.float32, device=DEVICE),
-            "camera2": torch.zeros((1, 3, 480, 640), dtype=torch.float32, device=DEVICE),
-            "camera3": torch.zeros((1, 3, 480, 640), dtype=torch.float32, device=DEVICE),
-        },
-        "state": torch.zeros((1, 6), dtype=torch.float32, device=DEVICE),
-    },
-    "language_instruction": ["Pick up the cube and place it in the box."]
-}
+dummy_obs: dict[str, np.ndarray] = {}
+for key, feat in policy.config.input_features.items():
+    if "image" in key:
+        dummy_obs[key] = np.random.randint(0, 255, (480, 640, 3), dtype=np.uint8)
+    else:
+        dim = len(feat.names) if hasattr(feat, "names") and feat.names else 6
+        dummy_obs[key] = np.random.rand(dim).astype(np.float32)
 
-# Pre/post-processors
-pre, post = make_smolvla_pre_post_processors(policy.config)
+print(f"[dummy_obs keys] {list(dummy_obs.keys())}")
 
-# Preprocess
-obs_proc = pre(obs)
+preprocess, postprocess = make_pre_post_processors(
+    policy.config,
+    pretrained_path=MODEL_ID,
+    preprocessor_overrides={"device_processor": {"device": DEVICE}},
+)
 
-# Inference
-with torch.no_grad():
-    action = policy.select_action(obs_proc)
+obs_tensor = prepare_observation_for_inference(
+    dummy_obs, device=DEVICE, task=TASK, robot_type=ROBOT_TYPE
+)
+obs_tensor = preprocess(obs_tensor)
 
-# Postprocess
-if hasattr(action, "cpu"):
-    action = action.cpu()
-action = post(action)
+with torch.inference_mode():
+    action = policy.select_action(obs_tensor)
 
-print("Action shape:", action.shape)
-print("Action dtype:", action.dtype)
-print("Action min:", action.min().item())
-print("Action max:", action.max().item())
+action = postprocess(action)
+
+print(f"Action shape: {tuple(action.shape)}")
+print(f"Action dtype: {action.dtype}")
+print(f"Action min:   {action.min().item():.6f}")
+print(f"Action max:   {action.max().item():.6f}")
