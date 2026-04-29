@@ -55,3 +55,9 @@
 
 | # | 항목 | 발견 출처 | 우선순위 | 상태 |
 |---|------|-----------|----------|------|
+| 1 | smolvla_base 학습 카메라 키(`camera1/2/3`)와 svla_so100_pickplace 데이터셋 카메라 키(`top/wrist`) 불일치 — 실 하드웨어 배포(04) 시 카메라 키 매핑 결정 필요 | TODO-02 분석 | 높음 | 미완 |
+| 2 | `empty_cameras` 더미 패딩으로 카메라 수 불일치 forward 가능하나 학습 수렴 보장 없음 — 04_leftarmVLA 진입 시 실 검증 필요 | TODO-02 분석 | 높음 | 미완 |
+| 3 | inference_baseline.py 실 실행 검증 미완 — TODO-05 prod 실행 시 `ModuleNotFoundError: No module named 'orin'` 발생. PYTHONPATH 수정 후 재테스트 필요 | TODO-03 / TODO-05 | 높음 | 미완 |
+| 4 | measure_latency.py 실 실행 검증 미완 — TODO-05 prod 실행 시 동일 `ModuleNotFoundError` 발생. PYTHONPATH 수정 후 재테스트 필요 | TODO-04 / TODO-05 | 높음 | 미완 |
+| 5 | 실행 명령에 PYTHONPATH 미포함 — `from orin.lerobot...` import 사용 스크립트가 직접 실행(`python ~/smolvla/orin/examples/...`) 시 `/home/laba/smolvla` 가 `sys.path` 에 없어 실패. 수정 방향: 실행 명령 앞 `PYTHONPATH=/home/laba/smolvla` 추가 또는 `orin/pyproject.toml` editable install 방식 검토 | TODO-05 prod 검증 | 높음 | 미완 |
+| 6 | `docs/storage/07_smolvla_base_test_results.md` 미작성 — TODO-05 Orin 실행 FAIL 로 inference 출력·latency JSON 없음. PYTHONPATH 수정 후 재실행 시 작성 | TODO-05 | 높음 | 미완 |

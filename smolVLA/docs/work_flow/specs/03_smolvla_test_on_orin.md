@@ -46,7 +46,7 @@
 
 ## Todo
 
-### [ ] TODO-01: `lerobot/smolvla_base` 사전학습 가중치 검증
+### [x] TODO-01: `lerobot/smolvla_base` 사전학습 가중치 검증
 
 - 타입: study
 - DOD: HuggingFace `lerobot/smolvla_base` 의 모델 카드와 safetensors 의 실제 파라미터 키를 검토하여, **expert layer (action expert) 가중치가 진짜로 포함되어 있음** 을 확인. 학습 흔적(`config.json` 의 `train_expert_only`, `freeze_vision_encoder`, `load_vlm_weights` 등) 을 정리하여 본 모델이 어떤 시나리오(S1~S4) 로 학습되었는지 추정. 본 결과를 `docs/lerobot_study/05_hf_model_selection.md` 와 일관되게 보충 정리.
@@ -63,7 +63,7 @@
   - 모델 카드에 학습 시나리오 명시가 부족할 가능성 → 그 경우 코드 구조 + 파라미터 수로 추정
   - safetensors 키 dump 결과가 `modeling_smolvla.py` 의 모듈명과 정확히 일치하지 않을 가능성 (HuggingFace 저장 시 prefix 변형) → 키 prefix 매핑 작업 포함
 
-### [ ] TODO-02: `svla_so100_pickplace` (단일팔) + 양팔 SO 데이터셋 구조 분석
+### [x] TODO-02: `svla_so100_pickplace` (단일팔) + 양팔 SO 데이터셋 구조 분석
 
 - 타입: study
 - DOD: 본 마일스톤(03) 과 후속 마일스톤(04 / 06) 의 데이터셋 구조 비교를 위한 산출물 작성. **사전학습 분포에 가까운 03 추론 환경의 입력 스펙(카메라 키 개수·이름·해상도, state·action dim, fps, 에피소드 수 등) 확정** 이 핵심 결과물.
@@ -85,7 +85,7 @@
   - lerobot upstream 과 seeed-lerobot fork 의 양팔 구현 차이가 클 경우 06 결정에 영향 → 차이점을 명시적으로 정리
   - 사전학습 데이터셋 카메라 수 < 04(2대) 일 경우, 04 학습 시 카메라 수 매칭(추가 카메라 입력) 으로 도메인 시프트 발생 → 04 진입 시 트리거할 후속 결정 사항으로 본 문서 §끝에 체크리스트로 남김
 
-### [ ] TODO-03: Orin 추론 환경 구성 — 학습 환경 미러링
+### [x] TODO-03: Orin 추론 환경 구성 — 학습 환경 미러링
 
 - 타입: task
 - DOD: TODO-02 산출물의 단일팔 데이터셋 입력 스펙(카메라 키 개수·이름·shape, state dim, language instruction) 에 정확히 맞춘 더미 입력 생성기 + smolvla_base 추론 래퍼가 작성됨. `compile_model=False`, `num_steps=10`, `n_action_steps=50` (모두 사전학습 분포에 일치하는 기본값) 로 forward pass 1회 가능.
@@ -97,7 +97,7 @@
   - `lerobot/smolvla_base` 첫 다운로드 시 네트워크 시간 (Orin 측 기준 5~15분) — TODO-09b / TODO-10b 에서 이미 다운로드되었으면 캐시 재활용
   - language instruction 의 정확한 문자열 — 사전학습 분포와 동일하게 맞춰야 의미 있음 (TODO-02 에서 `single_task` 필드 확인 필요)
 
-### [ ] TODO-04: Orin latency / VRAM(UMA) 측정 스크립트 작성
+### [x] TODO-04: Orin latency / VRAM(UMA) 측정 스크립트 작성
 
 - 타입: task
 - DOD: TODO-03 의 inference_baseline.py 를 확장(또는 sibling 스크립트) 하여, warmup N회 + 측정 N회 forward 로 latency 분포(p50 / p95) + RAM(UMA) peak 측정. `num_steps∈{10, 5}` 두 설정 비교. 결과는 JSON 으로 저장하여 후속 분석/문서화 용이하게.
@@ -147,6 +147,13 @@
   - HF Hub 다운로드 네트워크 변동
   - GB10 capability 12.1 UserWarning 출력 가능 (TODO-09b 와 동일 — 무시 가능)
   - 더미 입력은 실 카메라 분포와 다름 → 본 측정은 "코드 경로 자원 점유" 의 baseline 일 뿐, 실 카메라 입력 latency 는 04 학습 후 별도 검증
+- 테스트 결과 기록 (2026-04-29):
+  - Codex 비대화형 검증 4단계 전부 PASS
+  - 개발자 직접 검증 step 2~5 FAIL: `ModuleNotFoundError: No module named 'orin'`
+  - 원인: `from orin.lerobot...` import 가 `/home/laba/smolvla` 를 `sys.path` 에 요구하나 직접 실행 명령에 미포함
+  - 수정 방향: 실행 명령 앞에 `PYTHONPATH=/home/laba/smolvla` 추가 또는 editable install 방식 검토
+  - `docs/storage/07_smolvla_base_test_results.md` 미작성 (BLOCKED — Orin 실행 미통과)
+  - history: `docs/work_flow/context/history/03_smolvla_test_on_orin/20260429_1454_test_orin_inference_fail.md`
 
 ---
 

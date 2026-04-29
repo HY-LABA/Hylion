@@ -5,7 +5,7 @@ Copilot이 업데이트한 current_task.md를 읽고 spec에 반영한 뒤 histo
 ## 실행 순서
 
 1. `docs/work_flow/context/current_task.md` 를 읽는다.
-   - `## 업데이트` 섹션에 내용이 없으면 개발자에게 알리고 종료한다.
+   - `## 업데이트` > `### 변경한 내용` 아래에 실제 내용이 없으면 개발자에게 알리고 종료한다.
 
 2. current_task.md 헤더에서 연결된 스펙 파일 경로와 TODO 번호를 확인한다.
 
