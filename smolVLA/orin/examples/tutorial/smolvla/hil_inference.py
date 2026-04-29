@@ -54,6 +54,18 @@ def parse_camera_arg(value: str) -> dict[str, int]:
     return pairs
 
 
+def parse_camera_names(value: str) -> set[str]:
+    """`--flip-cameras wrist,top` 형식을 파싱."""
+    return {name.strip() for name in value.split(",") if name.strip()}
+
+
+def flip_observation_cameras(obs: dict, slots: set[str]) -> dict:
+    """Raw camera observations for selected slots only, flipped vertically."""
+    for slot in slots:
+        obs[slot] = obs[slot][::-1, :, :].copy()
+    return obs
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="SmolVLA hardware-in-the-loop inference on Orin + SO-ARM follower."
@@ -81,6 +93,12 @@ def main():
         type=parse_camera_arg,
         default=parse_camera_arg("top:0,wrist:1"),
         help="Camera mapping `name:device_idx,...` (default: top:0,wrist:1).",
+    )
+    parser.add_argument(
+        "--flip-cameras",
+        type=parse_camera_names,
+        default=set(),
+        help="Comma-separated camera names to vertically flip before inference (e.g., wrist).",
     )
     parser.add_argument(
         "--n-action-steps",
@@ -111,6 +129,13 @@ def main():
             f"Expected slots: {SLOT_MAP}."
         )
 
+    unknown_flip_cameras = args.flip_cameras - set(args.cameras)
+    if unknown_flip_cameras:
+        parser.error(
+            f"--flip-cameras contains unknown cameras: {sorted(unknown_flip_cameras)}. "
+            f"Known cameras: {list(args.cameras)}."
+        )
+
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     # ── 1. Model load ─────────────────────────────────────────
@@ -131,11 +156,15 @@ def main():
 
     # ── 2. Camera + Follower setup ────────────────────────────
     camera_config: dict[str, OpenCVCameraConfig] = {}
+    flip_slots: set[str] = set()
     for slot, (name, idx) in zip(SLOT_MAP, args.cameras.items()):
         camera_config[slot] = OpenCVCameraConfig(
             index_or_path=idx, width=640, height=480, fps=30
         )
-        print(f"[camera] {slot} ← {name} (device {idx})")
+        if name in args.flip_cameras:
+            flip_slots.add(slot)
+        flip_note = ", flip=vertical" if slot in flip_slots else ""
+        print(f"[camera] {slot} ← {name} (device {idx}{flip_note})")
 
     robot_cfg = SO100FollowerConfig(
         port=args.follower_port,
@@ -174,6 +203,8 @@ def main():
 
         while step_count < args.max_steps and not interrupted:
             obs = robot.get_observation()
+            if flip_slots:
+                obs = flip_observation_cameras(obs, flip_slots)
             obs_frame = build_inference_frame(
                 observation=obs,
                 ds_features=ds_features,

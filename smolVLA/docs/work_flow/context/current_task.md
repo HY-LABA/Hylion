@@ -87,6 +87,11 @@
 
 작업 시작 전 사전 점검 4단계 완료 후 사용자 승인 받아 신규 파일 1개 작성.
 
+2026-04-29 테스트 중 추가:
+- `orin/examples/tutorial/smolvla/hil_inference.py` 에 `--flip-cameras` 옵션 추가.
+- 지정한 카메라 이름의 raw observation 이미지를 policy 입력 전 상하반전하도록 처리.
+- 이번 Orin 검증에서 wrist 카메라가 상하반전된 상태라 `--flip-cameras wrist` 로 테스트 한정 보정 가능.
+
 **사전 점검 산출 결정**:
 - TODO-02 산출물 (`docs/lerobot_study/07b_smolvla_pretrain_dataset_structure.md`) 검토:
   - smolvla_base config 카메라 키 = `camera1/2/3` (3대), svla_so100_pickplace 데이터셋 키 = `top/wrist` (2대) — 사전학습은 LeRobot Community Datasets 통합 분포로 추정
@@ -117,6 +122,9 @@
 | 2 | 회귀 grep `^from orin\|^import orin` (orin/ 전체) | PASS (0건 — TODO-06 완료 상태 유지) |
 | 3 | 임포트 심볼 export 확인 — `OpenCVCameraConfig` ([orin/lerobot/cameras/opencv/__init__.py:18](../../orin/lerobot/cameras/opencv/__init__.py)), `make_pre_post_processors` ([orin/lerobot/policies/__init__.py:35](../../orin/lerobot/policies/__init__.py)), `SmolVLAPolicy` ([orin/lerobot/policies/smolvla/__init__.py:19](../../orin/lerobot/policies/smolvla/__init__.py)), `make_robot_action` ([orin/lerobot/policies/__init__.py:29](../../orin/lerobot/policies/__init__.py)), `SO100Follower` / `SO100FollowerConfig` ([orin/lerobot/robots/so_follower/__init__.py:26-27](../../orin/lerobot/robots/so_follower/__init__.py)) | PASS (5건 모두 export) |
 | 4 | 모듈 직접 경로 import — `build_inference_frame` ([orin/lerobot/policies/utils.py:140](../../orin/lerobot/policies/utils.py)), `hw_to_dataset_features` ([orin/lerobot/utils/feature_utils.py:47](../../orin/lerobot/utils/feature_utils.py)) | PASS (`__all__` 미등록이나 모듈 경로 직접 import 가능 — `using_smolvla_example.py` 동일 패턴) |
+| 5 | `python -m py_compile orin/examples/tutorial/smolvla/hil_inference.py` (`--flip-cameras` 추가 후) | PASS (출력 없음, exit 0) |
+| 6 | 회귀 grep `^from orin\|^import orin` (orin/ 전체, `--flip-cameras` 추가 후) | PASS (0건) |
+| 7 | Orin: `ssh orin "source ~/smolvla/orin/.hylion_arm/bin/activate && python ~/smolvla/orin/examples/tutorial/smolvla/hil_inference.py --help"` | PASS (`--flip-cameras` help 출력 확인, exit 0) |
 
 devPC 측 PyTorch 미설치로 실 import smoke 는 미수행 — Orin 측 prod 검증은 TODO-07b 의 책임.
 
