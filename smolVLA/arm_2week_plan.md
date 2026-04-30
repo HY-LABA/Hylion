@@ -84,36 +84,53 @@
 
 - 목표: Orin 위에서 사전학습 smolVLA 추론 동작 확인
 
-### [ ] 04_leftarmVLA
+### [ ] 04_infra_setup
+
+- 목표: leftarmVLA 사이클 진입 가능한 4-노드 인프라 셋업 — devPC + DataCollector(신규) + DGX + Orin
+- 배경: smolVLA 학습 정확도는 시연장 환경 미러링에 크게 의존. DGX·Orin 은 시연장과 떨어져 있어 시연장 인근의 데이터 수집 전용 노드(DataCollector) 가 필요. 결과적으로 데이터 수집(DataCollector) → 학습(DGX) → 추론(시연장 Orin) 의 분리된 흐름이 됨.
+- 주요 작업:
+  - orin/ 디렉터리 구조 정리 (lerobot inference-only 트리밍, tests/·config/·checkpoints/ 신규, calibration/ 제거)
+  - dgx/ 디렉터리 구조 정리 (orin/scripts/run_teleoperate.sh 이관 등)
+  - DataCollector 노드 신규 셋업 (하드웨어·OS·venv·lerobot 의존성 결정 + 디렉터리 신규)
+  - 환경 점검 게이트 스크립트 (시나리오 점검: 카메라 인덱스·flip / SO-ARM 포트 / venv. first-time / resume 두 모드)
+  - 시연장 환경 미러링 가이드 (사용자 책임 + 기록 위주)
+  - DataCollector → DGX 데이터 전송 경로 + DGX → Orin ckpt 전송 경로 모두 동작 확인
+- 결정사항 (04 진행 중 확정):
+  - DataCollector 노드 정체 (별도 PC vs 기존 노트북 vs 시연장 PC)
+  - 데이터 전송 방식 (HuggingFace Hub vs rsync 직접 vs 둘 다)
+  - 시연장 미러링 검증 깊이 (육안 + 사진 vs 자동 검증 스크립트)
+
+### [ ] 05_leftarmVLA
 
 - 목표: 단일 팔 (left arm, 휴머노이드 토르소 부착) 기준 smolVLA 파인튜닝 → Orin 배포까지 한 사이클 완주
 - 주요 작업:
   - 휴머노이드 토르소 부착 SO-ARM (left arm) calibration 및 작업 영역 재정의
-  - 풀 6 DOF 유지로 데이터 수집 → 학습 → Orin 배포까지 한 사이클 완주 (자유도 축소는 적용하지 않음, 02 TODO-11 결론)
+  - 풀 6 DOF 유지로 데이터 수집(DataCollector) → 학습(DGX) → 시연장 Orin 배포까지 한 사이클 완주 (자유도 축소는 적용하지 않음, 02 TODO-11 결론)
 - 고려사항:
   - 표준 SO-ARM 책상 mount 와 다른 좌표계·관절 한계 (어깨가 토르소에 부착되어 가용 작업 공간 변화)
   - 사전학습 smolvla_base 가 표준 SO-ARM 분포로 학습된 점 → 도메인 시프트 존재
-- 위치: 본 마일스톤은 "left arm 단일팔 사이클 자체의 검증·데모" 가 목적이며, 06 양팔 학습의 사전 단계가 아니다 (06 은 양팔 데이터로 처음부터 학습).
+  - 04 에서 셋업된 DataCollector 의 시연장 미러링 환경에서 데이터 수집 (학습 정확도의 핵심)
+- 위치: 본 마일스톤은 "left arm 단일팔 사이클 자체의 검증·데모" 가 목적이며, 07 양팔 학습의 사전 단계가 아니다 (07 은 양팔 데이터로 처음부터 학습).
 
-### [ ] 05_biarm_teleop_on_dgx
+### [ ] 06_biarm_teleop_on_dgx
 
-- 목표: 양팔 (left + right SO-ARM, 토르소 부착) teleoperation 데이터 수집 환경 (DGX 기준) 구축
+- 목표: 양팔 (left + right SO-ARM, 토르소 부착) teleoperation 데이터 수집 환경 구축 (DataCollector 기준)
 - 주요 작업:
   - 양팔 teleop 동작 검증 (좌·우 leader → 좌·우 follower)
   - 카메라 3대 구성 확정 및 데이터 수집 (손목 좌·우 2대 + 전체 조망 1대, base 미포함)
-- 결정사항 (05 진행 중 확정):
+- 결정사항 (06 진행 중 확정):
   - 데이터셋 카메라 키 컨벤션: `observation.images.{wrist_left, wrist_right, overview}` (또는 동등)
   - `observation.state` / `action` 12 DOF 매핑: `[left_6, right_6]` 단일 키 vs 좌·우 분리 키
 - 고려사항:
-  - 카메라 3대 구성은 smolvla_base 사전학습 분포 (보통 1~2 카메라) 와 다름 → 06 학습 시 expert 학습에 가장 큰 영향
+  - 카메라 3대 구성은 smolvla_base 사전학습 분포 (보통 1~2 카메라) 와 다름 → 07 학습 시 expert 학습에 가장 큰 영향
   - 손목 카메라는 그리퍼 동작을 가까이서 촬영 → 사전학습된 SmolVLM2 vision encoder 분포와 차이
   - 양팔이 토르소에 부착된 상태에서 teleop 시 좌·우 팔 충돌 회피 작업 영역 정의 필요
 
-### [ ] 06_biarm_VLA
+### [ ] 07_biarm_VLA
 
 - 목표: 양팔 데이터로 smolVLA 파인튜닝 → 양팔 추론 동작 검증
 - 주요 작업:
-  - 05 에서 수집한 양팔 12 DOF + 카메라 3대 구성 데이터로 smolVLA 파인튜닝 (단일팔에서 전이하지 않고 양팔 데이터로 처음부터 학습)
+  - 06 에서 수집한 양팔 12 DOF + 카메라 3대 구성 데이터로 smolVLA 파인튜닝 (단일팔에서 전이하지 않고 양팔 데이터로 처음부터 학습)
 - 고려사항:
   - SmolVLA `max_state_dim=32` / `max_action_dim=32` padding 으로 12 DOF 양팔 수용 가능 (코드 차원 확인 완료, `docs/lerobot_study/03_smolvla_architecture.md` §A·§E 참조)
   - 카메라 3대 → smolvla_base 사전학습 분포 차이로 vision/connector 까지 푸는 풀 파인튜닝(S3) 검토 필요할 수 있음. 첫 시도는 표준 파인튜닝(S1) 부터.
@@ -121,9 +138,9 @@
 - 비상 옵션:
   - 잘 안되면 머리 위에 더듬이 카메라 다는 것 고려 (조망 카메라 보강)
 
-### [ ] 07_biarm_deploy
+### [ ] 08_biarm_deploy
 
-- 목표: 양팔 VLA 정책을 Orin 에 배포하여 최종 데모 가능 상태로 완성
+- 목표: 양팔 VLA 정책을 시연장 Orin 에 배포하여 최종 데모 가능 상태로 완성
 - 고려사항:
   - 카메라 3대 + 양팔 SO-ARM 보드 2대 + 토르소 측 추가 USB 가능성 → Orin USB 포트 / 허브 구성 점검 (02_hardware 와 연동)
   - `num_steps` / `n_action_steps` 튜닝으로 Orin 추론 latency 최적화 (`docs/lerobot_study/03_smolvla_architecture.md` §F·§E 참조)

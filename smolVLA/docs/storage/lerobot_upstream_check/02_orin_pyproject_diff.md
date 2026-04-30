@@ -63,9 +63,9 @@ orin은 실행에 필요한 3개 extra만 유지하며, 중첩 참조 없이 패
 `aloha`, `pusht`, `libero`, `metaworld`,  
 `dev`, `notebook`, `test`, `video_benchmark`, `peft`, `async`
 
-### 5. `[project.scripts]` — upstream과 동일 (2026-04-23 동기화)
+### 5. `[project.scripts]` — 04_infra_setup TODO-O2 시점 정리 (2026-04-30)
 
-upstream 14개 중 학습/데이터셋 관련 유틸 일부를 제외하고, 실행·캘리브레이션·텔레옵 관련 11개를 orin에 등록.
+upstream 14개 중 04 의 4-노드 분리 후 Orin 책임 (추론 + 데이터 수집 + 환경 점검) 에 맞는 9개만 등록. 학습/평가 entrypoint 2개 제거.
 
 | 스크립트 | orin 포함 여부 |
 |---|---|
@@ -77,8 +77,8 @@ upstream 14개 중 학습/데이터셋 관련 유틸 일부를 제외하고, 실
 | `lerobot-replay` | ✅ |
 | `lerobot-setup-motors` | ✅ |
 | `lerobot-teleoperate` | ✅ |
-| `lerobot-eval` | ✅ |
-| `lerobot-train` | ✅ |
+| `lerobot-eval` | ❌ (04 TODO-O2 제거: Orin 평가 안 함, hil_inference.py 또는 DGX 가 대체) |
+| `lerobot-train` | ❌ (04 TODO-O2 제거: Orin 학습 안 함, DGX 책임) |
 | `lerobot-info` | ✅ |
 | `lerobot-dataset-viz` 등 시각화 유틸 | ❌ (제외) |
 
@@ -138,6 +138,50 @@ dependencies = [
 **변경 이유:** Orin에서 `lerobot-find-port`, `lerobot-calibrate` 등 CLI를 실행하려 했으나 `bash: command not found` 발생. orin의 스크립트 디렉토리(`orin/lerobot/scripts/`)에 upstream scripts를 복사하고 pyproject.toml에 엔트리포인트를 추가함. upstream과 동일하게 유지한다는 원칙에 따라 의존성 문제가 없는 스크립트는 그대로 등록.
 
 **함께 변경된 파일:** `orin/lerobot/scripts/` — upstream 18개 파일 전체 복사 (기존 수정 파일 없음, 덮어쓰기 안전)
+
+---
+
+### [2026-04-30] `[project.scripts]` — `lerobot-eval` / `lerobot-train` entrypoint 제거 (04 TODO-O2)
+
+**대상 파일:** `orin/pyproject.toml` `[project.scripts]` 섹션
+
+**변경 내용:**
+
+```toml
+# 제거된 2줄
+lerobot-eval              = "lerobot.scripts.lerobot_eval:main"
+lerobot-train             = "lerobot.scripts.lerobot_train:main"
+
+# 주석으로 대체 (이력 명시)
+# lerobot-eval, lerobot-train 제거 (04 TODO-O2): Orin 은 추론 + 데이터 수집 전용.
+# 학습은 DGX, 평가는 hil_inference.py 또는 DGX 가 대체. 변경 이력은 02_orin_pyproject_diff.md 참조.
+```
+
+**변경 이유:**
+
+04_infra_setup 마일스톤의 4-노드 아키텍처 도입 (devPC + DataCollector(신규) + DGX + 시연장 Orin) 에 따라 Orin 의 책임이 **추론 전용** 으로 축소. 학습은 DGX, 평가는 `hil_inference.py` 또는 DGX 가 대체. 두 entrypoint 는 사용자가 호출할 일 없음.
+
+**원칙 — 옵션 B (논리적 비활성화):**
+
+`orin/lerobot/scripts/lerobot_eval.py` / `lerobot_train.py` 파일 자체는 **upstream 보존 원칙대로 그대로 유지** (제거 안 함). pyproject.toml 의 entrypoint 등록 해제만으로 사용자 호출 차단. 사유: upstream 동기화 부담 ↓.
+
+**대응:**
+
+- `orin/pyproject.toml [project.scripts]` 에서 2줄 제거
+- 본 변경 이력 기록 (본 문서)
+- 변경 후 Orin venv 재설치 (`pip install -e .` 재실행) 필요 — TODO-O3 (회귀 검증) 단계에서 처리
+
+**영향 범위:**
+
+| 기능 | 영향 |
+|---|---|
+| `lerobot-eval` CLI 호출 | ❌ (Orin 에서 더 이상 호출 안 됨, DGX 또는 hil_inference.py 대체) |
+| `lerobot-train` CLI 호출 | ❌ (Orin 에서 더 이상 호출 안 됨, DGX 가 학습 담당) |
+| `orin/lerobot/scripts/lerobot_eval.py` 파일 자체 | 유지 (upstream 보존) |
+| `orin/lerobot/scripts/lerobot_train.py` 파일 자체 | 유지 (upstream 보존) |
+| 기존 9개 entrypoint | 영향 없음 |
+
+**잔여 리스크:** upstream 동기화 시 본 entrypoint 정리가 덮어씌워질 수 있음 — BACKLOG 04 #1 로 추적.
 
 ---
 

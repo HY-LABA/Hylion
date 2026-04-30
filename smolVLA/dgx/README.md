@@ -71,8 +71,8 @@ bash ~/smolvla/dgx/scripts/preflight_check.sh <시나리오>
 | 시나리오 | 필요 메모리 (RAM, UMA pool) | 용도 |
 |---|---|---|
 | `smoke` | 20 GiB | 1 step 검증 |
-| `s1` | 35 GiB | 04_leftarmVLA / 06_biarm_VLA 1차 |
-| `s3` | 65 GiB | 06_biarm_VLA 2차 (VLM 까지 풀 학습) |
+| `s1` | 35 GiB | 05_leftarmVLA / 07_biarm_VLA 1차 |
+| `s3` | 65 GiB | 07_biarm_VLA 2차 (VLM 까지 풀 학습) |
 | `lora` | 28 GiB | LoRA fallback |
 
 (안전 마진 +10 GiB 자동 적용)
@@ -104,7 +104,7 @@ bash ~/smolvla/dgx/scripts/smoke_test.sh
 
 → `lerobot/svla_so100_pickplace` 데이터셋 + `lerobot/smolvla_base` 가중치를 자동 다운로드 (최초 1회) 하고 1 step 학습. exit code 0 + loss 출력 확인.
 
-### 04_leftarmVLA 학습
+### 05_leftarmVLA 학습
 
 ```bash
 bash ~/smolvla/dgx/scripts/preflight_check.sh s1
@@ -121,7 +121,7 @@ lerobot-train \
     --wandb.enable=true
 ```
 
-### 06_biarm_VLA 학습
+### 07_biarm_VLA 학습
 
 `docs/lerobot_study/06_smolvla_finetune_feasibility.md §6.2` 의 1차/2차/LoRA 명령 참조.
 

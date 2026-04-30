@@ -274,6 +274,33 @@ self.processor = _TokenizerOnlyProcessor(model_id)
 
 ---
 
+### [2026-04-30] 04_infra_setup TODO-O2 — 옵션 B (논리적 비활성화) 원칙 명문화
+
+**대상 파일:** `orin/lerobot/` 전체 (변경 없음 — 본 변경은 원칙 명문화)
+
+**원칙:**
+
+`orin/lerobot/` 의 **파일·디렉터리는 upstream 보존**한다. inference-only 책임에 맞지 않는 모듈은 다음 두 방식으로만 비활성화:
+
+1. **`__init__.py` 의 import 차단** — 본 문서 위 변경 이력 (`policies/__init__.py`, `processor/__init__.py`, `configs/__init__.py` 등) 의 패턴
+2. **`orin/pyproject.toml [project.scripts]` 의 entrypoint 등록 해제** — `lerobot-eval` / `lerobot-train` 2개 (04_infra_setup TODO-O2, `02_orin_pyproject_diff.md` 참조)
+
+**제외:** `orin/lerobot/scripts/` 의 18개 파일 (lerobot_train.py, lerobot_eval.py, augment_dataset_quantile_stats.py 등) 자체는 upstream 그대로 보존. 사용자가 CLI 진입할 수 없도록 entrypoint 등록만 해제.
+
+**변경 이유:**
+
+04_infra_setup 마일스톤 진행 중 사용자가 명시적으로 "upstream 의 구조와 내용 최대한 변형 안 함" 원칙 강조. 실태 점검 결과 `orin/lerobot/` 은 이미 본 원칙대로 운영 중 (scripts/ 18개 = upstream 18개 그대로) 이었음을 확인. 본 항목은 향후 트리밍 결정 시 본 원칙을 적용하도록 명문화.
+
+**영향 범위:**
+
+| 기능 | 영향 |
+|---|---|
+| 기존 추론 경로 (smolvla forward, hil_inference 등) | 영향 없음 (변경 없음) |
+| upstream 동기화 시 재트리밍 부담 | 감소 — 파일은 그대로 받고 entrypoint·import 만 관리 |
+| 04 진입 후 트리밍 결정 흐름 | 본 원칙대로 entrypoint·import 단에서 처리 |
+
+---
+
 ## upstream 동기화 시 재확인 항목
 
 `orin/lerobot/`을 upstream에서 재동기화할 때 아래 파일들이 변경되었는지 확인하고, 필요 시 변경 이력을 추가한다.

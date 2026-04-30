@@ -2,7 +2,7 @@
 
 > 기준: `docs/reference/lerobot/` (v0.5.1-52-g05a52238) `src/lerobot/datasets/`, `src/lerobot/utils/constants.py`
 > 작성일: 2026-04-27
-> 목적: lerobot 데이터셋 포맷·키 컨벤션·SmolVLA 와의 매핑을 본 프로젝트(SO-ARM teleop 기반 양팔 + 카메라 3대) 관점에서 정리. 05_biarm_teleop_on_dgx 의 데이터 수집 단계에서 결정해야 할 사항 식별.
+> 목적: lerobot 데이터셋 포맷·키 컨벤션·SmolVLA 와의 매핑을 본 프로젝트(SO-ARM teleop 기반 양팔 + 카메라 3대) 관점에서 정리. 06_biarm_teleop_on_dgx 의 데이터 수집 단계에서 결정해야 할 사항 식별.
 > 선행 읽기: `docs/lerobot_study/03_smolvla_architecture.md` (SmolVLA 입력 포맷)
 
 ---
@@ -107,7 +107,7 @@ present_img_keys = [key for key in self.config.image_features if key in batch]
 
 | 마일스톤 | 카메라 키 |
 |---|---|
-| 04_leftarmVLA | `observation.images.wrist_left`, `observation.images.overview` (총 2대) |
+| 05_leftarmVLA | `observation.images.wrist_left`, `observation.images.overview` (총 2대) |
 | 05/06/07 | `observation.images.{wrist_left, wrist_right, overview}` (총 3대) |
 
 `overview` 는 base 미포함 전체 조망 카메라. 04 의 2대 구성은 left arm 단독이므로 `wrist_left` + `overview`.
@@ -216,7 +216,7 @@ present_img_keys = [key for key in self.config.image_features if key in batch]
 2. state/action 차원 (12 DOF, 단일 키 매핑)
 3. task instruction 자연어 문장
 
-## 9) 05_biarm_teleop_on_dgx 에서 결정해야 할 사항 체크리스트
+## 9) 06_biarm_teleop_on_dgx 에서 결정해야 할 사항 체크리스트
 
 본 문서를 근거로 05 진입 시 다음을 확정한다:
 

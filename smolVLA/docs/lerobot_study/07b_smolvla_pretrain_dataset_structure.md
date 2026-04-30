@@ -126,7 +126,7 @@ self.cameras = {**self.left_arm.cameras, **self.right_arm.cameras}
 | import 경로 | 상대 import (`.`) | 일부 절대 import (`lerobot.*`) |
 | 실질 동작 차이 | 없음 | 없음 |
 
-**결론**: 두 fork의 양팔 구현은 구조·키 컨벤션·DOF 모두 동일. 06_biarm_VLA 진입 시 어느 쪽을 기준으로 해도 무방.
+**결론**: 두 fork의 양팔 구현은 구조·키 컨벤션·DOF 모두 동일. 07_biarm_VLA 진입 시 어느 쪽을 기준으로 해도 무방.
 
 ---
 
@@ -184,9 +184,9 @@ for num_empty_cameras in range(len(missing_img_keys)):
 | 상황 | smolvla_base 학습 시 카메라 | 추론 환경 카메라 | empty_cameras 설정 |
 |---|---|---|---|
 | 03 마일스톤 (더미 입력) | 3대 (camera1/2/3) | 더미 2대 사용 가능 | `empty_cameras=1` 또는 2 (§4 참조) |
-| 04 마일스톤 이후 (실 하드웨어) | 3대 | 실제 카메라 N대 | 3-N 설정 (04 진입 시 결정) |
+| 05 마일스톤 이후 (실 하드웨어) | 3대 | 실제 카메라 N대 | 3-N 설정 (05 진입 시 결정) |
 
-**중요 미결 사항**: `empty_cameras`로 카메라 수를 맞출 수 있어 forward 자체는 가능하다. 그러나 **학습 수렴에도 잘 동작하는지**는 03에서 검증 불가 (더미 입력이라 실 도메인 검증 아님) → **04_leftarmVLA 진입 시 검증 항목**.
+**중요 미결 사항**: `empty_cameras`로 카메라 수를 맞출 수 있어 forward 자체는 가능하다. 그러나 **학습 수렴에도 잘 동작하는지**는 03에서 검증 불가 (더미 입력이라 실 도메인 검증 아님) → **05_leftarmVLA 진입 시 검증 항목**.
 
 ---
 
@@ -220,7 +220,7 @@ smolvla_base의 config.json 카메라 키(`camera1/2/3`)와 svla_so100_pickplace
 
 ---
 
-## 5) 06_biarm_VLA 진입 시 결정 체크리스트
+## 5) 07_biarm_VLA 진입 시 결정 체크리스트
 
 양팔 데이터 수집 및 학습 진입 전 반드시 결정해야 할 사항:
 
@@ -231,7 +231,7 @@ smolvla_base의 config.json 카메라 키(`camera1/2/3`)와 svla_so100_pickplace
 | 3 | smolvla_base(단일팔 사전학습)에서 양팔 파인튜닝 가능한지 | max_state_dim=32이므로 코드는 가능. 수렴은 미검증 | 06 직전 실험 |
 | 4 | 양팔 카메라 수 (실제 부착 카메라 대수) | 미결 (하드웨어 구성에 따라 다름) | 하드웨어 확정 시 |
 | 5 | lerobot upstream vs seeed-lerobot fork 선택 | 구조 동일, 어느 쪽이든 무방 | 06 진입 시 |
-| 6 | `empty_cameras` 학습 수렴 검증 | 03에서 불가 → 04 검증 항목 | 04_leftarmVLA 완료 후 |
+| 6 | `empty_cameras` 학습 수렴 검증 | 03에서 불가 → 05 검증 항목 | 05_leftarmVLA 완료 후 |
 
 ---
 

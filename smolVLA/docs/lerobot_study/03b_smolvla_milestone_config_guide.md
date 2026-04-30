@@ -2,7 +2,7 @@
 
 > 기준: `docs/reference/lerobot/` (v0.5.1-52-g05a52238) `src/lerobot/policies/smolvla/`
 > 작성일: 2026-04-27
-> 목적: 본 프로젝트(`arm_2week_plan.md`) 의 마일스톤 03~07 각 단계에서 SmolVLA config 의 어떤 분기를 어떻게 설정할지 가이드. 일반 지식(`03_smolvla_architecture.md`) 과 본 프로젝트 마일스톤(`arm_2week_plan.md`) 을 잇는 다리 역할.
+> 목적: 본 프로젝트(`arm_2week_plan.md`) 의 마일스톤 03·05~08 각 단계에서 SmolVLA config 의 어떤 분기를 어떻게 설정할지 가이드. 일반 지식(`03_smolvla_architecture.md`) 과 본 프로젝트 마일스톤(`arm_2week_plan.md`) 을 잇는 다리 역할. (04_infra_setup 은 인프라 셋업이라 SmolVLA config 분기와 직접 관련 없음 — 별도 스펙 참조)
 > 선행 읽기: `docs/lerobot_study/03_smolvla_architecture.md` — 본 문서는 그 §3 의 7 카테고리 분기를 마일스톤에 매핑한다.
 
 ---
@@ -14,12 +14,13 @@
 | 마일스톤 | 성격 | 학습? | 카메라 | 자유도 |
 |---|---|---|---|---|
 | 03_smolvla_test_on_orin | 사전학습 모델 추론 동작 확인 | X | 더미 | - |
-| 04_leftarmVLA | 단일팔 (left, 토르소 부착) 사이클 | O | 2대 | 6 DOF |
-| 05_biarm_teleop_on_dgx | 양팔 데이터 수집 환경 | X (수집) | 3대 (손목 좌·우 + 조망) | 12 DOF |
-| 06_biarm_VLA | 양팔 처음부터 학습 | O | 3대 | 12 DOF |
-| 07_biarm_deploy | Orin 배포 + latency 최적화 | X (추론 튜닝) | 3대 | 12 DOF |
+| 04_infra_setup | 4-노드 인프라 셋업 (DataCollector 신규) | X | - | - |
+| 05_leftarmVLA | 단일팔 (left, 토르소 부착) 사이클 | O | 2대 | 6 DOF |
+| 06_biarm_teleop_on_dgx | 양팔 데이터 수집 환경 | X (수집) | 3대 (손목 좌·우 + 조망) | 12 DOF |
+| 07_biarm_VLA | 양팔 처음부터 학습 | O | 3대 | 12 DOF |
+| 08_biarm_deploy | Orin 배포 + latency 최적화 | X (추론 튜닝) | 3대 | 12 DOF |
 
-**04 와 06 은 독립 학습 사이클** — 04 정책은 06 의 사전 단계가 아니다 (`02_dgx_setting.md` TODO-12 참조). 06 은 양팔 데이터로 **smolvla_base 부터 다시** 파인튜닝.
+**05 와 07 은 독립 학습 사이클** — 05 정책은 07 의 사전 단계가 아니다 (`02_dgx_setting.md` TODO-12 참조). 07 은 양팔 데이터로 **smolvla_base 부터 다시** 파인튜닝.
 
 **자유도는 모든 마일스톤에서 풀 6 DOF (단일팔) / 12 DOF (양팔) 유지** (`02_dgx_setting.md` TODO-11 결론).
 
@@ -77,7 +78,7 @@
 
 ---
 
-### 04_leftarmVLA
+### 05_leftarmVLA
 
 **목표**: 휴머노이드 토르소 부착 left arm 으로 한 사이클 (수집 → 학습 → Orin 배포) 완주. 풀 6 DOF, 카메라 2대.
 
@@ -102,17 +103,17 @@
 2. **PEFT/LoRA** 적용 — `lm_expert.q/v_proj` + projection layer 만 학습. S1 의 더 가벼운 버전. VRAM 절약 + overfitting 회피
 3. **S3 전환** (`train_expert_only=False`) — DGX VRAM 확인 후
 
-**04 의 핵심**: **거의 건드릴 게 없음.** 모든 기본값 유지. 핵심은 데이터 품질·양 / Orin 추론 latency 검증.
+**05 의 핵심**: **거의 건드릴 게 없음.** 모든 기본값 유지. 핵심은 데이터 품질·양 / Orin 추론 latency 검증.
 
-**데이터셋 키 명명 — 05 와 일관되게**:
+**데이터셋 키 명명 — 06 과 일관되게**:
 - 카메라 키: `observation.images.<camera_name>` (LeRobotDataset 표준, `lerobot_dataset.py:122-138` 예시)
-- 본 프로젝트 권장: `observation.images.{wrist_left, wrist_right, overview}` — 04 는 이 중 2개만 사용
+- 본 프로젝트 권장: `observation.images.{wrist_left, wrist_right, overview}` — 05 는 이 중 2개만 사용
 - 이유: SmolVLA 는 `config.input_features` 의 dict 삽입 순서대로 카메라를 처리 (`policies.py:148-152` `image_features` property + `modeling_smolvla.py:421-422`). **알파벳/숫자 정렬 안 함** — 따라서 숫자 prefix(`cam_0_*`) 강제는 불필요.
-- 04 와 05/06 사이에서는 카메라 이름 자체를 일관되게 유지 (예: 04 의 `wrist_left` 키가 05 에서도 동일 이름·동일 부착 위치 카메라를 가리킴). 04→06 모델 호환 자체는 별도 학습이라 강제 아니지만, 학습 결과 비교 시 변수 줄임
+- 05 와 06/07 사이에서는 카메라 이름 자체를 일관되게 유지 (예: 05 의 `wrist_left` 키가 06 에서도 동일 이름·동일 부착 위치 카메라를 가리킴). 05→07 모델 호환 자체는 별도 학습이라 강제 아니지만, 학습 결과 비교 시 변수 줄임
 
 ---
 
-### 05_biarm_teleop_on_dgx
+### 06_biarm_teleop_on_dgx
 
 **목표**: 양팔 + 카메라 3대 데이터 수집. **학습 안 함**, 데이터셋 빌드만.
 
@@ -128,11 +129,11 @@
 | FPS | 30 vs 60 | SO-ARM teleop 60Hz 면 **수집 60Hz** 권장 (제어 빈도와 일치). 학습 시 다운샘플 가능 |
 | Task instruction (language) | 짧은 자연어 | `tokenizer_max_length=48` 안에 들어가야 함 (`configuration_smolvla.py:60`) |
 
-**중요**: 카메라 키 명명을 **04 와 05 가 일관되게** 결정. 04 가 2대(`observation.images.wrist_left`, `observation.images.overview`) → 05 에서 `observation.images.wrist_right` 만 추가하는 식.
+**중요**: 카메라 키 명명을 **05 와 06 이 일관되게** 결정. 05 가 2대(`observation.images.wrist_left`, `observation.images.overview`) → 06 에서 `observation.images.wrist_right` 만 추가하는 식.
 
 ---
 
-### 06_biarm_VLA
+### 07_biarm_VLA
 
 **목표**: 양팔 12 DOF + 카메라 3대 데이터로 **처음부터** 파인튜닝 (04 결과 사용 안 함, 양팔 데이터로 smolvla_base 부터 다시 학습).
 
@@ -192,7 +193,7 @@
 
 ---
 
-### 07_biarm_deploy
+### 08_biarm_deploy
 
 **목표**: 06 체크포인트를 Orin 에 반입 → 추론 동작 확인 → 데모 가능 latency 달성.
 
@@ -229,7 +230,7 @@
 - RTC 는 **추론 단에서만 활성화 가능** 한 옵션이지만, **사전학습/파인튜닝 시 RTC 를 학습한 모델** 이 추론 시 RTC 활성화 했을 때 더 잘 동작
 - smolvla_base 가 RTC 학습됐는지, 06 파인튜닝에서 RTC 학습할지 결정 필요
 - `seeed-lerobot/tests/policies/smolvla/test_smolvla_rtc.py` 가 존재하므로 SmolVLA 정식 지원 기능
-- 본 프로젝트 적용 가치는 **06 까지의 latency 실측 결과** 에 의존 → 07 진입 시 결정
+- 본 프로젝트 적용 가치는 **07 까지의 latency 실측 결과** 에 의존 → 08 진입 시 결정
 
 ---
 
@@ -256,7 +257,7 @@
 
 **선행 조건 미해결 항목** (본 문서 권장값의 가정):
 - DGX VRAM 실측 (`02_dgx_setting.md` TODO-02) — S1 / S3 / S4 선택의 자원 근거
-- 04 카메라 키 명명 확정 — 05 와 일관되게 결정
+- 05 카메라 키 명명 확정 — 06 과 일관되게 결정
 - smolvla_base 의 RTC 사전학습 여부 — 07 RTC 활성화 결정의 근거
 
 ---

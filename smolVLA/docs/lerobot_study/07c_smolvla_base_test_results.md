@@ -175,7 +175,7 @@ python ~/smolvla/orin/examples/tutorial/smolvla/hil_inference.py \
 
 `lerobot/smolvla_base` 사전학습 분포는 lego cube pick-and-place 계열이며, 현재 실제 카메라 배치와 시작 자세는 사전학습 환경과 다르다. `hil_inference.py`는 현재 `TASK = "Pick up the cube and place it in the box."`를 하드코딩하여 policy 입력에 넣는다. 즉 자연어 task 조건은 들어가지만, 03 단계는 사용자가 임의 자연어 명령을 입력해 특정 물체를 성공적으로 집는지 평가하는 단계가 아니다.
 
-이번 실행에서 VLA 파이프라인은 실 카메라 프레임 + follower joint state를 받아 action을 생성하고 follower에 송신했으며, live 50 step에서 물리 움직임이 확인됐다. 다만 특정 물체를 집는 태스크 수행은 관찰되지 않았고, calibration 시작 중간값 근처에서 멈춘 형태였다. 이는 현재 단계의 잔여 리스크로 남기며, 실제 자연어 명령 기반 태스크 성공 검증은 04_leftarmVLA 데이터 수집/학습 이후 판단한다.
+이번 실행에서 VLA 파이프라인은 실 카메라 프레임 + follower joint state를 받아 action을 생성하고 follower에 송신했으며, live 50 step에서 물리 움직임이 확인됐다. 다만 특정 물체를 집는 태스크 수행은 관찰되지 않았고, calibration 시작 중간값 근처에서 멈춘 형태였다. 이는 현재 단계의 잔여 리스크로 남기며, 실제 자연어 명령 기반 태스크 성공 검증은 05_leftarmVLA 데이터 수집/학습 이후 판단한다.
 
 ### 7.5 카메라 시야 메모
 

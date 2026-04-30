@@ -227,6 +227,10 @@ cam*.jpg
 cam*.png
 *.mp4
 
+# smolVLA orin/ — learned policy checkpoints (DGX → Orin transfer)
+# README.md is tracked (정책·사용법 문서), <run_name>/ 하위는 추적 X (수백 MB ~ GB)
+smolVLA/orin/checkpoints/*/
+
 # Secrets / keys (defense-in-depth, beyond .env above)
 *.key
 *.pem

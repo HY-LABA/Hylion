@@ -56,9 +56,9 @@ lerobot-record            = "lerobot.scripts.lerobot_record:main"
 lerobot-replay            = "lerobot.scripts.lerobot_replay:main"
 lerobot-setup-motors      = "lerobot.scripts.lerobot_setup_motors:main"
 lerobot-teleoperate       = "lerobot.scripts.lerobot_teleoperate:main"
-lerobot-eval              = "lerobot.scripts.lerobot_eval:main"
-lerobot-train             = "lerobot.scripts.lerobot_train:main"
 lerobot-info              = "lerobot.scripts.lerobot_info:main"
+# lerobot-eval, lerobot-train 제거 (04 TODO-O2): Orin 은 추론 + 데이터 수집 전용.
+# 학습은 DGX, 평가는 hil_inference.py 또는 DGX 가 대체. 변경 이력은 02_orin_pyproject_diff.md 참조.
 
 [tool.setuptools.packages.find]
 where = ["."]
