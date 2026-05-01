@@ -1,0 +1,81 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "_comment": "smolVLA 워크플로우 권한·훅 설정. CLAUDE.md § Hard Constraints 의 Category A·D 정책을 시스템 레벨로 강제. jq 필수 (sudo apt install -y jq).",
+  "permissions": {
+    "allow": [
+      "Read",
+      "Grep",
+      "Glob",
+      "ToolSearch",
+      "Write",
+      "Edit",
+      "WebSearch",
+      "WebFetch",
+      "Bash(ls:*)",
+      "Bash(cat:*)",
+      "Bash(pwd)",
+      "Bash(echo:*)",
+      "Bash(find:*)",
+      "Bash(grep:*)",
+      "Bash(mkdir:*)",
+      "Bash(jq:*)",
+      "Bash(date:*)",
+      "Bash(wc:*)",
+      "Bash(head:*)",
+      "Bash(tail:*)",
+      "Bash(git status:*)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git mv:*)",
+      "Bash(git rm:*)",
+      "Bash(git branch:*)",
+      "Bash(git show:*)",
+      "Bash(pytest:*)",
+      "Bash(ruff:*)",
+      "Bash(mypy:*)",
+      "Bash(black:*)",
+      "Bash(rsync -*:*)",
+      "Bash(ssh orin:*)",
+      "Bash(ssh dgx:*)",
+      "Bash(scp:*)",
+      "Bash(bash scripts/deploy_orin.sh)",
+      "Bash(bash scripts/deploy_dgx.sh)",
+      "Bash(bash scripts/sync_to_laba5.sh:*)"
+    ],
+    "deny": [
+      "Bash(rm -rf:*)",
+      "Bash(sudo:*)",
+      "Bash(git push --force:*)",
+      "Bash(git push -f:*)",
+      "Bash(git reset --hard:*)",
+      "Bash(chmod 777:*)",
+      "Bash(curl -fsSL :* | bash)"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "FILE=$(jq -r '.tool_input.file_path // \"\"'); if echo \"$FILE\" | grep -qE '/docs/reference/|/\\.claude/agents/|/\\.claude/skills/|/\\.claude/settings\\.json$|/\\.credentials\\.json$'; then echo '[hook] ❌ 차단: Category A 영역 (' \"$FILE\" ') 수정 금지 — 워커는 ANOMALIES 에 HOOK_BLOCK 추가 후 다른 방식 시도. 메인 Claude 는 사용자 승인 후 직접 수정 가능.' >&2; exit 2; fi; exit 0"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "FILE=$(jq -r '.tool_input.file_path // \"\"'); if echo \"$FILE\" | grep -qE '/orin/lerobot/|/orin/pyproject\\.toml$|/orin/scripts/setup_env\\.sh$|/dgx/lerobot/|/dgx/pyproject\\.toml$'; then echo '[hook] ⚠️ Coupled File 영역 변경됨: ' \"$FILE\" ' — Coupled File Rules (lerobot-upstream-check 스킬) 따라 02_orin_pyproject_diff.md / 03_orin_lerobot_diff.md / setup_env.sh 동시 갱신 필요' >&2; fi; exit 0"
+          }
+        ]
+      }
+    ]
+  }
+}
