@@ -100,6 +100,7 @@ spec 의 모든 todo 를 **자율 처리**. 사용자는 `/observe` 로 read-onl
 - `lerobot-upstream-check` — 옵션 B 원칙·coupled file 규칙 (task-executor·code-tester·prod-test-runner)
 - `lerobot-reference-usage` — 레퍼런스 활용 규칙 (task-executor)
 - `orin-deploy-procedure` — rsync·deploy 절차·검증 명령 시퀀스 (prod-test-runner)
+- `harness-engineering-principles` — OpenAI harness engineering 평가 프레임워크 (reflection 활용, 사이클 분석 시 10 원칙 매핑)
 
 ## 슬래시 커맨드
 
