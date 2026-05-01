@@ -22,6 +22,7 @@
 | `agent_plan_pre-subagent.md` | `/agent_plan.md` | 3-AI 역할 분담 정책 (Claude 기획·Copilot 코딩·Codex 테스트) |
 | `AGENTS_codex-guide.md` | `/AGENTS.md` | Codex 전용 프로젝트 가이드 |
 | `copilot-instructions_pre-subagent.md` | `/.github/copilot-instructions.md` | GitHub Copilot 전용 가이드 |
+| `CLAUDE_pre-subagent.md` | `/CLAUDE.md` (복사본 — 원본 그대로 유지) | Phase 2 에서 대대적 재작성 예정. 옛 버전 스냅샷 |
 
 ## 새 워크플로우 자산 위치
 
@@ -43,3 +44,4 @@
 | 날짜 | 변경 |
 |---|---|
 | 2026-05-01 | 초기 보관 — 4개 파일 archive (워크플로우 재구성 직전 시점) |
+| 2026-05-01 | `CLAUDE.md` 스냅샷 추가 (`CLAUDE_pre-subagent.md`) — Phase 2 재작성 직전 옛 버전 보존 |
