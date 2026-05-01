@@ -48,9 +48,13 @@ context/
        │
        ├─ 매 이벤트 → context/log.md 한 줄 추가
        │
-       └─ prod-test 완료 → context/verification_queue.md 항목 누적
+       ├─ prod-test 완료 → context/verification_queue.md 항목 누적
+       │
+       └─ 하네스 이상 신호 → docs/work_flow/specs/ANOMALIES.md 활성 섹션 누적
        ↓
-[Phase 2 완료 신호] 메인 → 사용자: "spec X 자동화 완료. 검증 가나?"
+[Phase 2 종료 신호 — End-A 성공 또는 End-B 실패]
+메인 → 사용자: "spec X 자동화 완료. /verify-result 실행해" (End-A)
+   또는: "TODO-X, Y 자동 해결 실패 — 수정 필요" (End-B)
        ↓
 [Phase 3] 사용자 실물 검증
        ↓
@@ -66,6 +70,8 @@ context/
 
 1. `context/{plan.md, log.md, verification_queue.md}` + `context/todos/` 디렉터리 → `context/history/NN_<spec명>/` 로 이동
 2. `context/` 의 placeholder README 와 빈 plan/log/queue 파일이 다음 spec 준비 상태로 재초기화
+3. `docs/work_flow/specs/ANOMALIES.md` 의 활성 spec 섹션은 reflection 분석 후 "처리됨" 마킹 (파일 이동 X — 사이클 간 누적 자료라 specs/ 위치 유지)
+4. reflection 보고서 → `docs/storage/workflow_reflections/<날짜>_<spec명>.md` 작성
 
 ## 가시화 — 사용자가 어디서 보나
 
