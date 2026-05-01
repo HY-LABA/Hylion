@@ -23,6 +23,8 @@
 | `AGENTS_codex-guide.md` | `/AGENTS.md` | Codex 전용 프로젝트 가이드 |
 | `copilot-instructions_pre-subagent.md` | `/.github/copilot-instructions.md` | GitHub Copilot 전용 가이드 |
 | `CLAUDE_pre-subagent.md` | `/CLAUDE.md` (복사본 — 원본 그대로 유지) | Phase 2 에서 대대적 재작성 예정. 옛 버전 스냅샷 |
+| `current_task_pre-subagent.md` | `/docs/work_flow/context/current_task.md` | 옛 단일 활성 task 슬롯. 새 워크플로우는 `context/todos/<XX>/01_implementation.md` 로 대체 |
+| `current_test_pre-subagent.md` | `/docs/work_flow/context/current_test.md` | 옛 단일 활성 test 슬롯. 새 워크플로우는 `context/todos/<XX>/{02_code-test, 03_prod-test}.md` 로 대체 |
 
 ## 새 워크플로우 자산 위치
 
@@ -46,3 +48,4 @@
 | 2026-05-01 | 초기 보관 — 4개 파일 archive (워크플로우 재구성 직전 시점) |
 | 2026-05-01 | `CLAUDE.md` 스냅샷 추가 (`CLAUDE_pre-subagent.md`) — Phase 2 재작성 직전 옛 버전 보존 |
 | 2026-05-01 | `/.codex` 빈 마커 파일 삭제 — Codex 미사용 (보관 가치 없는 0 byte 파일) |
+| 2026-05-01 | `context/current_task.md`, `current_test.md` archive — 새 `context/todos/<XX>/` 구조로 대체 |
