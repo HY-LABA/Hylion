@@ -100,37 +100,59 @@
   - 데이터 전송 방식 (HuggingFace Hub vs rsync 직접 vs 둘 다)
   - 시연장 미러링 검증 깊이 (육안 + 사진 vs 자동 검증 스크립트)
 
-### [ ] 05_leftarmVLA
+### [ ] 05_interactive_cli
+
+- 목표: orin·dgx·datacollector 세 노드 공통 대화형 CLI 게이트웨이 — 환경 체크부터 데이터 수집·전송까지 한 명령으로 진행 가능. 04 산출물 (check_hardware·run_teleoperate·sync_dataset·push_dataset_hub) 을 사용자 친화 인터페이스로 통합.
+- 주요 작업:
+  - 공통 console 프레임워크 설계 (3 노드 공통 구조 — 진입 → 장치 선택 → 환경 체크 → 노드별 후속 flow)
+  - 신규 디렉터리: `orin/interactive_cli/`, `dgx/interactive_cli/`, `datacollector/interactive_cli/` (마일스톤 이름과 동일 폴더, 각 노드 루트에 형제)
+  - flow 0~7 단계 (datacollector 기준 — orin·dgx flow 는 spec 진행 중 협의):
+    - 0. 인터페이스 진입 (orin·dgx 는 SSH, datacollector 는 직접 터미널)
+    - 1. 장치 선택 질문 (orin / dgx / datacollector)
+    - 2. 환경 체크 (04 TODO-G1 `check_hardware.sh` 패턴 미러 — 각 노드 환경 맞춤)
+    - 3. "텔레오퍼레이션 진행 (이 작업 끝나면 학습 준비 완료)" 안내 + enter 시 실행 (04 TODO-D2 `run_teleoperate.sh` 활용)
+    - 4. 사용자 동작 확인 후 enter 입력 ("잘 작동하면 enter")
+    - 5. "어떤 학습 데이터를 모을건가요?" 학습 종류 질문 (옵션은 spec 진행 중 정의)
+    - 6. 데이터 수집 시나리오 진행 (간단한 설명서 + lerobot-record 호출)
+    - 7. "[저장경로]에 저장됨" 출력 + 전송 방식 사용자 선택 (HF Hub / rsync DGX / 안함) — 04 TODO-T1 산출물 활용
+- 결정사항 (05 진행 중 확정):
+  - 5단계 학습 데이터 종류 옵션 (예: 단순 pick-place / 복잡 manipulation / dual-arm coordination 등)
+  - orin·dgx 측 flow 의 3~7 단계 (datacollector 와 어떤 차이점 — orin 추론 검증·dgx 학습 trigger 등)
+  - 공통 console 프레임워크 코드 공유 방식 (각 노드별 중복 vs 공통 모듈 import)
+- 위치: 본 마일스톤은 04 인프라의 사용자 인터페이스 통합 — 06_leftarmVLA 진입 시점에 데이터 수집을 한 명령으로 끝낼 수 있는 환경 완성. 본 마일스톤의 종착점이 06 진입 준비 완료.
+
+### [ ] 06_leftarmVLA
 
 - 목표: 단일 팔 (left arm, 휴머노이드 토르소 부착) 기준 smolVLA 파인튜닝 → Orin 배포까지 한 사이클 완주
 - 주요 작업:
   - 휴머노이드 토르소 부착 SO-ARM (left arm) calibration 및 작업 영역 재정의
   - 풀 6 DOF 유지로 데이터 수집(DataCollector) → 학습(DGX) → 시연장 Orin 배포까지 한 사이클 완주 (자유도 축소는 적용하지 않음, 02 TODO-11 결론)
+  - 데이터 수집·전송은 05 의 interactive_cli 활용
 - 고려사항:
   - 표준 SO-ARM 책상 mount 와 다른 좌표계·관절 한계 (어깨가 토르소에 부착되어 가용 작업 공간 변화)
   - 사전학습 smolvla_base 가 표준 SO-ARM 분포로 학습된 점 → 도메인 시프트 존재
   - 04 에서 셋업된 DataCollector 의 시연장 미러링 환경에서 데이터 수집 (학습 정확도의 핵심)
-- 위치: 본 마일스톤은 "left arm 단일팔 사이클 자체의 검증·데모" 가 목적이며, 07 양팔 학습의 사전 단계가 아니다 (07 은 양팔 데이터로 처음부터 학습).
+- 위치: 본 마일스톤은 "left arm 단일팔 사이클 자체의 검증·데모" 가 목적이며, 08 양팔 학습의 사전 단계가 아니다 (08 은 양팔 데이터로 처음부터 학습).
 
-### [ ] 06_biarm_teleop_on_dgx
+### [ ] 07_biarm_teleop_on_dgx
 
 - 목표: 양팔 (left + right SO-ARM, 토르소 부착) teleoperation 데이터 수집 환경 구축 (DataCollector 기준)
 - 주요 작업:
   - 양팔 teleop 동작 검증 (좌·우 leader → 좌·우 follower)
   - 카메라 3대 구성 확정 및 데이터 수집 (손목 좌·우 2대 + 전체 조망 1대, base 미포함)
-- 결정사항 (06 진행 중 확정):
+- 결정사항 (07 진행 중 확정):
   - 데이터셋 카메라 키 컨벤션: `observation.images.{wrist_left, wrist_right, overview}` (또는 동등)
   - `observation.state` / `action` 12 DOF 매핑: `[left_6, right_6]` 단일 키 vs 좌·우 분리 키
 - 고려사항:
-  - 카메라 3대 구성은 smolvla_base 사전학습 분포 (보통 1~2 카메라) 와 다름 → 07 학습 시 expert 학습에 가장 큰 영향
+  - 카메라 3대 구성은 smolvla_base 사전학습 분포 (보통 1~2 카메라) 와 다름 → 08 학습 시 expert 학습에 가장 큰 영향
   - 손목 카메라는 그리퍼 동작을 가까이서 촬영 → 사전학습된 SmolVLM2 vision encoder 분포와 차이
   - 양팔이 토르소에 부착된 상태에서 teleop 시 좌·우 팔 충돌 회피 작업 영역 정의 필요
 
-### [ ] 07_biarm_VLA
+### [ ] 08_biarm_VLA
 
 - 목표: 양팔 데이터로 smolVLA 파인튜닝 → 양팔 추론 동작 검증
 - 주요 작업:
-  - 06 에서 수집한 양팔 12 DOF + 카메라 3대 구성 데이터로 smolVLA 파인튜닝 (단일팔에서 전이하지 않고 양팔 데이터로 처음부터 학습)
+  - 07 에서 수집한 양팔 12 DOF + 카메라 3대 구성 데이터로 smolVLA 파인튜닝 (단일팔에서 전이하지 않고 양팔 데이터로 처음부터 학습)
 - 고려사항:
   - SmolVLA `max_state_dim=32` / `max_action_dim=32` padding 으로 12 DOF 양팔 수용 가능 (코드 차원 확인 완료, `docs/lerobot_study/03_smolvla_architecture.md` §A·§E 참조)
   - 카메라 3대 → smolvla_base 사전학습 분포 차이로 vision/connector 까지 푸는 풀 파인튜닝(S3) 검토 필요할 수 있음. 첫 시도는 표준 파인튜닝(S1) 부터.
@@ -138,7 +160,7 @@
 - 비상 옵션:
   - 잘 안되면 머리 위에 더듬이 카메라 다는 것 고려 (조망 카메라 보강)
 
-### [ ] 08_biarm_deploy
+### [ ] 09_biarm_deploy
 
 - 목표: 양팔 VLA 정책을 시연장 Orin 에 배포하여 최종 데모 가능 상태로 완성
 - 고려사항:
