@@ -38,6 +38,14 @@
 
 ### 5. dispatch loop 시작 (Phase 2 진입)
 
+- **사이클 시작 — todo 별 TaskCreate 등록**:
+  - plan 의 활성 todo 개수만큼 `TaskCreate` 호출 (예: 13 todo → task 13개)
+  - 각 task `subject` 에 todo ID 명시 (예: `"TODO-X1: dgx 매트릭스 study"`)
+  - dispatch 시점 → `TaskUpdate(status=in_progress)`
+  - verdict 종료 (READY / MINOR 또는 cycle 2 후 verdict) 시점 → `TaskUpdate(status=completed)`
+  - awaits_user 로 dispatch 불가 todo → `TaskUpdate(metadata={notes: "awaits_user 해소 후 진입"})`
+  - → ORCHESTRATOR_GAP (dispatch 누락) 자동 검출 게이트 (PHASE2_DONE 직전 TaskList 검증과 짝)
+
 - `context/log.md` 첫 줄 추가:
   ```
   YYYY-MM-DD HH:MM:SS | START | spec=<NN_xxx>, todos=N, parallel_groups=M
@@ -61,6 +69,16 @@
 
 - "Phase 2 시작됨. 진행 상황 보려면 별도 터미널·VSC 익스텐션에서 `claude` 띄우고 `/observe` 호출"
 - dispatch loop 가 도는 동안 메인은 워커 호출·감시·로그 갱신에 집중
+
+## PHASE2_DONE 검증 게이트
+
+End-A / End-B 선언 직전 다음 순서로 검증:
+
+1. `TaskList` 호출하여 모든 task 의 상태 확인
+2. 미완료 task 발견 시 (in_progress 잔존 또는 dispatch 자체 누락) → 즉시 dispatch 또는 `ORCHESTRATOR_GAP` ANOMALIES 추가 후 사용자 보고
+3. 모든 task 가 `completed` 상태일 때만 `PHASE2_DONE` 로그 기록 + Phase 3 진입 안내
+
+→ G3·G4 같은 dispatch 누락 (04_infra_setup 사이클의 ORCHESTRATOR_GAP 사례) 자동 검출.
 
 ## 종료 신호 (Phase 2 → Phase 3)
 

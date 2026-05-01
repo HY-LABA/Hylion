@@ -1,0 +1,19 @@
+{
+  "_comment": "DataCollector -> DGX 데이터셋 전송 설정 (placeholder). 실 값은 TODO-T1 결정 후 사용자가 채울 것.",
+  "_schema_version": "1.0",
+  "_active_method_values": ["hf_hub", "rsync"],
+  "datasets": [
+    {
+      "name": "example_dataset",
+      "hf_hub": {
+        "repo_id": "${HF_USER}/example_dataset",
+        "private": false
+      },
+      "rsync": {
+        "source": "datacollector:/home/user/smolvla/.hf_cache/lerobot/${HF_USER}/example_dataset",
+        "dest": "/home/laba/smolvla/.hf_cache/lerobot/${HF_USER}/example_dataset"
+      },
+      "active_method": "hf_hub"
+    }
+  ]
+}

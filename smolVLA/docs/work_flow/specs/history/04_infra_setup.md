@@ -273,7 +273,7 @@ orin/
 
 **[그룹 X — dgx/ 구조 정리]**
 
-### [ ] TODO-X1: dgx/ 구조·기능 책임 매트릭스 + 마이그레이션 계획
+### [x] TODO-X1: dgx/ 구조·기능 책임 매트릭스 + 마이그레이션 계획
 
 - 타입: study
 - DOD: TODO-O1 과 동일 패턴으로 dgx/ 정리. orin/ 에서 이관 받을 자산 (`run_teleoperate.sh` 등) 의 위치 결정. DataCollector 와의 인터페이스 정의 (데이터 받아서 학습).
@@ -282,8 +282,10 @@ orin/
 - 테스트: 없음
 - 참조: `dgx/` 전체 트리, `dgx/pyproject.toml`, `dgx/scripts/`, `docs/storage/06_dgx_venv_setting.md`, memory `project_dgx_structure_migrations.md`
 - 잔여 리스크: dgx 가 SO-ARM 직접 연결 안 됨 — `run_teleoperate.sh` 가 dgx 에서 의미 있는지 본 TODO 에서 재확인. DataCollector 가 더 적합할 가능성
+- **자동화 완료 (2026-05-01 14:16)**: code-tester verdict READY_TO_SHIP. 산출물 `docs/storage/08_dgx_structure.md` (07_orin_structure.md 패턴 미러 §0~§6, 변경 이력 표 포함). 핵심 결정: run_teleoperate.sh 최종 위치 = DataCollector (DGX SO-ARM 미연결). dgx/pyproject.toml·dgx/lerobot/ 미존재 확인 — Category B 자연 충족. TODO-X2 입력 사양 (5 카테고리 마이그레이션 계획) 산출.
+  - history: `docs/work_flow/context/history/04_infra_setup/20260501_0900_task_dgx_structure.md`
 
-### [ ] TODO-X2: dgx/ 마이그레이션 실행
+### [x] TODO-X2: dgx/ 마이그레이션 실행
 
 - 타입: task
 - DOD: TODO-X1 의 계획대로 dgx/ 변경. 02 산출물 (setup_train_env.sh, preflight_check.sh, smoke_test.sh, save_dummy_checkpoint.sh) 의 동작 회귀 없음.
@@ -292,6 +294,8 @@ orin/
   - 기타 TODO-X1 결정 사항
   - `docs/storage/lerobot_upstream_check/04_dgx_lerobot_diff.md` 갱신 (있다면)
 - 테스트: 없음 (TODO-X3 에서 검증)
+- **자동화 완료 (2026-05-01 15:05, cycle 2)**: cycle 1 task-executor → code-tester verdict MINOR_REVISIONS (`smolVLA/dgx/outputs/` .gitignore 패턴 누락) → cycle 2 .gitignore 1행 추가. 산출물: `dgx/tests/README.md`, `dgx/config/{README.md, dataset_repos.json}` (HF Hub + rsync 양방향 schema), `dgx/README.md` 갱신 (pyproject 미존재 주의 + DataCollector 인터페이스), coupled file `04_dgx_lerobot_diff.md` 갱신, `.gitignore` `smolVLA/dgx/outputs/` 추가. dgx/scripts/ 4개 (02 산출물) 미변경 확인. run_teleoperate.sh 처리는 D2 위임.
+  - history: `20260501_1500_task_dgx_migration.md`, `20260501_1500_task_x2_cycle2_gitignore.md`
 
 ### [ ] TODO-X3: dgx/ 마이그레이션 회귀 검증 (DGX prod)
 
@@ -302,7 +306,7 @@ orin/
 
 **[그룹 D — DataCollector 노드 신규 셋업]**
 
-### [ ] TODO-D1: DataCollector 노드 정체 결정 + 디렉터리 신규
+### [x] TODO-D1: DataCollector 노드 정체 결정 + 디렉터리 신규
 
 - 타입: study
 - DOD: DataCollector 노드의 하드웨어·OS·venv·lerobot 의존성 결정. `smolVLA/` 하위 디렉터리 위치 확정 (`datacollector/` 권장). devPC sync hub 와의 관계 정의.
@@ -317,8 +321,10 @@ orin/
 - 참조: `docs/storage/04_devnetwork.md` (devPC ↔ Orin SSH 패턴 — DataCollector 도 동일 패턴 권장), `docs/storage/05_orin_venv_setting.md` (venv 패턴)
 - 사용자 결정 사항: 노드 하드웨어 (별도 PC / 기존 노트북 / 시연장 PC), OS (Ubuntu 권장 — lerobot 안정성), 디렉터리 이름 (`datacollector/` vs 다른 이름)
 - 잔여 리스크: DataCollector 가 시연장과 떨어진 임시 위치에서 시작 → 시연장 이동 시 IP·포트 변동 가능 (BACKLOG 02 #1 DHCP 예약과 동일 카테고리)
+- **자동화 완료 (2026-05-01 14:33)**: code-tester verdict READY_TO_SHIP (Recommended 2건만). 사용자 awaits_user 답 확정 (별도 PC 신규 / Ubuntu 22.04 LTS / `datacollector/` / pyproject.toml 신규 (orin subset) / HF Hub + rsync 둘 다). 산출물 `docs/storage/09_datacollector_setup.md` (07/08 패턴 미러 §0~§7). 핵심 결정: lerobot extras subset = `record + hardware + feetech` (smolvla·training 제외, upstream pyproject.toml 직접 대조 검증), venv 이름 `.hylion_collector`, 옵션 B 원칙 (datacollector/lerobot/ 파일 변경 X), TODO-D2 시점 coupled file `05_datacollector_lerobot_diff.md` 신규 의무 명시.
+  - history: `20260501_1418_task_datacollector_setup.md`
 
-### [ ] TODO-D2: DataCollector venv·lerobot 셋업 스크립트
+### [x] TODO-D2: DataCollector venv·lerobot 셋업 스크립트
 
 - 타입: task
 - DOD: DataCollector 측 환경 셋업 스크립트 작성. orin 의 setup_env.sh 패턴 참조하되, 학습 모듈 X / 데이터 수집 + teleop + 카메라 모듈만 설치.
@@ -328,6 +334,8 @@ orin/
 - 테스트: 없음 (TODO-D3 검증)
 - 제약: TODO-D1 완료 후
 - 잔여 리스크: DataCollector OS 가 Linux 가 아니면 (예: Windows) lerobot 호환성 이슈 — TODO-D1 결정 시 Linux 권장
+- **자동화 완료 (2026-05-01 15:24)**: code-tester verdict READY_TO_SHIP (Critical 0, Recommended 2건). 산출물: `datacollector/{pyproject.toml, scripts/setup_env.sh, scripts/run_teleoperate.sh, README.md, tests/README.md, config/README.md, data/README.md}` 신규 + coupled file `docs/storage/lerobot_upstream_check/05_datacollector_lerobot_diff.md` 신규 + `smolVLA/.gitignore` 신규 (datacollector/data/ 등). pyproject.toml extras 정의: `record` (upstream `dataset` 대응 + torchcodec 조건부) / `hardware` / `feetech`. venv 이름 `.hylion_collector`. orin 대비 핵심 차이: cusparseLt 패치 X, 표준 PyPI torch wheel. **BACKLOG 04 #2 자연 해소** (run_teleoperate.sh archive → datacollector/scripts/ 최종 이동, BACKLOG.md 상태 "완료" 갱신).
+  - history: `20260501_0000_task_d2_datacollector_env.md`
 
 ### [ ] TODO-D3: DataCollector 환경 셋업 검증 prod
 
@@ -338,7 +346,7 @@ orin/
 
 **[그룹 G — 환경 점검 게이트 스크립트]**
 
-### [ ] TODO-G1: tests/check_hardware.sh 작성 (Orin)
+### [x] TODO-G1: tests/check_hardware.sh 작성 (Orin)
 
 - 타입: task
 - DOD: Orin 에서 카메라 인덱스·flip / SO-ARM 포트 / venv 활성화 / cuda 라이브러리를 자동 점검하는 스크립트. first-time 모드 (전부 새로 발견 + `config/` 에 cache) + resume 모드 (cache 기반 검증). 03 prod 검증의 4개 환경 이슈 (BACKLOG 03 #14, #15, #16 + 01 #1) 모두 해소.
@@ -356,6 +364,8 @@ orin/
 - 잔여 리스크:
   - lerobot CLI entrypoint 가 대화형 (stdin) 일 경우 wrapping 어려움 → OpenCV 직접 호출 또는 `udevadm` 우회
   - first-time 모드의 카메라 미리보기는 X11 forwarding 필요 — Orin 콘솔 직접 사용 가정
+- **자동화 완료 (2026-05-01 14:30)**: code-tester verdict READY_TO_SHIP (Recommended 2건만). 산출물: `orin/tests/check_hardware.sh` (554줄, 5단계 점검 + JSON 출력 + cache 갱신·비교 분기), `orin/tests/configs/{first_time,resume}.yaml` placeholder, `.gitignore` 코멘트 (cache 정책 명시). 레퍼런스 활용: `lerobot_find_port.py find_available_ports()` Linux 분기 (ttyACM*/ttyUSB* glob) + `OpenCVCamera.find_cameras()` 비대화형 직접 호출. **BACKLOG 자연 해소**: 03 #14 (SSH 비대화형 cusparseLt — 스크립트 자체가 venv activate + LD_LIBRARY_PATH 패치), #15 (카메라 인덱스 사전 발견), #16 (wrist flip cache), 01 #1 (SO-ARM 포트 변동 — 동적 스캔). **ANOMALIES.md SKILL_GAP #1 누적**: sandbox 가 `bash -n` 차단 → 수동 코드 리뷰 대체 (이후 14건+ 재현됨).
+  - history: `20260501_0000_task_check_hardware.md`
 
 ### [ ] TODO-G2: check_hardware.sh prod 검증 (Orin)
 
@@ -383,7 +393,7 @@ orin/
 
 **[그룹 M — 시연장 환경 미러링 가이드]**
 
-### [ ] TODO-M1: 시연장 미러링 가이드 작성
+### [x] TODO-M1: 시연장 미러링 가이드 작성
 
 - 타입: study
 - DOD: 시연장 환경을 DataCollector 인근에 재현하기 위한 절차·체크리스트 문서. 사용자(인간) 책임 영역과 자동화 가능 영역 분리. 05_leftarmVLA 진입 전 1차 미러링 셋업 가능.
@@ -397,6 +407,8 @@ orin/
 - 테스트: 없음
 - 사용자 결정 사항: 미러링 검증 깊이 (육안+사진 vs 자동 검증 스크립트). 첫 사이클은 육안+사진 권장
 - 잔여 리스크: 시연장 접근 가능성 — 사용자 일정에 따라 시연장 측정 시점 조정 필요
+- **자동화 완료 (2026-05-01 15:21, cycle 2)**: cycle 1 task-executor → code-tester verdict MAJOR_REVISIONS (Critical 2건: BACKLOG #6 미추가 + §5 lerobot-record CLI 추측 작성 — `--robot-path`, `--num-frames` 등 레퍼런스 부재 플래그) → cycle 2 수정 후 verdict READY_TO_SHIP (레퍼런스 직접 대조 PASS). 사용자 답 E 확정 (육안+사진 결정, 자동 검증은 BACKLOG). 산출물 `docs/storage/10_demo_site_mirroring.md` (306줄, §1~§5 + draccus dataclass 안내 메모). **BACKLOG 04 #6 신규 추가** (자동 미러링 검증 스크립트, 낮음 / 05·06 트리거 시 중간).
+  - history: `20260501_1425_task_demo_site_mirroring.md`, `20260501_1455_task_m1_cycle2_revisions.md`
 
 ### [ ] TODO-M2: 시연장 1차 미러링 셋업
 
@@ -429,7 +441,7 @@ orin/
 - 제약: TODO-D1 완료 후 (DataCollector 네트워크 위치 결정)
 - 잔여 리스크: 시연장 Orin 의 네트워크 격리 정도 — 사용자가 시연장 인터넷 환경 확인 필요
 
-### [ ] TODO-T3: devPC sync hub 갱신
+### [x] TODO-T3: devPC sync hub 갱신
 
 - 타입: task
 - DOD: devPC 의 `scripts/` 에 DataCollector 배포 스크립트 추가. 기존 `deploy_orin.sh` / `deploy_dgx.sh` 와 형제 패턴.
@@ -437,6 +449,8 @@ orin/
   - `scripts/deploy_datacollector.sh` — orin·dgx 배포 패턴 참조
 - 테스트: dry-run (실 배포는 사용자 확인 후)
 - 제약: TODO-D1 완료 후
+- **자동화 완료 (2026-05-01 14:58)**: code-tester verdict READY_TO_SHIP (Recommended 2건 quoting). prod-test-runner verdict NEEDS_USER_VERIFICATION (Read 직독 정적 분석 PASS — bash 차단으로 dry-run 실 실행 불가 → verification_queue 위임). 산출물: `scripts/deploy_datacollector.sh` (Category B 신규, deploy_dgx.sh `set -e` 포함 패턴 채택). **BACKLOG 02 #9 두 버그 답습 X** 검증 PASS: (1) `ssh datacollector "mkdir -p ..."` 선행, (2) 각 rsync 뒤 `|| { exit 1 }` 명시 + `set -e` 이중 보호. SSH alias 사전 확인 + friendly error + exit 1, `--dry-run` flag 지원, `data/` exclude. 형제 deploy_orin.sh / deploy_dgx.sh 미변경 확인.
+  - history: `20260501_1530_task_t3_deploy_datacollector.md`
 
 ---
 

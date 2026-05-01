@@ -2,6 +2,28 @@
 
 > SmolVLA 학습 전용. orin/ (추론) 과 형제 디렉터리.
 > 결정 근거: `docs/work_flow/specs/02_dgx_setting.md` TODO-08 / `docs/lerobot_study/06_smolvla_finetune_feasibility.md`
+> 갱신: 04_infra_setup TODO-X2 (2026-05-01) — tests/, config/ 신규 디렉터리 추가 + DataCollector 인터페이스 안내 추가
+
+---
+
+## ⚠ 주의사항 — DGX 환경 구성
+
+### pyproject.toml 미존재
+
+`dgx/pyproject.toml` 은 **존재하지 않는다**. DGX 는 `docs/reference/lerobot/` upstream submodule 을 editable install 로 그대로 사용하기 때문에 별도 pyproject 가 불필요하다.
+
+- 학습 entrypoint (`lerobot-train`) 는 `docs/reference/lerobot/pyproject.toml` 의 `[project.scripts]` 에서 제공됨
+- DGX 에서 직접 사용하는 entrypoint: `lerobot-train` 만 (나머지는 DataCollector / Orin 의 책임)
+- 사용하지 않는 entrypoint (`lerobot-record`, `lerobot-calibrate`, `lerobot-teleoperate` 등) — DGX 에서 실행 X. SO-ARM 직접 연결 없음
+
+### lerobot 설치 방법
+
+`setup_train_env.sh` 가 `docs/reference/lerobot/` 를 editable install 로 설치한다. `dgx/lerobot/` curated 디렉터리는 존재하지 않으며 도입 계획도 없다 (upstream 무수정 원칙).
+
+```bash
+# setup_train_env.sh 가 수행하는 lerobot 설치
+pip install -e ~/smolvla/docs/reference/lerobot[smolvla]
+```
 
 ---
 
@@ -15,7 +37,12 @@ dgx/
 │   ├── setup_train_env.sh   # venv 생성 + PyTorch + lerobot editable 설치 + 환경변수 자동 적용
 │   ├── preflight_check.sh   # 학습 전 OOM/Walking RL 보호 게이트
 │   └── smoke_test.sh        # lerobot-train --steps=1 검증 (svla_so100_pickplace)
-├── runs/                    # 마일스톤별 학습 실행 자료 (04 진입 시 채움)
+├── tests/                   # ★ 신규 (04 TODO-X2) — dgx 측 환경 점검 + 회귀 검증 자산
+│   └── README.md            # tests/ 의 책임 + 자산 목록
+├── config/                  # ★ 신규 (04 TODO-X2) — dgx 측 학습 설정 캐시
+│   ├── README.md            # config/ 의 책임 + dataset_repos.json 스키마
+│   └── dataset_repos.json   # DataCollector 로부터 수신할 HF 데이터셋 repo_id 목록 (placeholder)
+├── runs/                    # 마일스톤별 학습 실행 자료 (05 진입 시 채움)
 │   └── README.md            # 구조 안내
 └── outputs/                 # 학습 출력 (체크포인트, 로그) — 자동 생성. rsync 배포 제외
 ```
@@ -154,6 +181,28 @@ lerobot-train \
 
 ---
 
+## DataCollector ↔ DGX 인터페이스
+
+DataCollector 로부터 학습 데이터를 수신하는 방식은 **HF Hub + rsync 둘 다** (TODO-T1 결정). 설정은 `dgx/config/dataset_repos.json` 에서 관리.
+
+```
+DataCollector:
+  lerobot-record → 데이터셋 (LeRobotDataset 포맷)
+      ↓
+  HF Hub push (lerobot-record --push-to-hub) 또는 rsync (TODO-T1 결정)
+      ↓
+DGX:
+  lerobot-train --dataset.repo_id=<HF_USER>/... 또는 --dataset.local_path=...
+      ↓
+  outputs/train/<run_name>/checkpoints/<step>/pretrained_model/
+```
+
+- `dataset.repo_id` 포맷: `{hf_username}/{dataset_name}` (lerobot upstream 표준)
+- HF 데이터셋 캐시: `$HF_HOME/lerobot/` = `/home/laba/smolvla/.hf_cache/lerobot/`
+- 실 데이터셋 목록은 `dgx/config/dataset_repos.json` 에 등록 (05_leftarmVLA 진입 시 채움)
+
+---
+
 ## 배포 (devPC → DGX)
 
 devPC 에서:
@@ -163,3 +212,4 @@ bash smolVLA/scripts/deploy_dgx.sh
 ```
 
 → `dgx/` + `docs/reference/lerobot/` (editable 설치 대상) 을 `~/smolvla/` 로 rsync.
+※ `dgx/outputs/`, `dgx/.arm_finetune/` 는 rsync 배포 제외 (런타임 생성 자산).

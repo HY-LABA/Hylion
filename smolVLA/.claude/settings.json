@@ -36,6 +36,8 @@
       "Bash(ruff:*)",
       "Bash(mypy:*)",
       "Bash(black:*)",
+      "Bash(bash -n *:*)",
+      "Bash(shellcheck:*)",
       "Bash(rsync -*:*)",
       "Bash(ssh orin:*)",
       "Bash(ssh dgx:*)",

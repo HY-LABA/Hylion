@@ -83,7 +83,11 @@
 | # | 항목 | 발견 출처 | 우선순위 | 상태 |
 |---|------|-----------|----------|------|
 | 1 | upstream 동기화 시 `orin/pyproject.toml [project.scripts]` 의 entrypoint 정리 (lerobot-eval / lerobot-train 제거) 가 덮어씌워질 수 있음 — 동기화 절차에 본 항목 명시 필요 (현재 `02_orin_pyproject_diff.md` 갱신만으로 추적) | TODO-O1 study | 중간 | 미완 |
-| 2 | run_teleoperate.sh 의 임시 보관 위치 — TODO-O2 진행 시점에 DataCollector 디렉터리 미존재 시 `docs/storage/others/run_teleoperate.sh.archive` 같은 임시 위치 후보. TODO-D2 시점에 최종 이동. 임시 보관 형식 (확장자 `.archive` 등) 일관 컨벤션 결정 필요 | TODO-O1 study | 낮음 | 미완 |
+| 2 | run_teleoperate.sh 의 임시 보관 위치 — TODO-O2 진행 시점에 DataCollector 디렉터리 미존재 시 `docs/storage/others/run_teleoperate.sh.archive` 같은 임시 위치 후보. TODO-D2 시점에 최종 이동. 임시 보관 형식 (확장자 `.archive` 등) 일관 컨벤션 결정 필요 | TODO-O1 study | 낮음 | 완료 (2026-05-01 TODO-D2: datacollector/scripts/run_teleoperate.sh 로 최종 이관) |
 | 3 | `orin/config/ports.json`, `cameras.json` 의 git 추적 vs gitignore 정책 결정 — TODO-O1 §1-2 에서 git 추적 가정. 단 사용자 환경 의존(시연장 셋업 후 안정적) 이라 별 인스턴스 환경에서 충돌 가능. 정책 명문화 필요 | TODO-O1 study | 낮음 | 미완 |
 | 4 | `orin/examples/tutorial/smolvla/` 가 1개 파일 (`using_smolvla_example.py`) 만 남은 디렉터리 — 평탄화 (`examples/tutorial/using_smolvla_example.py`) 검토 가능. 단 upstream 구조 보존 원칙대로면 그대로 유지가 자연스러움. TODO-O3 검증 시점에 사용자와 합의 | TODO-O2b | 낮음 | 미완 |
 | 5 | 향후 마일스톤별 추론 entry point 가 늘어날 때 `orin/inference/` 의 하위 구조 결정 (archive/, milestone 별 디렉터리 등). 05_leftarmVLA TODO-14 진입 시 hil_inference.py 가 ckpt 인자로 다양한 정책을 받을 수 있는지에 따라 결정 | TODO-O2b | 낮음 (05 트리거 시 중간) | 미완 |
+| 6 | 시연장 미러링 자동 검증 스크립트 — DataCollector 측 사진·조도·색온도 자동 측정·비교 (사용자 답 E: 본 사이클은 육안+사진 결정. 05/06 학습 결과로 미러링 부족 진단 시 트리거) | TODO-M1 | 낮음 (05·06 트리거 시 중간) | 미완 |
+| 7 | Phase 3 사용자 검증 대기 7건 (X3 smoke·save_dummy / G2 first-time/resume + hil_inference / D3 16단계 / M2 시연장 측정·재현 / T1 dummy push / T2 시연장 네트워크 / T3 dry-run) — 시간·환경 의존이라 BACKLOG 이관. 상세 절차는 `context/history/04_infra_setup/verification_queue.md` 참조. 사용자 환경 셋업 (DataCollector 머신 구매, 시연장 방문) 후 처리 | wrap 시점 | 중간 | 미완 |
+| 8 | TODO-G3 dispatch 누락 (orchestrator gap) — DataCollector 측 `check_hardware.sh` 이식. G1 산출물 (`orin/tests/check_hardware.sh`) 을 `datacollector/tests/` 에 이식 + venv path 갱신. D3 사용자 셋업 시 함께 처리 권고 | wrap 시점 | 낮음 (D3 트리거 시 중간) | 미완 |
+| 9 | TODO-G4 dispatch 누락 (orchestrator gap) — DataCollector check_hardware.sh prod 검증. G3 의존. G3·D3 완료 후 자연 처리 | wrap 시점 | 낮음 (D3 트리거 시 중간) | 미완 |

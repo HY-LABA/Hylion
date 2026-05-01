@@ -231,6 +231,16 @@ cam*.png
 # README.md is tracked (정책·사용법 문서), <run_name>/ 하위는 추적 X (수백 MB ~ GB)
 smolVLA/orin/checkpoints/*/
 
+# DGX 학습 출력 (체크포인트·로그 등 — 02 마일스톤 산출물)
+smolVLA/dgx/outputs/
+
+# smolVLA orin/config/ — 실 cache (시연장 환경 의존, 노드별 상이)
+# placeholder (ports.json, cameras.json 초기값 null) 는 추적 O (TODO-O2 산출물)
+# first-time 모드가 갱신한 실제 값은 추적 X (사용자 환경 의존, BACKLOG 04 #3 결정)
+# 추적 제외 패턴: *_cache.json 또는 *_actual.json 같은 별도 파일 방식 대신
+# 현재는 placeholder 그대로 추적하고 first-time 갱신 후 git 상태를 사용자가 판단하도록 함
+# → 향후 필요 시 smolVLA/orin/config/ports.json 을 ignore 추가 (BACKLOG 04 #3 재논의)
+
 # Secrets / keys (defense-in-depth, beyond .env above)
 *.key
 *.pem

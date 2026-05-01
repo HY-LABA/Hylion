@@ -1,0 +1,35 @@
+# check_hardware.sh 설정 — first-time 모드
+# 첫 실행 시 카메라 인덱스·flip / SO-ARM 포트를 발견하여 config/ 에 cache 저장
+#
+# 본 파일은 점검 동작 옵션 정의용 placeholder.
+# 실제 발견 결과는 orin/config/ports.json + cameras.json 에 저장됨.
+#
+# 사용 예:
+#   bash orin/tests/check_hardware.sh --mode first-time
+#   bash orin/tests/check_hardware.sh --mode first-time --quiet   # 비대화형 자동 할당
+
+mode: first-time
+
+# venv 경로 (기본값: ~/smolvla/orin/.hylion_arm)
+venv_path: "~/smolvla/orin/.hylion_arm"
+
+# cache 저장 경로 (기본값: 스크립트 기준 ../config/)
+cache:
+  ports_json: "~/smolvla/orin/config/ports.json"
+  cameras_json: "~/smolvla/orin/config/cameras.json"
+
+# 점검 단계 활성화 여부 (모두 기본 활성)
+steps:
+  venv: true
+  cuda: true
+  soarm_port: true
+  cameras: true
+
+# first-time 모드 전용 옵션
+first_time:
+  # SO-ARM 이 연결되지 않은 경우 포트 미발견을 PASS 처리
+  allow_missing_port: true
+  # 카메라 연결 없을 경우 PASS 처리
+  allow_missing_camera: true
+  # --quiet 시 자동 카메라 할당 순서 (첫 번째 → top, 두 번째 → wrist)
+  auto_assign_cameras: true

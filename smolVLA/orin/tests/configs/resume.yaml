@@ -1,0 +1,37 @@
+# check_hardware.sh 설정 — resume 모드
+# first-time 이후 매 시작 시 cache(ports.json, cameras.json) 와 현재 하드웨어 비교
+#
+# resume 모드 전제 조건:
+#   - orin/config/ports.json 에 follower_port (null 허용) 기록
+#   - orin/config/cameras.json 에 top.index / wrist.index 기록
+#
+# 사용 예:
+#   bash orin/tests/check_hardware.sh --mode resume
+#   bash orin/tests/check_hardware.sh --mode resume --quiet --output-json /tmp/hw.json
+
+mode: resume
+
+# venv 경로
+venv_path: "~/smolvla/orin/.hylion_arm"
+
+# cache 위치 (first-time 이 저장한 위치와 일치해야 함)
+cache:
+  ports_json: "~/smolvla/orin/config/ports.json"
+  cameras_json: "~/smolvla/orin/config/cameras.json"
+
+# 점검 단계 활성화 여부
+steps:
+  venv: true
+  cuda: true
+  soarm_port: true
+  cameras: true
+
+# resume 모드 전용 옵션
+resume:
+  # cache 의 follower_port 가 null 이면 포트 비교 건너뜀
+  skip_null_port: true
+  # cache 의 index 가 null 이면 카메라 비교 건너뜀
+  skip_null_cameras: true
+  # 현재 포트 목록과 cache 불일치 시 자동 갱신 여부
+  # false: FAIL 로 마킹 (기본 — 사용자 확인 유도)
+  auto_update_on_mismatch: false

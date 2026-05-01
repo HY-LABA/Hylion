@@ -37,6 +37,20 @@ description: orin·dgx 배포 절차 + 비대화형 검증 명령 시퀀스. pro
 
 → 자율 영역은 즉시 실행. 동의 영역은 작업 전 orchestrator 에 보고하여 사용자 답 받기.
 
+### 자율성 분류 시 직접 확인 의무
+
+신규·미확인 스크립트의 자율성 분류 시 **반드시 스크립트 내용을 Read 하여 확인** (추측 분류 X):
+
+1. **실 실행 여부**: 스크립트가 GPU 학습 / 패키지 설치 / 데이터 다운로드 를 트리거하는가?
+   - 포함 시 → 자율 불가 (동의 필요 또는 NEEDS_USER_VERIFICATION)
+   - 스크립트 이름만으로 판단 X (예: `save_dummy_checkpoint.sh` 가 "dummy" 라는 이름이라도 GPU 학습 1 step 트리거 — 04 X3 cycle 1 사례)
+2. **환경 의존 경로**: 하드코딩된 경로 (예: `~/.cache/huggingface/`) 가 실제 환경과 일치하는가?
+   - 불일치 의심 시 → `docs/storage/` 의 해당 환경 문서 (예: `06_dgx_venv_setting.md`) 직접 확인
+   - 04 X3 cycle 1 의 HF cache 경로 오류 (`~/.cache/huggingface/hub/` vs 실제 `~/smolvla/.hf_cache/hub/`) 답습 X
+3. **기존 환경 문서 교차 확인**: DGX/Orin 의 실제 경로·설정은 `docs/storage/` 에 기록된 실측치 우선
+
+→ 추측 기반 자율성 분류 시 code-tester 가 Critical 마킹. 확인 불가 시 NEEDS_USER_VERIFICATION 또는 CONSTRAINT_AMBIGUITY 누적.
+
 ## SSH 명령 패턴 — 자율 (예시)
 
 ### 환경 정보

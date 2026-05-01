@@ -42,16 +42,20 @@ find docs/reference/lerobot/ -name "*.py" | xargs grep -l "<pattern>"
 
 ### 2. 발견 시 — 그 기반 작성
 
-- 레퍼런스 파일을 Read 하여 **패턴·인터페이스·convention** 파악
+- 레퍼런스 파일을 **반드시 직접 Read** (Grep 으로 파일 존재 확인만으로 부족 — 파일 내용 전체 또는 해당 함수·클래스 직접 Read)
+- Read 한 레퍼런스의 **핵심 인터페이스 (함수 시그니처·인자명·기본값·경로) 를 01_implementation.md 에 인용**
 - 같은 패턴으로 `orin/` 또는 `dgx/` 에 구현
 - 변경 사항 명시 (왜 그대로 안 쓰고 일부 변경했는지)
 
 01_implementation.md 의 `## 적용 룰` 섹션에 명시 예시:
 
 ```
-- 레퍼런스 활용: docs/reference/seeed-lerobot/.../foo.py 의 X 함수 패턴 차용
-- 변경 사항: Orin 환경에 맞춰 Y 부분만 추가
+- 레퍼런스 직접 Read: docs/reference/lerobot/src/lerobot/scripts/lerobot_record.py
+  인용: `def record(..., single_task: str, ..., push_to_hub: bool = True, ...)` (line 47)
+- 적용: 위 시그니처 그대로 활용. 변경 사항: Orin 환경에 맞춰 Y 부분만 추가
 ```
+
+**"레퍼런스를 확인했다" 만으로 부족** — 인용 없이 적용 룰 작성 X. 04_infra_setup TODO-M1 cycle 1 처럼 "스킬 적용 완료" 선언만 하고 실제 인자를 추측 작성한 경우 code-tester 가 Critical 마킹하므로 사전 차단 필수.
 
 ### 3. 미발견 시 — SKILL_GAP 보고
 
@@ -89,6 +93,8 @@ find docs/reference/lerobot/ -name "*.py" | xargs grep -l "<pattern>"
 - ❌ 레퍼런스 검색 없이 신규 코드 작성
 - ❌ 레퍼런스에 유사 구현 있는데 그것 무시하고 다른 패턴 사용
 - ❌ SKILL_GAP 보고 없이 신규 자산 만든 경우
+- ❌ 레퍼런스 파일을 Read 하지 않고 "레퍼런스 적용 완료" 명시 (선언과 실제 행위 불일치)
+- ❌ 인자명·기본값·경로를 추측으로 작성하여 실제 레퍼런스와 불일치
 
 → code-tester 가 발견 시 `MAJOR_REVISIONS` verdict + Critical 마킹.
 

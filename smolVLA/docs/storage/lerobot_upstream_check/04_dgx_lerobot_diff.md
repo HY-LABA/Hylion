@@ -85,3 +85,43 @@ TODO-09b DGX prod 검증에서 `smoke_test.sh` 단독 실행을 완료 조건으
 - [ ] `lerobot/svla_so100_pickplace` dataset camera key가 바뀌었는지 확인
 - [ ] `lerobot-train` output dir 존재 검증 정책이 바뀌었는지 확인
 - [ ] GB10 UMA에서 `nvidia-smi` memory field가 계속 `[N/A]`인지 확인
+
+---
+
+### [2026-05-01] `dgx/tests/`, `dgx/config/` 신규 디렉터리 — 04 TODO-X2 마이그레이션
+
+**대상 파일:**
+- `dgx/tests/README.md` (신규)
+- `dgx/config/README.md` (신규)
+- `dgx/config/dataset_repos.json` (신규 — placeholder)
+- `dgx/README.md` (갱신 — pyproject.toml 미존재 주의사항 + DataCollector 인터페이스 + 새 디렉터리 안내)
+
+**변경 내용:**
+
+| 항목 | 내용 |
+|---|---|
+| `dgx/tests/` 신규 | DGX 측 환경 점검 + 회귀 검증 자산 보관 디렉터리. 실 스크립트는 TODO-X3 이전 필요 시 추가 |
+| `dgx/config/` 신규 | DataCollector 로부터 수신할 HF 데이터셋 repo_id 목록 등 학습 설정 캐시 관리 |
+| `dataset_repos.json` placeholder | HF Hub + rsync 두 방식 모두 지원하는 스키마. 실 값은 05_leftarmVLA 진입 시 채움 |
+| `dgx/README.md` 갱신 | pyproject.toml 미존재 + lerobot 설치 방법 주의사항 추가. DataCollector ↔ DGX 인터페이스 섹션 추가. 배포 주의사항 (outputs/, .arm_finetune/ rsync 제외) 명시 |
+
+**변경 이유:**
+
+04_infra_setup TODO-X1 (§5 마이그레이션 계획) 에 따른 dgx/ 구조 정리. 4-노드 분리 아키텍처 (devPC / DataCollector / DGX / 시연장 Orin) 공식화로 DGX 의 학습 전용 책임을 명문화하고, DataCollector 와의 데이터 인터페이스를 위한 `config/` 디렉터리를 신설.
+
+**영향 범위:**
+
+| 기능 | 영향 |
+|---|---|
+| upstream lerobot 코드 | 변경 없음 (dgx/lerobot/ 미존재 유지) |
+| 기존 02 산출물 (setup_train_env / preflight / smoke / save_dummy_checkpoint) | 변경 없음 — 회귀 없음 확인은 TODO-X3 |
+| Orin inference path | 영향 없음 |
+| DataCollector 인터페이스 | dataset_repos.json placeholder 신설 — 실 운용은 TODO-T1 결정 후 |
+
+**검증:**
+
+- `dgx/tests/README.md` 신규 파일 존재 확인
+- `dgx/config/README.md` 신규 파일 존재 확인
+- `dgx/config/dataset_repos.json` valid JSON 확인
+- `dgx/README.md` 주의사항 섹션 추가 확인
+- `dgx/scripts/` 미변경 확인 (02 산출물 회귀 없음)

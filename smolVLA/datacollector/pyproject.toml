@@ -1,0 +1,83 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "lerobot"
+version = "0.5.2"
+description = "LeRobot curated subset for DataCollector (record + hardware + feetech only, x86_64 Ubuntu)"
+requires-python = ">=3.12"
+
+dependencies = [
+    # torch / torchvision 은 setup_env.sh 에서 표준 PyPI wheel 로 설치
+    # — x86_64 Ubuntu 22.04 이므로 Jetson 제약 없음. pyproject 에 두면
+    #   pip 가 설치 시 CPU-only 또는 버전 불일치 wheel 을 선택할 수 있으므로
+    #   setup_env.sh 에서 lerobot 설치 후 별도 설치.
+    "numpy>=2.0.0,<2.3.0",
+    "opencv-python-headless>=4.9.0,<4.14.0",
+    "Pillow>=10.0.0,<13.0.0",
+    "einops>=0.8.0,<0.9.0",
+    "draccus==0.10.0",
+    "huggingface-hub>=1.0.0,<2.0.0",
+    "requests>=2.32.0,<3.0.0",
+    "gymnasium>=1.1.1,<2.0.0",
+    "safetensors>=0.4.3,<1.0.0",
+    "packaging>=24.2,<26.0",
+    "termcolor>=2.4.0,<4.0.0",
+    "tqdm>=4.66.0,<5.0.0",
+    "cmake>=3.29.0.1,<4.2.0",
+    "setuptools>=71.0.0,<81.0.0",
+]
+
+# Optional extras: record + hardware + feetech only
+# smolvla / training 제외 — DataCollector 는 추론·학습 X
+[project.optional-dependencies]
+
+# record: upstream `dataset` extras 에 대응 (DataCollector 자체 정의 키)
+# LeRobotDataset 포맷으로 저장 + HF Hub 업로드 + 비디오 인코딩 지원
+# torchcodec: x86_64 Linux 환경에서 사용 가능한 비디오 디코딩 라이브러리
+# — aarch64(Jetson) 에서는 동작 안 함. DataCollector 는 x86_64 이므로 포함.
+record = [
+    "datasets>=4.0.0,<5.0.0",
+    "pandas>=2.0.0,<3.0.0",
+    "pyarrow>=21.0.0,<30.0.0",
+    "av>=15.0.0,<16.0.0",
+    "torchcodec>=0.3.0,<0.11.0; sys_platform == 'linux' and platform_machine == 'x86_64'",
+    "jsonlines>=4.0.0,<5.0.0",
+]
+
+# hardware: SO-ARM 모터 제어 + 키보드 입력 (upstream 동일 구성)
+hardware = [
+    "pynput>=1.7.8,<1.9.0",
+    "pyserial>=3.5,<4.0",
+    "deepdiff>=7.0.1,<9.0.0",
+]
+
+# feetech: SO-ARM Feetech 서보 직접 구동 (upstream 동일 구성)
+feetech = [
+    "feetech-servo-sdk>=1.0.0,<2.0.0",
+    "pyserial>=3.5,<4.0",
+    "deepdiff>=7.0.1,<9.0.0",
+]
+
+# smolvla, training 은 의도적으로 미정의:
+# - smolvla: DataCollector 는 추론 X (Orin 의 책임)
+# - training: DataCollector 는 학습 X (DGX 의 책임)
+
+[project.scripts]
+# DataCollector 책임: 데이터 수집 + teleop + 하드웨어 설정
+# eval / train 미등록 — DataCollector 는 추론·학습 X
+lerobot-calibrate         = "lerobot.scripts.lerobot_calibrate:main"
+lerobot-find-cameras      = "lerobot.scripts.lerobot_find_cameras:main"
+lerobot-find-port         = "lerobot.scripts.lerobot_find_port:main"
+lerobot-find-joint-limits = "lerobot.scripts.lerobot_find_joint_limits:main"
+lerobot-record            = "lerobot.scripts.lerobot_record:main"
+lerobot-replay            = "lerobot.scripts.lerobot_replay:main"
+lerobot-setup-motors      = "lerobot.scripts.lerobot_setup_motors:main"
+lerobot-teleoperate       = "lerobot.scripts.lerobot_teleoperate:main"
+lerobot-info              = "lerobot.scripts.lerobot_info:main"
+# lerobot-eval, lerobot-train 제거: DataCollector 는 수집 전용
+# 추론 → Orin, 학습 → DGX
+
+[tool.setuptools.packages.find]
+where = ["."]
