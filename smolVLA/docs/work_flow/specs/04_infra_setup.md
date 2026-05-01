@@ -240,7 +240,7 @@ orin/
   - 실 실행 검증은 TODO-O3 의 책임 (TODO-O2 + O2b 통합)
   - history: `docs/work_flow/context/history/04_infra_setup/20260430_1612_task_examples_split.md`
 
-### [ ] TODO-O3: orin/ 마이그레이션 회귀 검증 (Orin prod)
+### [x] TODO-O3: orin/ 마이그레이션 회귀 검증 (Orin prod)
 
 - 타입: test
 - DOD: TODO-O2 + TODO-O2b 마이그레이션 후 03 산출물 5개 (`smoke_test.py`, `inference_baseline.py`, `measure_latency.py`, `load_checkpoint_test.py`, `hil_inference.py`) 가 Orin 에서 새 경로로 모두 정상 동작 확인. import 회귀 없음. tests/ / config/ / checkpoints/ / inference/ 4개 신규 디렉터리 인식. entrypoint 2개 (`lerobot-eval`, `lerobot-train`) 등록 해제 반영.
@@ -255,6 +255,21 @@ orin/
   - `python ~/smolvla/orin/tests/inference_baseline.py` — forward PASS
   - `python ~/smolvla/orin/inference/hil_inference.py --help` — help 출력 PASS
   - `ls ~/smolvla/orin/{tests,config,checkpoints,inference}/README.md` — 4개 README 모두 존재
+- **완료 (2026-04-30 16:53)**: devPC 환경 변경 (Windows → Linux) 후 본 AI 가 SSH `orin` 으로 직접 배포·검증. `/handoff-test` 외부 위임 우회.
+  - 배포: `bash scripts/deploy_orin.sh` 성공. 신규 4개 디렉터리 + 5개 .py 새 경로 + run_teleoperate.sh 삭제 모두 동기화 (1.19 MB)
+  - 재설치: `pip install -e .[smolvla,hardware,feetech]` PASS. lerobot-0.5.2 editable wheel 재빌드. entrypoint 갱신 반영
+  - 검증 결과 (8개 항목 모두 PASS):
+    1. `which lerobot-eval lerobot-train` — exit=1, stdout 빈 결과 (등록 해제 확인)
+    2. venv `bin/lerobot-*` 9개만 (eval/train 제외)
+    3. 4 README 모두 존재 (`tests/`, `config/`, `checkpoints/`, `inference/`)
+    4. `hil_inference.py --help` exit=0
+    5. `load_checkpoint_test.py --help` exit=0
+    6. `smoke_test.py` compile OK
+    7. `inference_baseline.py` 실 forward PASS — lerobot/smolvla_base 다운로드 + 더미 입력 forward, Action shape (1,6) / dtype torch.float32 / min 0.391 / max 0.943 (03 prod 검증과 동일 패턴 재현)
+    8. `measure_latency.py --help` exit=0
+  - 부수 관찰: `lerobot-train` 은 본 검증 직전부터 venv 에 부재 (이전 build 에서 미등록). 실효성 있는 정리는 `lerobot-eval` 만. inference_baseline 실행 중 HF_TOKEN 미설정 경고 (정성 동작 무관)
+  - **04 그룹 O 클로징** — 다음 진입 후보: 그룹 X (DGX 정리) 또는 그룹 D (DataCollector)
+  - history: `docs/work_flow/context/history/04_infra_setup/20260430_1653_test_orin_migration_verify.md`
 
 **[그룹 X — dgx/ 구조 정리]**
 
