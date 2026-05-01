@@ -50,7 +50,7 @@
       "Bash(git push --force:*)",
       "Bash(git push -f:*)",
       "Bash(git reset --hard:*)",
-      "Bash(chmod 777:*)",
+      "Bash(chmod 777:*)"
     ]
   },
   "hooks": {
