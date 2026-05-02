@@ -17,7 +17,7 @@ smolVLA/dgx/outputs/
 
 ## 근거
 
-- `08_dgx_structure.md §5-5 부수 작업` 명시 사항 — cycle 1 task-executor 가 누락
+- `09_dgx_structure.md §5-5 부수 작업` 명시 사항 — cycle 1 task-executor 가 누락
 - `smolVLA/orin/checkpoints/*/` 패턴과 형제 관계 — 동일 카테고리 (대용량 학습 아티팩트)
 - code-tester MINOR_REVISIONS Recommended #1 처리
 

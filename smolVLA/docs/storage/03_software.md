@@ -91,7 +91,24 @@ JetPack 판별 근거:
   - `nvidia-smi`에서 GPU 메모리 총량은 `[N/A]`, 상세 메모리 사용량은 `Not Supported`로 표시되며 UMA/iGPU 구조의 정상 표시로 취급.
   - GPU 워크로드 가용 메모리 추정은 VRAM 총량이 아니라 OS `MemAvailable + SwapFree` 기준으로 기록.
 
-## 6) 추가 확인 필요 항목
+## 6) DataCollector 실측 소프트웨어 정보 (2026-05-02)
+
+- OS: `Ubuntu 22.04 LTS` (x86_64, kernel `6.8.0-106-generic` HWE)
+- Python: `3.10.12` (시스템) — venv 별도 (`.hylion_collector`, 셋업 후 갱신)
+- GPU 드라이버: 없음 (Intel HD 620 only — NVIDIA 미탑재)
+- CUDA / cuDNN / TensorRT: 미해당 (GPU 없음)
+- PyTorch: 셋업 시 표준 PyPI CPU wheel 설치 예정 (`torch` cp310 x86_64 — venv `setup_env.sh`)
+- ssh: `openssh-server 1:8.9p1-3ubuntu0.15` 설치·active·enabled (2026-05-02)
+- 설치된 핵심 패키지: `git`, `python3`, `build-essential`, `rsync`, `usbutils`, `libusb-1.0-0`
+- **셋업 시점 추가 설치 필요**: `python3-venv`, `python3-pip`, `python3-dev`, `curl`, `ffmpeg`, `v4l-utils`
+- 사용자 그룹 추가 필요: `dialout` (SO-ARM `/dev/ttyACM*` 접근용)
+- conda: 미설치 (시스템 Python + venv 직접 사용)
+- Docker: 미확인 (DataCollector 책임상 불필요 — lerobot-record + push 만 수행)
+- ROS2: 미설치 (DataCollector 는 lerobot 단독)
+
+DataCollector venv 상세는 `docs/storage/07_datacollector_venv_setting.md` 참조 (셋업 후 작성).
+
+## 7) 추가 확인 필요 항목
 
 - [x] Orin 시스템 소프트웨어 재검증 완료 (2026-04-23)
   - `nvcc -V` 정상 출력 (`release 12.6, V12.6.68`)

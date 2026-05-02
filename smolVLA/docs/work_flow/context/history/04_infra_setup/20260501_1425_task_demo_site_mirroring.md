@@ -4,14 +4,14 @@
 
 ## 요약
 
-`docs/storage/10_demo_site_mirroring.md` 신규 작성 완료.
+`docs/storage/11_demo_site_mirroring.md` 신규 작성 완료.
 시연장 환경을 DataCollector 인근에 재현하기 위한 절차·체크리스트 문서.
 사용자 결정 (육안+사진 비교, 자동 검증 BACKLOG) 반영.
 BACKLOG 03 #15·#16 연계 명시.
 
 ## 산출물
 
-- `docs/storage/10_demo_site_mirroring.md` — 신규 작성 (246줄)
+- `docs/storage/11_demo_site_mirroring.md` — 신규 작성 (246줄)
   - §1 시연장 환경 측정 항목 (책상·작업영역·조명·top카메라·wrist카메라·토르소)
   - §2 측정 도구 (줄자·스마트폰·조도계 앱 등)
   - §3 DataCollector 측 재현 체크리스트 (책상/조명/top카메라/wrist카메라/토르소/포트/카메라인덱스)

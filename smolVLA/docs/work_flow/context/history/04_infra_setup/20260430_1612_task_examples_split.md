@@ -28,7 +28,7 @@
 3. `orin/examples/tutorial/smolvla/` 에 `using_smolvla_example.py` 만 남음 (upstream 미러 그대로)
 4. `orin/examples/tutorial/smolvla/__pycache__/` 정리 (이동된 파일들의 cache)
 5. `orin/tests/README.md` 갱신 — 자산 표에 4개 신규 자산 추가
-6. `docs/storage/07_orin_structure.md` 갱신:
+6. `docs/storage/08_orin_structure.md` 갱신:
    - §1 디렉터리 트리 (현재·새 구조 모두)
    - §2 컴포넌트 책임 표 (`orin/inference/` 추가, `orin/examples/` 책임 갱신)
    - §3 마일스톤 매트릭스 (5개 파일 위치 갱신)
@@ -47,7 +47,7 @@
 
 ### 수정
 - `orin/tests/README.md` — 자산 표 갱신
-- `docs/storage/07_orin_structure.md` — §1 / §2 / §3 / §5 갱신
+- `docs/storage/08_orin_structure.md` — §1 / §2 / §3 / §5 갱신
 
 ### 정리
 - `orin/examples/tutorial/smolvla/__pycache__/` 의 .pyc 파일 (이동된 파일 분만)
@@ -64,7 +64,7 @@
 
 1. **현재 `orin/examples/tutorial/smolvla/` 구조 확인** — 6개 .py 파일 + __pycache__ 정상 존재 검증
 2. **5개 .py 파일의 import 경로** 확인 — 모두 `from lerobot...` 절대 import 인지 (이동 안전성 검증)
-3. **`docs/storage/07_orin_structure.md` 의 현재 §1/§2/§3/§5** 파악 — 갱신 범위 식별
+3. **`docs/storage/08_orin_structure.md` 의 현재 §1/§2/§3/§5** 파악 — 갱신 범위 식별
 4. **`orin/tests/README.md` 의 자산 표 형식** 파악 — 4개 신규 자산 추가 패턴
 
 ## 신규 README 콘텐츠 가이드
@@ -80,7 +80,7 @@
   - `orin/config/{ports,cameras}.json` — SO-ARM·카메라 설정 cache
   - `orin/tests/check_hardware.sh --mode resume` — 운영 진입 직전 게이트 (TODO-G1 구현)
 - 참고:
-  - `docs/storage/07_orin_structure.md` §2 (inference/ 컴포넌트 책임)
+  - `docs/storage/08_orin_structure.md` §2 (inference/ 컴포넌트 책임)
   - `docs/work_flow/specs/04_infra_setup.md` TODO-O2b (본 디렉터리 신설 사유)
   - `docs/work_flow/specs/history/03_smolvla_test_on_orin.md` TODO-07 (hil_inference.py 의 출처)
 
@@ -96,7 +96,7 @@
 | `inference_baseline.py` | 더미 입력 1회 forward (입력 미러링) | 03 TODO-06 (04 TODO-O2b 에서 이관) |
 | `measure_latency.py` | latency p50/p95 + RAM peak 측정 | 03 TODO-06 (04 TODO-O2b 에서 이관) |
 
-## `docs/storage/07_orin_structure.md` 갱신 가이드
+## `docs/storage/08_orin_structure.md` 갱신 가이드
 
 ### §1-2 새 구조 트리에 inference/ 추가
 ```
@@ -139,7 +139,7 @@ orin/
 
 ## 참고 레퍼런스
 
-- `docs/storage/07_orin_structure.md` — 기존 §1~§6 (본 TODO 의 갱신 대상)
+- `docs/storage/08_orin_structure.md` — 기존 §1~§6 (본 TODO 의 갱신 대상)
 - `docs/work_flow/specs/04_infra_setup.md` TODO-O2b — 본 작업 사양
 - `docs/work_flow/context/history/04_infra_setup/20260430_1542_task_orin_migration.md` — 직전 TODO-O2 의 history (디렉터리 변경 사항 종합)
 - `orin/tests/README.md` — 직전 TODO-O2 에서 신규 작성된 README (자산 표 형식 참고)
@@ -181,7 +181,7 @@ orin/
 **6. README 갱신**:
 - `orin/tests/README.md` — 자산 (현재) 표에 4개 행 추가 (smoke_test / load_checkpoint_test / inference_baseline / measure_latency)
 
-**7. `docs/storage/07_orin_structure.md` 갱신**:
+**7. `docs/storage/08_orin_structure.md` 갱신**:
 - §1-2 새 구조 트리 — `inference/` 추가, `examples/tutorial/smolvla/` 가 upstream 미러 책임만 가짐 명시, 책임 분리 메모 추가
 - §2 컴포넌트 책임 표 — `orin/inference/` 행 신규 추가, `orin/examples/tutorial/smolvla/` 행 책임 갱신, `orin/tests/` 행 책임 갱신 (4개 검증/측정 스크립트 추가 명시)
 - §3 마일스톤 매트릭스 — 5개 파일 행의 경로 prefix 갱신 (`examples/tutorial/smolvla/` → `tests/` 또는 `inference/`), `using_smolvla_example.py` 행 추가, 04 컬럼에 ✏️ (TODO-O2b 이관) 표시
@@ -204,7 +204,7 @@ orin/
 | 7 | 회귀 grep `^(from orin\|import orin)` (orin/ 전체) | PASS (0건 — TODO-06 정책 유지) |
 | 8 | `orin/inference/README.md` 신규 작성 | PASS |
 | 9 | `orin/tests/README.md` 자산 표 4행 추가 | PASS |
-| 10 | `docs/storage/07_orin_structure.md` §1·§2·§3·§4-1·§5 갱신 + 변경 이력 추가 | PASS |
+| 10 | `docs/storage/08_orin_structure.md` §1·§2·§3·§4-1·§5 갱신 + 변경 이력 추가 | PASS |
 
 ### 실 실행 검증 필요 여부
 

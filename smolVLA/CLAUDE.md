@@ -143,7 +143,7 @@ spec 의 모든 todo 를 **자율 처리**. 사용자는 `/observe` 로 read-onl
 
 code-tester `MAJOR_REVISIONS` 시 일반적으론 task-executor 재호출. 단 다음 영역 변경에 대해서는 **자동 재시도 X, 사용자 보고 게이트**.
 
-- `orin/lerobot/`, `dgx/lerobot/` (upstream 옵션 B)
+- `orin/lerobot/`, `dgx/lerobot/`, `datacollector/lerobot/` (upstream 옵션 B)
 - `pyproject.toml` 류 (의존성)
 - `orin/scripts/setup_env.sh` (Jetson PyTorch 직접 설치)
 - `scripts/deploy_*.sh`
@@ -198,6 +198,10 @@ orchestrator·planner 가 다음을 plan 에 넣으려면 **사용자 답 받기
 `orin/lerobot/` 하위 코드 수정 시 함께 갱신:
 
 3. **`docs/storage/lerobot_upstream_check/03_orin_lerobot_diff.md`** — upstream 대비 `orin/lerobot/` 코드 변경 이력. inference-only 트리밍 시 이유·영향 범위 명시.
+
+`datacollector/lerobot/` 하위 코드 수정 시 함께 갱신:
+
+3-b. **`docs/storage/lerobot_upstream_check/05_datacollector_lerobot_diff.md`** — upstream 대비 `datacollector/lerobot/` 코드 변경 이력. PEP 695 등 Python 3.12+ syntax backport 시 사유·영향 범위 명시 (BACKLOG #11 (c) 옵션 진행 시 활성화).
 
 skill·hook·CLAUDE.md 갱신 시 (reflection 결과):
 

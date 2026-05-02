@@ -30,7 +30,7 @@ TODO-X1 (study: dgx/ 매트릭스)
 ```
 
 - X1 은 선결 의존 없음 (즉시 진입 가능)
-- X2 는 X1 산출물 (`docs/storage/08_dgx_structure.md`) 필수
+- X2 는 X1 산출물 (`docs/storage/09_dgx_structure.md`) 필수
 - X3 는 X2 실행 후 prod 검증 (DGX SSH 접속)
 
 ### 그룹 D — DataCollector 노드 신규 셋업

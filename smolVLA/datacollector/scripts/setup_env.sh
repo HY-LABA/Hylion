@@ -2,11 +2,15 @@
 # DataCollector (x86_64 Ubuntu 22.04 LTS) 독립 Python 환경 구성 스크립트
 # 실행 위치: DataCollector (~/smolvla/datacollector/scripts/setup_env.sh)
 #
-# 환경 기준:
+# 환경 기준 (07_datacollector_venv_setting.md 결정 — 2026-05-02 실 셋업 결과):
 #   OS: Ubuntu 22.04 LTS, x86_64
-#   Python: 3.12 (Ubuntu 22.04 기본 제공 또는 deadsnakes PPA)
+#   Python: **3.12** (deadsnakes PPA 사전 설치 필요 — lerobot upstream 이 PEP 695
+#           generic syntax 사용 → Python 3.12+ 강제, 시스템 Python 3.10 SyntaxError)
+#           사전 설치: sudo add-apt-repository -y ppa:deadsnakes/ppa &&
+#                      sudo apt install -y python3.12 python3.12-venv python3.12-dev
 #   PyTorch: 표준 PyPI wheel (pip install torch torchvision)
 #     — Jetson 제약 없음. NVIDIA JP 6.0 redist URL 불필요.
+#     — GPU 없음 (Intel HD 620 only) — CPU-only 동작 (CUDA wheel 받히지만 미사용).
 #   venv: .hylion_collector (orin/.hylion_arm, dgx/.arm_finetune 와 명명 패턴 통일)
 #
 # Orin setup_env.sh 와의 핵심 차이:
@@ -14,7 +18,7 @@
 #   - LD_LIBRARY_PATH 패치 불필요
 #   - torch/torchvision: 표준 PyPI wheel (pip install torch torchvision)
 #   - extras: record + hardware + feetech (smolvla 제외)
-#   - Python: 3.12 (Jetson 3.10 제약 없음)
+#   - Python: 3.12 (Orin 의 JP 6.2.2 cp310 과 다른 점, DGX 의 3.12.3 와 동일)
 #   - lerobot/: upstream src 에 대한 symlink 자동 생성 (옵션 B — 파일 변경 X)
 
 set -e
@@ -22,16 +26,16 @@ set -e
 SMOLVLA_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 VENV_DIR="${SMOLVLA_DIR}/.hylion_collector"  # datacollector/.hylion_collector
 
-# Python 3.12 우선. Ubuntu 22.04 에서는 python3.12 가 설치되어 있거나
-# deadsnakes PPA (`sudo add-apt-repository ppa:deadsnakes/ppa`) 로 설치 가능.
+# lerobot upstream 가 PEP 695 generic syntax (`def fn[T: ...]`, `type X = ...`)
+# 를 5+ 군데 사용 → Python 3.12+ 필수. 사용자가 deadsnakes PPA 로 사전 설치한 가정.
 if command -v python3.12 &>/dev/null; then
     PYTHON=python3.12
-elif command -v python3 &>/dev/null; then
-    PYTHON=python3
-    echo "[setup] 경고: python3.12 미발견 — python3 로 폴백 (버전: $($PYTHON --version))"
-    echo "[setup]   권장: sudo apt-get install python3.12 python3.12-venv"
 else
-    echo "[setup] 오류: Python 3 이 설치되지 않았습니다." >&2
+    echo "[setup] 오류: python3.12 미발견." >&2
+    echo "[setup]   사전 설치 필요:" >&2
+    echo "[setup]     sudo add-apt-repository -y ppa:deadsnakes/ppa" >&2
+    echo "[setup]     sudo apt update" >&2
+    echo "[setup]     sudo apt install -y python3.12 python3.12-venv python3.12-dev" >&2
     exit 1
 fi
 
@@ -43,7 +47,8 @@ echo "[setup] Python:       $($PYTHON --version)"
 # x86_64 Ubuntu 22.04 에서 권장되는 빌드 의존성
 # libopenblas-dev: numpy/scipy 최적화 BLAS 백엔드
 # libusb-1.0-0-dev: USB 장치 SDK 빌드 시 필요
-# python3.12-venv: venv 생성에 필요
+# python3.12-venv: venv 생성 (deadsnakes PPA 사전 설치 가정)
+# 이미 설치된 패키지는 apt-get install 이 idempotent 하게 skip — set -e 안전.
 echo "[setup] 시스템 의존 패키지 설치 중..."
 sudo apt-get install -y \
     libopenblas-dev \

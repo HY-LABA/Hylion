@@ -16,8 +16,8 @@ DataCollector 노드 설계 결정 문서 (`docs/storage/09_datacollector_setup.
 | orin/pyproject.toml extras 분석 | smolvla + hardware + feetech (학습 의존성 제외됨) |
 | 04_devnetwork.md SSH 패턴 | Host alias / HostName / User / Port / IdentityFile / ServerAliveInterval 패턴 추출 |
 | 05_orin_venv_setting.md venv 패턴 | .hylion_arm / Python 3.10 / setup_env.sh 패턴 추출 |
-| 07_orin_structure.md 대칭 패턴 | §0 변경이력 + §1~§5 + §6 향후 + §7 변경이력 표 구성 확인 |
-| 08_dgx_structure.md 대칭 패턴 | 동일 절 구성 확인 |
+| 08_orin_structure.md 대칭 패턴 | §0 변경이력 + §1~§5 + §6 향후 + §7 변경이력 표 구성 확인 |
+| 09_dgx_structure.md 대칭 패턴 | 동일 절 구성 확인 |
 
 ## 주요 결정
 

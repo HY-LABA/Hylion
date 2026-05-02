@@ -57,6 +57,6 @@
 
 ## 참고
 
-- `docs/storage/08_dgx_structure.md` §2 (tests/ 컴포넌트 책임) + §3 (마일스톤별 책임 매트릭스)
+- `docs/storage/09_dgx_structure.md` §2 (tests/ 컴포넌트 책임) + §3 (마일스톤별 책임 매트릭스)
 - `docs/work_flow/specs/04_infra_setup.md` TODO-X2 / TODO-X3 (실 구현·검증)
 - `dgx/scripts/preflight_check.sh` — Walking RL 보호 + OOM 방어 게이트 (본 tests/ 와 보완 관계)

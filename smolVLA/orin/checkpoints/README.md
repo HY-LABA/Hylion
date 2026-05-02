@@ -78,7 +78,7 @@ forward + action shape `(1, 50, *)` 출력이면 OK.
 
 ## 참고
 
-- `docs/storage/07_orin_structure.md` §2 (checkpoints/ 컴포넌트 책임) + §4-1 (devPC sync hub)
+- `docs/storage/08_orin_structure.md` §2 (checkpoints/ 컴포넌트 책임) + §4-1 (devPC sync hub)
 - `docs/storage/06_dgx_venv_setting.md` §10 (DGX → Orin 체크포인트 전송 절차, 02 TODO-10b 검증)
 - `docs/work_flow/specs/04_infra_setup.md` TODO-T2 (시연장 Orin 의 ckpt 전송 경로 재확인)
 - `orin/examples/tutorial/smolvla/load_checkpoint_test.py` (ckpt 호환성 검증)

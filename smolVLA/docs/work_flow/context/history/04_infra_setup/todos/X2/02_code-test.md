@@ -52,7 +52,7 @@ dataset_repos.json: 파일 직접 Read 로 수동 JSON 구조 검증 — PASS
 
 | # | 위치 | 권장 |
 |---|---|---|
-| 1 | 루트 `.gitignore` | `smolVLA/dgx/outputs/` (또는 `smolVLA/dgx/outputs/*/`) gitignore 패턴 미추가. `08_dgx_structure.md` §5-5 부수 작업에 "미존재 시 추가" 명시, `08_dgx_structure.md` §1 트리에서 "gitignore" 라 표기했으나 실제 패턴 없음. `smolVLA/orin/checkpoints/*/` 패턴은 이미 추가되어 있어 형제 패턴과 불일치. task-executor 도 확인 보류 SKILL_GAP 명시. TODO-X3 전에 추가 권장 |
+| 1 | 루트 `.gitignore` | `smolVLA/dgx/outputs/` (또는 `smolVLA/dgx/outputs/*/`) gitignore 패턴 미추가. `09_dgx_structure.md` §5-5 부수 작업에 "미존재 시 추가" 명시, `09_dgx_structure.md` §1 트리에서 "gitignore" 라 표기했으나 실제 패턴 없음. `smolVLA/orin/checkpoints/*/` 패턴은 이미 추가되어 있어 형제 패턴과 불일치. task-executor 도 확인 보류 SKILL_GAP 명시. TODO-X3 전에 추가 권장 |
 | 2 | `dgx/tests/README.md` | orin/tests/README.md 와 구조 비교 시 "두 모드 (first-time / resume)" 섹션이 orin/tests 에는 있고 dgx/tests 에는 없음. dgx/tests 에는 해당 모드 개념 불필요하므로 패턴 엄격 미러보다 DGX 책임에 맞는 형식이 적합. 단, 책임·자산표·외부의존성·참고 4섹션 구조는 모두 충족됨. 미러 충실도 관점에서 섹션 구성 차이가 있으나 DGX 맥락에서 합리적 변형이라 Critical 아님 |
 | 3 | `dgx/config/dataset_repos.json` `hf_hub.repo_id` 값 | placeholder 값 `"${HF_USER}/example_dataset"` 가 shell 변수 치환 표기를 JSON 문자열로 사용 중. JSON spec 상 유효하나 값을 그대로 lerobot CLI 에 넘기면 `${HF_USER}` 가 리터럴로 전달되어 실패할 수 있음. placeholder 임을 README에 명시했으나, 혼동 방지를 위해 `"<HF_USER>/example_dataset"` 또는 `"PLACEHOLDER/example_dataset"` 형태 권장. 실용적 오동작은 TODO-T1 결정 전까지 없음 (실제 사용 X) |
 

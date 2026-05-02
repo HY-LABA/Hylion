@@ -53,7 +53,7 @@ dgx/
 
 ## 산출물
 
-- `docs/storage/08_dgx_structure.md` — 신규 작성 (07_orin_structure.md 패턴 미러)
+- `docs/storage/09_dgx_structure.md` — 신규 작성 (08_orin_structure.md 패턴 미러)
 
 ### 절별 요약
 
@@ -102,7 +102,7 @@ dgx/
 
 - CLAUDE.md Hard Constraints: `docs/reference/` 미변경 (read-only 레퍼런스 활용만)
 - Coupled File Rule: `dgx/lerobot/` 변경 없음 → `04_dgx_lerobot_diff.md` 갱신 불필요 (본 TODO). 기존 파일 존재 확인 완료
-- 레퍼런스 활용: `07_orin_structure.md` 의 §0~§6 절 구성 패턴 미러. `06_dgx_venv_setting.md` 실측 사실 §1 / §4 에 반영
+- 레퍼런스 활용: `08_orin_structure.md` 의 §0~§6 절 구성 패턴 미러. `06_dgx_venv_setting.md` 실측 사실 §1 / §4 에 반영
 - lerobot-reference-usage 스킬: study 타입 (신규 코드 X) — SKILL_GAP 해당 없음
 - lerobot-upstream-check 스킬: `dgx/pyproject.toml` 미존재이므로 coupled file 규칙 적용 대상 없음. Category B 주의사항: TODO-X2 에서 dgx/scripts/ 에 신규 스크립트 추가 시 `04_dgx_lerobot_diff.md` 이력 추가 권장
 
@@ -112,7 +112,7 @@ dgx/
 
 | 경로 | 변경 종류 | 한 줄 요약 |
 |---|---|---|
-| `docs/storage/08_dgx_structure.md` | 신규 | DGX 구조·책임 매트릭스 + 마이그레이션 계획 (07_orin_structure.md 패턴 미러) |
+| `docs/storage/09_dgx_structure.md` | 신규 | DGX 구조·책임 매트릭스 + 마이그레이션 계획 (08_orin_structure.md 패턴 미러) |
 | `docs/work_flow/context/todos/X1/01_implementation.md` | 신규 | 본 파일 (TODO-X1 구현 보고서) |
 | `docs/work_flow/context/history/04_infra_setup/<timestamp>_task_dgx_structure.md` | 신규 | 작업 history 기록 (별도 작성 예정) |
 
@@ -132,7 +132,7 @@ dgx/
 
 code-tester 는 study 타입이라 코드 검증 불필요. 산출물 일관성 + 패턴 미러 검증:
 
-- 07_orin_structure.md 와 동일 절 구조 (§0~§6) 준수 여부
+- 08_orin_structure.md 와 동일 절 구조 (§0~§6) 준수 여부
 - §3 마일스톤 매트릭스 9개 마일스톤 (00~08) 모두 포함 여부
 - §4-3 DataCollector ↔ DGX 인터페이스: TODO-T1 awaits_user 미결 상태 명시 여부
 - §5 run_teleoperate.sh 결정 (후보 a DataCollector 채택) 근거 명시 여부

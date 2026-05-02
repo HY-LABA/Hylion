@@ -141,9 +141,9 @@ datacollector/interactive_cli/   # 동일 구조, datacollector 책임 맞춤
 
 ### 04 study 산출물 (구조 정의)
 
-- `docs/storage/07_orin_structure.md` — orin/ 디렉터리 책임 매트릭스
-- `docs/storage/08_dgx_structure.md` — dgx/ 디렉터리 책임 매트릭스
-- `docs/storage/09_datacollector_setup.md` — datacollector/ 노드 정체·디렉터리·SSH
+- `docs/storage/08_orin_structure.md` — orin/ 디렉터리 책임 매트릭스
+- `docs/storage/09_dgx_structure.md` — dgx/ 디렉터리 책임 매트릭스
+- `docs/storage/10_datacollector_structure.md` — datacollector/ 구조·책임·외부 의존성 (구 09_datacollector_setup.md 정보 분해 흡수됨)
 
 ### lerobot 레퍼런스 (interactive_cli 가 호출할 도구)
 
@@ -177,9 +177,9 @@ datacollector/interactive_cli/   # 동일 구조, datacollector 책임 맞춤
 | CLI 구현 언어 | ✅ 확정 (2026-05-01) | **(c) bash 진입점 + python flow 모듈** — main.sh 가 venv activate, flows/*.py 가 대화형·draccus·subprocess |
 | flow 0 인터페이스 진입 형태 | ✅ 확정 (2026-05-01) | orin·dgx = VSCode remote-ssh 사용자 자체 연결 후 `bash <node>/interactive_cli/main.sh` 호출 / datacollector = 직접 터미널 + "이 환경에서 실행하신 게 맞나요?" 확인 단계 |
 | flow 1 장치 선택 의미 | ✅ 확정 (2026-05-01) | 본 노드 외 다른 노드 선택 시 안내만 (CLI 가 ssh 자동 호출 X — 사용자가 다른 노드에서 다시 진입). 본 노드만 active |
-| 5단계 학습 종류 옵션 | ⏳ D1 study 시점 결정 | docs/lerobot_study/ 참조하여 task-executor 가 후보 ≤ 5개 제안 → 사용자 답 받기 |
-| orin 측 flow 3~ 단계 (추론 책임) | ⏳ O1 study 시점 결정 | 후보: ckpt 선택·hil_inference 실행·시연 데모 모드 |
-| dgx 측 flow 3~ 단계 (학습 책임) | ⏳ X1 study 시점 결정 | 후보: preflight·데이터셋 선택·학습 trigger·체크포인트 관리 |
+| 5단계 학습 종류 옵션 | ✅ 확정 (2026-05-02) | **(1) 단순 pick-place** — `svla_so100_pickplace` 사전학습 분포 동일. instruction `Pick up the object and place it in the target area.`, 50ep |
+| orin 측 flow 3~ 단계 (추론 책임) | ✅ 확정 (2026-05-02) | **(A) 3단계 순차** (ckpt 선택 → hil_inference 실행 → 시연 데모 결과). ckpt 소스: HF Hub repo_id + 로컬 ckpt 경로 + 기본값 `smolvla_base` 고정 3개 조합. 시연 데모 모드 포함. (`hil_inference.py` 수정은 Category B 비해당 — O2 자동 처리) |
+| dgx 측 flow 3~ 단계 (학습 책임) | ✅ 확정 (2026-05-02) | **(C) 3단계 권고** (preflight → 데이터셋 선택 → 학습+ckpt 관리 통합). smoke_test 동의 게이트 포함 (CLAUDE.md `>100MB 다운로드 사용자 동의` 정책). ckpt 전송 케이스 목록 출력 + 사용자 선택 방식 (자동 감지 X — 구현 복잡) |
 
 ---
 
@@ -190,12 +190,14 @@ datacollector/interactive_cli/   # 동일 구조, datacollector 책임 맞춤
 
 **[그룹 F — 공통 console 프레임워크 boilerplate]**
 
-### [ ] TODO-F1: 공통 boilerplate 코드·문서 작성 (flow 0·1 + main.sh 진입점 패턴)
+### [x] TODO-F1: 공통 boilerplate 코드·문서 작성 (flow 0·1 + main.sh 진입점 패턴)
+
+**자동화 완료 (2026-05-01)**: `docs/storage/12_interactive_cli_framework.md` 작성 (5개 절: 디렉터리·main.sh·flow 0 entry.py·flow 1 장치 선택·노드별 차이점). 04 G1 `check_hardware.sh` + G2 `hil_inference.py --gate-json` 패턴 인용. code-tester verdict READY_TO_SHIP (Critical 0, Recommended 2건 — §5 예시의 `--gate-json` 표기 정정·라인 인용 통일은 F2 인계 시 task-executor 가 처리).
 
 - 타입: study (디렉터리·언어·코드 공유 결정은 spec 작성 시 이미 확정 — 본 todo 는 boilerplate 정의)
 - DOD: 3 노드 동일 복사할 main.sh + flows/entry.py boilerplate 작성. flow 0 (환경 확인 단계 — datacollector 의 "이 환경 맞나요?" 포함) + flow 1 (장치 선택 메뉴 — 본 노드만 active, 다른 노드는 안내만) 완성. 04 G1 check_hardware.sh 의 bash·python 혼합 패턴 미러.
 - 구현 대상:
-  - `docs/storage/11_interactive_cli_framework.md` — 절 구성:
+  - `docs/storage/12_interactive_cli_framework.md` — 절 구성:
     - §1 디렉터리 구조 (3 노드 형제 동일 — 결정됨)
     - §2 진입점 main.sh 패턴 (bash + venv activate + python 호출)
     - §3 flow 0 entry.py 코드 (환경 확인 단계 + datacollector "이 환경 맞나요?" 분기)
@@ -205,7 +207,9 @@ datacollector/interactive_cli/   # 동일 구조, datacollector 책임 맞춤
 - 참조: 04 G1 `orin/tests/check_hardware.sh` (bash·python 혼합 패턴 직접 Read + 인용), 04 G2 cycle 2 `orin/inference/hil_inference.py` (`--gate-json` JSON 로딩 패턴)
 - 잔여 리스크: 공통 boilerplate 가 3 노드의 venv 의존성 차이 (record+hardware+feetech / smolvla / training) 흡수 — 단순 boilerplate 면 venv 의존성 무관 (subprocess 호출만)
 
-### [ ] TODO-F2: 각 노드에 boilerplate 동일 복사 + 노드별 환경 설정 분리
+### [x] TODO-F2: 각 노드에 boilerplate 동일 복사 + 노드별 환경 설정 분리
+
+**자동화 완료 (2026-05-01)**: orin·dgx·datacollector 각 `interactive_cli/` 신규 디렉터리 + main.sh + flows/{__init__, entry}.py + configs/node.yaml + README.md 총 15개 파일 생성. F1 §3 entry.py 3 사본 IDENTICAL 확인. cusparseLt 블록 orin only. code-tester verdict READY_TO_SHIP (Recommended 1건은 F1 원본 cascade — F1 갱신 시 자연 처리). F2 prod-test 별도 진입 X — D3·O3·X3 통합 검증.
 
 - 타입: task
 - DOD: F1 산출물 (main.sh + flows/entry.py) 을 3 노드에 동일 복사. 각 노드의 configs/ 에 환경 설정 분리 (venv 경로·노드 식별자 등). main.sh 가 자기 노드를 인식하여 flow 1 의 본 노드 active 처리.
@@ -220,12 +224,14 @@ datacollector/interactive_cli/   # 동일 구조, datacollector 책임 맞춤
 
 **[그룹 D — DataCollector (사용자 우선)]**
 
-### [ ] TODO-D1: datacollector flow 2~7 정의 + 5단계 학습 종류 옵션 결정
+### [x] TODO-D1: datacollector flow 2~7 정의 + 5단계 학습 종류 옵션 결정
+
+**자동화 완료 (2026-05-01)**: `docs/storage/15_datacollector_cli_flow.md` 작성 (5개 절: flow 2 환경 체크 / flow 3·4 텔레오퍼레이션 / flow 5 학습 옵션 5개 후보 / flow 6 lerobot-record draccus 인자 매핑 / flow 7 전송 분기). `lerobot_record.py DatasetRecordConfig` (line 161~211) 직접 인용. code-tester verdict READY_TO_SHIP (Recommended 2건은 라인 인용 trivial). **awaits_user-A 발송 명세** 작성 완료 (5단계 옵션 후보 5개) — 사용자 답 받기 전 D2 dispatch X.
 
 - 타입: study
 - DOD: datacollector 측 flow 2~7 단계 구체 동작 정의. 5단계 "어떤 학습 데이터" 옵션 (≤5개 후보) 확정. 6단계 lerobot-record draccus 인자 매핑 결정.
 - 구현 대상:
-  - `docs/storage/12_datacollector_cli_flow.md` — 절 구성:
+  - `docs/storage/15_datacollector_cli_flow.md` — 절 구성:
     - §1 flow 2 (환경 체크 — 04 G3·G4 책임 흡수) 동작
     - §2 flow 3·4 (텔레오퍼레이션 + 사용자 확인) 동작
     - §3 flow 5 학습 종류 옵션 후보 (`docs/lerobot_study/` 참조 — task-executor 가 직접 Read 후 후보 제안)
@@ -236,7 +242,9 @@ datacollector/interactive_cli/   # 동일 구조, datacollector 책임 맞춤
 - 사용자 결정 사항: 5단계 학습 종류 옵션 (awaits_user — task-executor 후보 제안 후 사용자 답)
 - 잔여 리스크: 5단계 옵션이 너무 많으면 CLI UX 복잡 — 후보 ≤ 5개 강제
 
-### [ ] TODO-D2: datacollector/interactive_cli/ flow 2~7 구현
+### [x] TODO-D2: datacollector/interactive_cli/ flow 2~7 구현
+
+**자동화 완료 (2026-05-02, cycle 2)**: `datacollector/interactive_cli/flows/{env_check, teleop, data_kind, record, transfer}.py` 신규 + `entry.py` 수정 (cycle 2 — sys.path 절대 import 패턴, orin·dgx 와 일관). cycle 1 verdict MAJOR_REVISIONS (Critical 1: entry.py 상대 import → main.sh 호출 시 ImportError). cycle 2 정정 + Recommended 3건 (record validation 자기비교, 이중 호출, env_check 5단계 순서) 함께 처리. 사용자 결정 옵션 1 (단순 pick-place) 적용. 04 G3 (DataCollector check_hardware) 책임 흡수. **Phase 3 검증 대기 (D3)**: DataCollector 머신 + SO-ARM + 카메라 실물 — 04 BACKLOG #7·#8·#9 통합.
 
 - 타입: task
 - DOD: datacollector flow 2~7 단계 모두 구현. 04 산출물 (`run_teleoperate.sh`, `push_dataset_hub.sh`, `sync_dataset_collector_to_dgx.sh`) subprocess 호출 + lerobot-record draccus 인자 동적 생성.
@@ -251,6 +259,28 @@ datacollector/interactive_cli/   # 동일 구조, datacollector 책임 맞춤
 
 ### [ ] TODO-D3: datacollector/interactive_cli/ prod 검증 (04 BACKLOG #7·#8·#9 통합)
 
+**자동화 완료, Phase 3 부분 검증 (2026-05-02)**: prod-test-runner verdict NEEDS_USER_VERIFICATION → Phase 3 사용자 검증 진행:
+
+**완료된 검증** (사용자 실물 확인):
+- ✅ DataCollector 머신 셋업 (`smallgaint`·Ubuntu 22.04 LTS x86_64) — 04 D3 16단계 사실상 처리
+- ✅ SSH 인프라 (key 배포·~/.ssh/config·dev-connect.sh)
+- ✅ 트랙 A (apt 6 패키지 + dialout 그룹)
+- ✅ deploy_datacollector.sh dry-run + 실배포 — **04 BACKLOG #7 T3 자연 처리**
+- ✅ venv 셋업 (lerobot 0.5.2·torch 2.11.0·9 entrypoint OK — 단 cuda wheel + nvidia deps 2.7GB dead weight, BACKLOG #10)
+- ✅ USB 디바이스 (외부 카메라 2대 + SO-ARM 2대) 인식 + 모터 ID 1~6 등록 확인
+- ✅ env_check 7단계 통합 동작 검증 (사용자 요청 §6·§7 추가 — **04 BACKLOG #8 G3 자연 처리**, **04 BACKLOG #9 G4 부분 처리**)
+- ✅ interactive_cli main.sh flow 0~2 진입 검증
+
+**다음 사이클 이관** (BACKLOG #11·#12·#13):
+- ❌ Python 3.12 셋업 또는 lerobot 옵션 B backport — lerobot upstream PEP 695 syntax 5+ 파일이 Python 3.12+ 강제. 학교 WiFi 의 launchpad.net timeout 으로 deadsnakes PPA 차단 (ANOMALIES #2·#3)
+- ❌ lerobot-calibrate (follower + leader)
+- ❌ flow 3~7 (teleop·record·transfer) 실 호출 — lerobot import 의존
+- ❌ flow 7 분기 3건 (HF Hub / rsync / 안함) — 04 BACKLOG #7 T1 미완
+
+**사용자 결정 (2026-05-02)**: "interactive-cli 작동하는지까지만 05 에서 진행, 추가 검증은 다음 spec" → 옵션 A (끝까지) → 옵션 B (부분 검증 + wrap-spec) fallback. ANOMALIES #4 USER_OVERRIDE 기록.
+
+상세: `context/verification_queue.md` D3 항목 + `auto_grants_05_interactive_cli.md` 17건 누적.
+
 - 타입: test
 - DOD: datacollector 머신에서 실 인터페이스 진입 → flow 0~7 완주. 데이터 수집 후 7단계 분기 (HF Hub / rsync / 안함) 모두 동작. **04 BACKLOG #7 (D3 verification_queue) + #8·#9 (G3·G4 dispatch 누락) 자연 처리** — 본 D3 prod 가 DataCollector 환경 셋업 + check_hardware 이식 + 검증을 통합 수행.
 - 구현 대상: 없음 (검증·기록)
@@ -260,7 +290,9 @@ datacollector/interactive_cli/   # 동일 구조, datacollector 책임 맞춤
 
 **[그룹 O — Orin (추론 책임)]**
 
-### [ ] TODO-O1: orin flow 3~ 단계 정의 (추론 책임)
+### [x] TODO-O1: orin flow 3~ 단계 정의 (추론 책임)
+
+**자동화 완료 (2026-05-02, cycle 2)**: `docs/storage/13_orin_cli_flow.md` 작성 (5개 절: flow 2 환경 체크 / flow 3~ 후보 / ckpt 선택 / hil_inference.py --gate-json 호출 / 시연 데모). cycle 1 verdict MAJOR_REVISIONS (Critical 2건: hil_inference.py Category B 오분류 + check_hardware.sh `--gate-json` 잘못된 호출). cycle 2 에서 양쪽 정정 + F1 §5 cascade (`12_interactive_cli_framework.md` §5 의 `--gate-json` 패턴) 함께 정정. **awaits_user-B 발송 명세** 작성 완료 (3가지 결정 사항: flow 구조 / ckpt 소스 / 시연 데모 포함 여부) — 사용자 답 받기 전 O2 dispatch X.
 
 - 타입: study
 - DOD: orin 측 flow 3~ 단계 (datacollector 와 다른 추론 책임) 구체 정의. ckpt 선택·hil_inference 실행·시연 데모 중 어느 책임을 어떻게 묶을지 사용자 합의.
@@ -268,9 +300,11 @@ datacollector/interactive_cli/   # 동일 구조, datacollector 책임 맞춤
   - `docs/storage/13_orin_cli_flow.md`
 - 테스트: 없음
 - 사용자 결정 사항: orin 측 flow 의 구체 단계·책임 (awaits_user — task-executor 후보 제안 후 사용자 답)
-- 참조: `orin/inference/hil_inference.py` (`--gate-json` 패턴 — interactive_cli 가 hil_inference 호출 구조), `docs/storage/07_orin_structure.md`, 04 G2 verification_queue (실 카메라·SO-ARM 환경)
+- 참조: `orin/inference/hil_inference.py` (`--gate-json` 패턴 — interactive_cli 가 hil_inference 호출 구조), `docs/storage/08_orin_structure.md`, 04 G2 verification_queue (실 카메라·SO-ARM 환경)
 
-### [ ] TODO-O2: orin/interactive_cli/ flow 3~ 구현
+### [x] TODO-O2: orin/interactive_cli/ flow 3~ 구현
+
+**자동화 완료 (2026-05-02)**: `orin/interactive_cli/flows/{env_check, inference}.py` 신규 + `entry.py` 수정 (`_run_node_flows` + sys.path 패턴) + `orin/inference/hil_inference.py` line 246~266 `--model-id`·`--ckpt-path` argparse 인자 추가 (default None — 03 사이클 회귀 방지). 사용자 결정 (A) 3단계 + ckpt 소스 3개 조합 + 시연 데모 포함 적용. O1 cycle 2 정정 (`check_hardware.sh --gate-json` 미전달) 준수. code-tester verdict READY_TO_SHIP (Recommended 2건 trivial: type hint PEP 604, options 미사용 변수). **Phase 3 검증 대기 (O3)**: Orin SSH + 카메라 2대 + SO-ARM follower 실물 — 04 G2 verification_queue 자연 통합.
 
 - 타입: task
 - DOD: O1 정의대로 orin 측 flow 구현. F2 boilerplate (entry/env_check) + orin 환경 맞춤 추론 모듈 (`flows/inference.py` 등).
@@ -281,6 +315,8 @@ datacollector/interactive_cli/   # 동일 구조, datacollector 책임 맞춤
 
 ### [ ] TODO-O3: orin/interactive_cli/ prod 검증 (04 BACKLOG #7 G2 통합)
 
+**자동화 완료, Phase 3 대기 (2026-05-02)**: prod-test-runner verdict NEEDS_USER_VERIFICATION. devPC 정적 검증 (py_compile 4파일·AST parse·entry.py importlib·hil_inference.py argparse line 247·257 존재) 통과. effective_model 우선순위 시뮬레이션으로 03 사이클 회귀 없음 확인 (인자 미전달 시 `smolvla_base` 동작). Orin SSH connection timed out (172.16.137.232:22) — 네트워크 연결 후 deploy + 실물 검증 필요. **사용자 실물 검증**: deploy_orin.sh 실행 + 카메라 2대 + SO-ARM follower 연결 + main.sh 실행 → flow 0~5 완주. 04 BACKLOG #7 G2 (first-time/resume + hil_inference 50-step) 통합 처리. 상세: `context/verification_queue.md` O3 항목.
+
 - 타입: test
 - DOD: Orin 에서 실 인터페이스 진입 → 추론 flow 완주. **04 G2 verification_queue (Orin 카메라 2대 + SO-ARM follower first-time/resume + hil_inference 50-step) 자연 통합**.
 - 구현 대상: 없음 (검증·기록)
@@ -289,16 +325,20 @@ datacollector/interactive_cli/   # 동일 구조, datacollector 책임 맞춤
 
 **[그룹 X — DGX (학습 책임)]**
 
-### [ ] TODO-X1: dgx flow 3~ 단계 정의 (학습 책임)
+### [x] TODO-X1: dgx flow 3~ 단계 정의 (학습 책임)
+
+**자동화 완료 (2026-05-01)**: `docs/storage/14_dgx_cli_flow.md` 작성 (5개 절: flow 2 환경 체크 / flow 3~ 후보 / 데이터셋 선택 / 학습 trigger smoke_test 동의 게이트 / 체크포인트 관리). `dgx/scripts/{preflight_check, smoke_test, save_dummy_checkpoint}.sh` + `sync_ckpt_dgx_to_datacollector.sh` 직접 인용. code-tester verdict READY_TO_SHIP (Recommended 2건 line 인용 trivial). **awaits_user-C 발송 명세** 작성 완료 — 사용자 답 받기 전 X2 dispatch X.
 
 - 타입: study
 - DOD: dgx 측 flow 3~ 단계 구체 정의. preflight·데이터셋 선택·학습 trigger·체크포인트 관리 중 어느 책임을 어떻게 묶을지 사용자 합의.
 - 구현 대상:
   - `docs/storage/14_dgx_cli_flow.md`
 - 사용자 결정 사항: dgx 측 flow 책임 (awaits_user)
-- 참조: `dgx/scripts/{setup_train_env,preflight_check,smoke_test,save_dummy_checkpoint}.sh`, `docs/storage/08_dgx_structure.md`, 04 X3 verification_queue (smoke_test·save_dummy_checkpoint 사용자 동의)
+- 참조: `dgx/scripts/{setup_train_env,preflight_check,smoke_test,save_dummy_checkpoint}.sh`, `docs/storage/09_dgx_structure.md`, 04 X3 verification_queue (smoke_test·save_dummy_checkpoint 사용자 동의)
 
-### [ ] TODO-X2: dgx/interactive_cli/ flow 3~ 구현
+### [x] TODO-X2: dgx/interactive_cli/ flow 3~ 구현
+
+**자동화 완료 (2026-05-02)**: `dgx/interactive_cli/flows/{env_check, training}.py` 신규 + `entry.py` 수정. 사용자 결정 옵션 C (3단계: preflight → 데이터셋 선택 → 학습+ckpt 통합) + smoke_test 동의 게이트 포함 (CLAUDE.md 자율성 정책 충족) + ckpt 케이스 목록 출력 방식 적용. CKPT_CASES 케이스 1~4 (sync_ckpt_dgx_to_datacollector.sh line 19~22 인용) 완전 정합. code-tester verdict MINOR_REVISIONS → patch 1회 (ruff F401·F541 6건 정정 + 케이스 4 추가 + 동적 종료 번호). **Phase 3 검증 대기 (X3)**: DGX SSH + smoke_test 사용자 동의 + svla_so100_pickplace 다운로드 — 04 X3·T1·T2 verification_queue 통합.
 
 - 타입: task
 - DOD: X1 정의대로 dgx 측 flow 구현.
@@ -307,6 +347,8 @@ datacollector/interactive_cli/   # 동일 구조, datacollector 책임 맞춤
 - 제약: F1·F2·X1 완료 후
 
 ### [ ] TODO-X3: dgx/interactive_cli/ prod 검증 (04 BACKLOG #7 X3·T1·T2 통합)
+
+**자동화 완료, Phase 3 대기 (2026-05-02)**: prod-test-runner verdict NEEDS_USER_VERIFICATION. devPC 정적 검증 (py_compile 3파일·bash -n·ruff All passed·CKPT_CASES 1~4·SCENARIOS 4종·_smoke_consent_gate Y/n·_show_ckpt_management 자동 감지 X) 통과. **deploy_dgx.sh 자율 실행 완료** (7개 파일 신규 sync). DGX 원격 read-only 검증 (py_compile·bash -n·entry.py --help·디스크 3.3T·메모리 114GB·GPU idle·Ollama 점유 없음) 통과. **사용자 실물 검증**: VSCode remote-ssh → DGX → main.sh 실행 → flow 0~5 완주 (smoke 시나리오 + 동의 게이트 Y + svla_so100_pickplace ~100MB 다운로드 동의 + 5~15분 실행 + ckpt 케이스 목록). 04 BACKLOG #7 X3 (smoke 캐시 MISS) + T1 (HF Hub push) + T2 (시연장 ckpt 전송) 통합 처리. 상세: `context/verification_queue.md` X3 항목.
 
 - 타입: test
 - DOD: DGX SSH 에서 실 인터페이스 진입 → 학습 flow 완주. **04 X3 verification_queue (smoke_test 5~15분 사용자 동의·svla_so100_pickplace 다운로드) + T1 verification_queue (HF Hub push 실 검증) + T2 verification_queue (시연장 ckpt 전송) 자연 통합 가능**.

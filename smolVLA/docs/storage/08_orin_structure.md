@@ -3,7 +3,7 @@
 > 작성일: 2026-04-30
 > 출처: `04_infra_setup` 마일스톤 TODO-O1
 > 목적: 04 사이클의 orin/ 마이그레이션 (TODO-O2) 입력 + 후속 마일스톤 (05~08) 에서 어느 컴포넌트가 어떤 책임을 지는지 한 곳에 정리.
-> 형제 문서: `docs/storage/08_dgx_structure.md` (TODO-X1 산출물 예정)
+> 형제 문서: `docs/storage/09_dgx_structure.md` (TODO-X1 산출물 예정)
 
 ---
 
@@ -272,7 +272,7 @@ Orin → 시연장 운영:     hil_inference.py 가 학습 ckpt + 실 카메라 
 - **TODO-O3**: §1-2 새 트리 + §2 컴포넌트 책임으로 회귀 검증 항목 도출
 - **TODO-G1**: §2 의 tests/check_hardware.sh 책임 + §4-2 외부 의존성 (lerobot 표준 캘리브레이션 위치) 활용
 - **TODO-D1**: §3 마일스톤별 책임 매트릭스의 "DataCollector" 표시된 항목들이 DataCollector 디렉터리에 와야 할 자산
-- **TODO-X1** (dgx 구조): 본 문서의 형제 위치 (08_dgx_structure.md) 에서 동일 패턴 적용
+- **TODO-X1** (dgx 구조): 본 문서의 형제 위치 (09_dgx_structure.md) 에서 동일 패턴 적용
 
 ---
 

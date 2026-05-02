@@ -31,7 +31,7 @@
 - rsync 시 `--exclude '.hylion_arm'` 패턴
 - setup_env.sh 절 구조: §0 시스템 패키지 → §1 venv 생성 → §2 lerobot editable → §3 torch → §4 LD_LIBRARY_PATH 패치 → §5 nvcc PATH → §6 검증
 
-**07_orin_structure.md / 08_dgx_structure.md 절 패턴 확인**:
+**08_orin_structure.md / 09_dgx_structure.md 절 패턴 확인**:
 - §0 본 문서의 위치 → §1 디렉터리 트리 → §2 핵심 컴포넌트 책임 표 → §3 마일스톤별 책임 매트릭스 → §4 외부 의존성 → §5 마이그레이션 계획 → §6 후속 TODO 트리거 → §7 변경 이력 표
 - 09 에서는 study DOD 5개 절 (노드 정체 / venv / 디렉터리 / 시연장 배치 / devPC 네트워크) 을 핵심으로 재구성
 

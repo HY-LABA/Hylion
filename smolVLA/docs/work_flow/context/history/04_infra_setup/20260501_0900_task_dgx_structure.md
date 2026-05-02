@@ -4,7 +4,7 @@
 
 ## 요약
 
-TODO-X1 (study 타입) 완료. `docs/storage/08_dgx_structure.md` 신규 작성.
+TODO-X1 (study 타입) 완료. `docs/storage/09_dgx_structure.md` 신규 작성.
 
 ## 주요 발견 / 결정
 
@@ -16,7 +16,7 @@ TODO-X1 (study 타입) 완료. `docs/storage/08_dgx_structure.md` 신규 작성.
 
 ## 산출물
 
-- `docs/storage/08_dgx_structure.md` (신규) — §0~§6 + 변경 이력
+- `docs/storage/09_dgx_structure.md` (신규) — §0~§6 + 변경 이력
 - `docs/work_flow/context/todos/X1/01_implementation.md` (신규)
 
 ## 다음 단계

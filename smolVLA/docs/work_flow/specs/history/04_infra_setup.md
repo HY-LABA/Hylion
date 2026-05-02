@@ -147,7 +147,7 @@ orin/
 - 타입: study
 - DOD: 현재 orin/ 의 디렉터리·스크립트·모듈을 마일스톤별 책임 관점에서 정리. 합의된 새 구조 (위 §"합의된 새 orin/ 구조") 기준으로 마이그레이션 계획 (제거 / 이관 / 신규 / 유지) 명시. `lerobot/scripts/` 트리밍 대상 8개를 4-노드 분리 후 관점에서 재확정 (record 가 DataCollector 로 가는 경우 orin/lerobot/scripts/lerobot_record.py 도 제거 후보).
 - 구현 대상:
-  - `docs/storage/07_orin_structure.md` — 절 구성:
+  - `docs/storage/08_orin_structure.md` — 절 구성:
     - §1 디렉터리 트리 (현재 + 새 구조)
     - §2 핵심 컴포넌트 책임 표
     - §3 마일스톤별 책임 매트릭스 (00~08 마일스톤 × 각 컴포넌트)
@@ -158,7 +158,7 @@ orin/
 - 잔여 리스크: 트리밍 대상이 다른 모듈에서 import 되어 있을 가능성 — TODO-O2 마이그레이션 시 import 회귀 검증 필요
 - **완료 (2026-04-30 15:32)**: 사전 점검에서 중요한 사실 발견 — `orin/lerobot/` 은 물리적 트리밍 X, 기존 패치 (`__init__.py` import 차단) 만으로 inference-only 구현된 상태. 사용자 원칙 ("upstream 구조 변형 X") 와 정확히 부합. 이 발견을 바탕으로 트리밍 방식을 **옵션 B (논리적 비활성화)** 로 확정.
   - 사용자 합의 결정: (1) 옵션 B 트리밍 방식 (2) `lerobot-eval`·`lerobot-train` 2개 entrypoint 제거 + 9개 유지 (3) §5 마이그레이션 5개 카테고리 (유지 / 이관 / 신규 / 삭제 / entrypoint 정리)
-  - 산출물: `docs/storage/07_orin_structure.md` 신규 작성 — §0~§6 + 변경 이력 모두 채움. 디렉터리 트리 비교, 8개 컴포넌트 책임 표, 9 마일스톤 × 20+ 컴포넌트 책임 매트릭스, 외부 의존성 (devPC sync hub / HF Hub / 시스템 의존성 / 캘리브레이션 표준 위치), TODO-O2 입력 사양 (5개 카테고리별 표)
+  - 산출물: `docs/storage/08_orin_structure.md` 신규 작성 — §0~§6 + 변경 이력 모두 채움. 디렉터리 트리 비교, 8개 컴포넌트 책임 표, 9 마일스톤 × 20+ 컴포넌트 책임 매트릭스, 외부 의존성 (devPC sync hub / HF Hub / 시스템 의존성 / 캘리브레이션 표준 위치), TODO-O2 입력 사양 (5개 카테고리별 표)
   - 04 스펙 갱신: TODO-O2 본문을 옵션 B 기반으로 재작성 — "8개 파일 제거" → "entrypoint 2개 제거", run_teleoperate.sh 임시 보관 시나리오 명시, "orin/lerobot/ 하위 변경 금지" 제약 추가
   - history: `docs/work_flow/context/history/04_infra_setup/20260430_1532_task_orin_structure.md`
 
@@ -220,7 +220,7 @@ orin/
   - **`orin/tests/README.md` 갱신**: 자산 표에 4개 신규 자산 추가 (smoke_test / load_checkpoint_test / inference_baseline / measure_latency)
   - **`orin/inference/README.md` 신규 작성**: inference/ 책임 + 향후 마일스톤별 정책 아카이빙 의도 + 현재 자산 (hil_inference.py — 03 산출물)
   - **`orin/examples/tutorial/smolvla/__pycache__/` 정리** (이동된 파일들의 cache)
-  - **`docs/storage/07_orin_structure.md` 갱신**:
+  - **`docs/storage/08_orin_structure.md` 갱신**:
     - §1 디렉터리 트리 (현재·새 구조 모두)
     - §2 컴포넌트 책임 표 (`orin/inference/` 추가, `orin/examples/` 책임 갱신)
     - §3 마일스톤 매트릭스 (5개 파일 위치 갱신)
@@ -235,7 +235,7 @@ orin/
   - 이동: hil_inference.py → `orin/inference/`, smoke_test/load_checkpoint_test/inference_baseline/measure_latency 4개 → `orin/tests/`
   - 결과: `orin/examples/tutorial/smolvla/` 에 `using_smolvla_example.py` 1개만 남아 upstream 미러 책임 명확화. `orin/tests/` 6개 자산 (1개 기존 + 4개 이관 + README), `orin/inference/` 2개 자산 (1개 + README)
   - `orin/tests/README.md` 자산 표 4행 추가
-  - `docs/storage/07_orin_structure.md` §1-2 / §2 / §3 / §4-1 / §5-1·5-2·5-3 + 변경 이력 모두 갱신
+  - `docs/storage/08_orin_structure.md` §1-2 / §2 / §3 / §4-1 / §5-1·5-2·5-3 + 변경 이력 모두 갱신
   - 검증: py_compile 6개 모두 PASS, 회귀 grep `^(from orin|import orin)` 0건 유지, __pycache__ 4개 .pyc 정리
   - 실 실행 검증은 TODO-O3 의 책임 (TODO-O2 + O2b 통합)
   - history: `docs/work_flow/context/history/04_infra_setup/20260430_1612_task_examples_split.md`
@@ -278,11 +278,11 @@ orin/
 - 타입: study
 - DOD: TODO-O1 과 동일 패턴으로 dgx/ 정리. orin/ 에서 이관 받을 자산 (`run_teleoperate.sh` 등) 의 위치 결정. DataCollector 와의 인터페이스 정의 (데이터 받아서 학습).
 - 구현 대상:
-  - `docs/storage/08_dgx_structure.md` — TODO-O1 의 §1~§5 구조
+  - `docs/storage/09_dgx_structure.md` — TODO-O1 의 §1~§5 구조
 - 테스트: 없음
 - 참조: `dgx/` 전체 트리, `dgx/pyproject.toml`, `dgx/scripts/`, `docs/storage/06_dgx_venv_setting.md`, memory `project_dgx_structure_migrations.md`
 - 잔여 리스크: dgx 가 SO-ARM 직접 연결 안 됨 — `run_teleoperate.sh` 가 dgx 에서 의미 있는지 본 TODO 에서 재확인. DataCollector 가 더 적합할 가능성
-- **자동화 완료 (2026-05-01 14:16)**: code-tester verdict READY_TO_SHIP. 산출물 `docs/storage/08_dgx_structure.md` (07_orin_structure.md 패턴 미러 §0~§6, 변경 이력 표 포함). 핵심 결정: run_teleoperate.sh 최종 위치 = DataCollector (DGX SO-ARM 미연결). dgx/pyproject.toml·dgx/lerobot/ 미존재 확인 — Category B 자연 충족. TODO-X2 입력 사양 (5 카테고리 마이그레이션 계획) 산출.
+- **자동화 완료 (2026-05-01 14:16)**: code-tester verdict READY_TO_SHIP. 산출물 `docs/storage/09_dgx_structure.md` (08_orin_structure.md 패턴 미러 §0~§6, 변경 이력 표 포함). 핵심 결정: run_teleoperate.sh 최종 위치 = DataCollector (DGX SO-ARM 미연결). dgx/pyproject.toml·dgx/lerobot/ 미존재 확인 — Category B 자연 충족. TODO-X2 입력 사양 (5 카테고리 마이그레이션 계획) 산출.
   - history: `docs/work_flow/context/history/04_infra_setup/20260501_0900_task_dgx_structure.md`
 
 ### [x] TODO-X2: dgx/ 마이그레이션 실행
@@ -398,7 +398,7 @@ orin/
 - 타입: study
 - DOD: 시연장 환경을 DataCollector 인근에 재현하기 위한 절차·체크리스트 문서. 사용자(인간) 책임 영역과 자동화 가능 영역 분리. 05_leftarmVLA 진입 전 1차 미러링 셋업 가능.
 - 구현 대상:
-  - `docs/storage/10_demo_site_mirroring.md` — 절 구성:
+  - `docs/storage/11_demo_site_mirroring.md` — 절 구성:
     - §1 시연장 환경 측정 항목 (책상 높이·재질·색 / 조명 강도·색온도·각도 / 카메라 위치·각도·렌즈 / 토르소 부착 위치·각도 / 작업 영역 크기·위치)
     - §2 측정 도구 (줄자·조도계·색온도계·사진 — 사용자 책임)
     - §3 DataCollector 측 재현 절차 (체크리스트 형태)
@@ -407,7 +407,7 @@ orin/
 - 테스트: 없음
 - 사용자 결정 사항: 미러링 검증 깊이 (육안+사진 vs 자동 검증 스크립트). 첫 사이클은 육안+사진 권장
 - 잔여 리스크: 시연장 접근 가능성 — 사용자 일정에 따라 시연장 측정 시점 조정 필요
-- **자동화 완료 (2026-05-01 15:21, cycle 2)**: cycle 1 task-executor → code-tester verdict MAJOR_REVISIONS (Critical 2건: BACKLOG #6 미추가 + §5 lerobot-record CLI 추측 작성 — `--robot-path`, `--num-frames` 등 레퍼런스 부재 플래그) → cycle 2 수정 후 verdict READY_TO_SHIP (레퍼런스 직접 대조 PASS). 사용자 답 E 확정 (육안+사진 결정, 자동 검증은 BACKLOG). 산출물 `docs/storage/10_demo_site_mirroring.md` (306줄, §1~§5 + draccus dataclass 안내 메모). **BACKLOG 04 #6 신규 추가** (자동 미러링 검증 스크립트, 낮음 / 05·06 트리거 시 중간).
+- **자동화 완료 (2026-05-01 15:21, cycle 2)**: cycle 1 task-executor → code-tester verdict MAJOR_REVISIONS (Critical 2건: BACKLOG #6 미추가 + §5 lerobot-record CLI 추측 작성 — `--robot-path`, `--num-frames` 등 레퍼런스 부재 플래그) → cycle 2 수정 후 verdict READY_TO_SHIP (레퍼런스 직접 대조 PASS). 사용자 답 E 확정 (육안+사진 결정, 자동 검증은 BACKLOG). 산출물 `docs/storage/11_demo_site_mirroring.md` (306줄, §1~§5 + draccus dataclass 안내 메모). **BACKLOG 04 #6 신규 추가** (자동 미러링 검증 스크립트, 낮음 / 05·06 트리거 시 중간).
   - history: `20260501_1425_task_demo_site_mirroring.md`, `20260501_1455_task_m1_cycle2_revisions.md`
 
 ### [ ] TODO-M2: 시연장 1차 미러링 셋업

@@ -72,6 +72,6 @@ bash orin/tests/check_hardware.sh --mode first-time --output-config orin/config/
 
 ## 참고
 
-- `docs/storage/07_orin_structure.md` §2 (config/ 컴포넌트 책임) + §4-5 (캘리브레이션 표준 위치)
+- `docs/storage/08_orin_structure.md` §2 (config/ 컴포넌트 책임) + §4-5 (캘리브레이션 표준 위치)
 - `docs/work_flow/specs/04_infra_setup.md` TODO-G1 (check_hardware.sh 구현)
 - BACKLOG 04 #3 — git 추적 vs gitignore 정책 결정

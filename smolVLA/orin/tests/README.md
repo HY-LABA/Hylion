@@ -48,6 +48,6 @@
 
 ## 참고
 
-- `docs/storage/07_orin_structure.md` §2 (tests/ 컴포넌트 책임) + §3 (마일스톤별 책임 매트릭스)
+- `docs/storage/08_orin_structure.md` §2 (tests/ 컴포넌트 책임) + §3 (마일스톤별 책임 매트릭스)
 - `docs/work_flow/specs/04_infra_setup.md` TODO-G1 / TODO-G2 (실 구현·검증)
 - BACKLOG 03 #14·#15·#16 — 본 게이트가 해소할 환경 이슈 4건 (venv import / 카메라 인덱스 / wrist flip)

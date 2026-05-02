@@ -77,7 +77,7 @@ python ~/smolvla/orin/inference/hil_inference.py \
 
 ## 참고
 
-- `docs/storage/07_orin_structure.md` §2 (inference/ 컴포넌트 책임)
+- `docs/storage/08_orin_structure.md` §2 (inference/ 컴포넌트 책임)
 - `docs/work_flow/specs/04_infra_setup.md` TODO-O2b (본 디렉터리 신설 사유)
 - `docs/work_flow/specs/history/03_smolvla_test_on_orin.md` TODO-07 / TODO-07b (hil_inference.py 의 출처 + prod 검증 결과)
 - `docs/lerobot_study/07c_smolvla_base_test_results.md` §7 — hil_inference 03 prod 검증 정성 기록 (실행 인자 확정, 카메라 매핑 결정 등)

@@ -243,7 +243,43 @@ def main():
             "CLI 에 직접 인자를 지정한 경우 그쪽이 우선 (하위 호환)."
         ),
     )
+    parser.add_argument(
+        "--model-id",
+        type=str,
+        default=None,
+        help=(
+            "HuggingFace Hub repo_id (예: lerobot/smolvla_base, <username>/<repo>). "
+            "미지정 시 모듈 상수 MODEL_ID 를 사용 (하위 호환). "
+            "--ckpt-path 와 동시 지정 불가."
+        ),
+    )
+    parser.add_argument(
+        "--ckpt-path",
+        type=str,
+        default=None,
+        help=(
+            "로컬 pretrained_model 디렉터리 경로 "
+            "(예: ~/smolvla/orin/checkpoints/<run>/<step>/pretrained_model). "
+            "미지정 시 --model-id 또는 모듈 상수 MODEL_ID 를 사용 (하위 호환). "
+            "--model-id 와 동시 지정 불가."
+        ),
+    )
     args = parser.parse_args()
+
+    # ── --model-id / --ckpt-path 충돌 검사 ───────────────────────
+    if args.model_id is not None and args.ckpt_path is not None:
+        parser.error("--model-id 와 --ckpt-path 는 동시에 지정할 수 없습니다.")
+
+    # ── 실제 사용 model 경로 결정 ─────────────────────────────────
+    # 우선순위: --ckpt-path > --model-id > 모듈 상수 MODEL_ID
+    if args.ckpt_path is not None:
+        effective_model = str(Path(args.ckpt_path).expanduser())
+        print(f"[ckpt] 로컬 경로 사용: {effective_model}")
+    elif args.model_id is not None:
+        effective_model = args.model_id
+        print(f"[ckpt] HF Hub 사용: {effective_model}")
+    else:
+        effective_model = MODEL_ID  # 하드코드 기본값 (하위 호환)
 
     # ── gate-json 자동 인자 채우기 ────────────────────────────────
     if args.gate_json is not None:
@@ -273,8 +309,8 @@ def main():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     # ── 1. Model load ─────────────────────────────────────────
-    print(f"[load] {MODEL_ID}")
-    policy = SmolVLAPolicy.from_pretrained(MODEL_ID).to(device)
+    print(f"[load] {effective_model}")
+    policy = SmolVLAPolicy.from_pretrained(effective_model).to(device)
     policy.eval()
 
     # camera2 만 들어가는 환경에서 1개 더미 슬롯 자동 처리
@@ -284,7 +320,7 @@ def main():
 
     preprocess, postprocess = make_pre_post_processors(
         policy.config,
-        pretrained_path=MODEL_ID,
+        pretrained_path=effective_model,
         preprocessor_overrides={"device_processor": {"device": str(device)}},
     )
 
@@ -372,7 +408,7 @@ def main():
         with open(args.output_json, "w") as f:
             json.dump(
                 {
-                    "model_id": MODEL_ID,
+                    "model_id": effective_model,
                     "mode": args.mode,
                     "n_action_steps": args.n_action_steps,
                     "total_steps": step_count,

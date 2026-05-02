@@ -181,7 +181,7 @@
 
 - **사용자 검증 필요 사항**:
 
-  **A. 시연장 방문 + 측정** (`docs/storage/10_demo_site_mirroring.md` §1·§2 가이드 따라):
+  **A. 시연장 방문 + 측정** (`docs/storage/11_demo_site_mirroring.md` §1·§2 가이드 따라):
   1. 시연장 방문 (사용자 일정에 따라)
   2. §1 표 전체 항목 측정·기록:
      - 1-1) 책상: 높이·가로×세로·재질·색·다리 형태
@@ -225,7 +225,7 @@
 
 - **prod-test-runner 결과 요약**: 자동화 영역 X — 물리 환경 셋업이므로 prod-test-runner 개입 불가. 시나리오 정의만으로 task-executor 책임 완료.
 - **참고 파일**:
-  - `docs/storage/10_demo_site_mirroring.md` — §1~§5 상세 가이드
+  - `docs/storage/11_demo_site_mirroring.md` — §1~§5 상세 가이드
   - `context/todos/M2/01_implementation.md`
 - **전제 조건**: TODO-M1 완료 (READY_TO_SHIP). TODO-D3 완료 권장 (DataCollector 측 환경 셋업 완료 후 재현 작업이 효율적).
 - **잔여 리스크**: 첫 시도에서 정확한 미러링 어려움 (spec 명시). 세밀한 도메인 일치는 05_leftarmVLA 학습 결과로 피드백받아 재조정. BACKLOG 04 #6 (자동 검증 스크립트) 트리거 조건: 05/06 학습 후 미러링 부족 진단 시.

@@ -3,7 +3,7 @@
 > 작성일: 2026-05-01
 > 출처: `04_infra_setup` 마일스톤 TODO-X1
 > 목적: 04 사이클의 dgx/ 마이그레이션 (TODO-X2) 입력 + 후속 마일스톤 (05~08) 에서 어느 컴포넌트가 어떤 책임을 지는지 한 곳에 정리.
-> 형제 문서: `docs/storage/07_orin_structure.md` (TODO-O1 산출물)
+> 형제 문서: `docs/storage/08_orin_structure.md` (TODO-O1 산출물)
 
 ---
 

@@ -23,7 +23,7 @@ YYYY-MM-DD HH:MM:SS | [이벤트 타입] | 상세
 2026-05-01 14:11:05 | START | spec=04_infra_setup, active_todos=13, waves=5, awaits_user=5
 2026-05-01 14:11:05 | DISPATCH | wave=1, todos=[X1, G1] (M1 은 awaits_user E 의존 — 답 후 dispatch)
 2026-05-01 14:11:05 | USER_QUESTION | awaits_user 4/5 일괄 발송 (D1·T1·Category C 동의 포함, M1 E 별도 발송 예정)
-2026-05-01 14:16:05 | COMPLETE | task-executor X1 study 완료 (08_dgx_structure.md 신규, run_teleoperate.sh→DataCollector 권고)
+2026-05-01 14:16:05 | COMPLETE | task-executor X1 study 완료 (09_dgx_structure.md 신규, run_teleoperate.sh→DataCollector 권고)
 2026-05-01 14:18:50 | USER_INPUT | D1: 별도PC/Ubuntu, 디렉터리=datacollector/, pyproject 신규(orin subset), 전송=HF Hub+rsync 직접 (D2·D3·G3·G4·T1·T2·T3 unblock)
 2026-05-01 14:18:50 | DISPATCH | code-tester X1 (study 산출물 패턴 미러·사실 정확성 검증)
 2026-05-01 14:18:50 | DISPATCH | task-executor D1 (사용자 답 입력 → 09_datacollector_setup.md study)
@@ -38,7 +38,7 @@ YYYY-MM-DD HH:MM:SS | [이벤트 타입] | 상세
 2026-05-01 14:30:30 | DISPATCH | task-executor G2 (hil_inference.py 게이트 결과 JSON 자동 인자 부분 구현 + prod 검증 시나리오 정의)
 2026-05-01 14:33:30 | VERDICT | code-tester D1 READY_TO_SHIP (Recommended 2건, lerobot extras 키 upstream 직접 대조 검증)
 2026-05-01 14:33:30 | DISPATCH | wave=3, todos=[task-executor D2, task-executor T3, task-executor T2] 3 병렬 (T1 은 D2 datacollector/ 생성 후 직렬 진입)
-2026-05-01 14:38:30 | COMPLETE | task-executor M1 (10_demo_site_mirroring.md 306줄, 육안+사진 확정, 자동 검증은 BACKLOG 04 신규)
+2026-05-01 14:38:30 | COMPLETE | task-executor M1 (11_demo_site_mirroring.md 306줄, 육안+사진 확정, 자동 검증은 BACKLOG 04 신규)
 2026-05-01 14:38:30 | COMPLETE | task-executor X2 (dgx/tests·config 신규, dataset_repos.json HF Hub+rsync, 04_dgx_lerobot_diff.md 갱신)
 2026-05-01 14:38:30 | DISPATCH | code-tester M1 + code-tester X2 2 병렬
 2026-05-01 14:42:00 | COMPLETE | task-executor T3 (scripts/deploy_datacollector.sh 신규, Category B, BACKLOG 02 #9 두 버그 답습 X 명시)
