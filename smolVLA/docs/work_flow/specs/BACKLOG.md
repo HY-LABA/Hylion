@@ -72,6 +72,8 @@
 | 15 | 카메라 인덱스 사전 발견 단계 필요 — `hil_inference.py` 실행 전 `lerobot-find-cameras opencv` 로 top/wrist 카메라의 실제 디바이스 인덱스 확인 필수. 기본값(`top:0,wrist:1`) 이 실제 인덱스와 불일치하여 `OpenCVCamera(1)` 실패 발생 (TODO-07b 에서 재발견 필요했음). hil_inference.py argparse 기본값 또는 README 에 이 단계 명시 필요 | TODO-07b prod 검증 | 높음 | 미완 |
 | 16 | wrist 카메라 방향 플립 필요 — `--flip-cameras wrist` 없이 실행 시 wrist 카메라 이미지가 뒤집힘. 06_leftarmVLA 학습 전 사전학습 분포의 wrist 카메라 방향과 일치하는지 확인 후 hil_inference.py 기본값 또는 데이터 수집 스크립트에 반영 필요 | TODO-07b prod 검증 | 높음 | 미완 |
 | 17 | 팔 calibration 중간값 경직 — live 50 step 이후 팔이 calibration 중간값 근처에서 멈추고 경직됨. 사전학습 분포(lego 큐브 pick-and-place, 특정 책상 배치) 와 본 환경 차이의 예상 동작. 03 마일스톤 범위 내 정상 결과. 06_leftarmVLA 학습 및 fine-tuning 으로 해결 필요 | TODO-07b prod 검증 | 중간 | 06_leftarmVLA 이관 |
+| 18 | Orin cuSPARSELt Option B 수동 설치 (NVIDIA deb local) — 현재 `LD_LIBRARY_PATH` 패치로 우회 운영. Option B 적용 시 패치 완전 제거 가능. **보류 (문제 발생 시 재시도)** — 정상 동작 중인 환경 변경 비용 > 효익 | 구 `docs/storage/logs/todo.md` §2·§A-2 (2026-04-23) | 낮음 | 미완 |
+| 19 | (선택) Seeed SharePoint JP 6.2 PyTorch 2.7 wheel 별도 test venv 설치 → cusparselt 해소 여부 확인. 현재 JP 6.0 wheel + LD_LIBRARY_PATH 패치 OK 라 보류. 06·07 학습 후 PyTorch 2.5 한계 트리거 시 격상 | 구 `docs/storage/logs/todo.md` §A-4 (2026-04-23) | 낮음 (트리거 시 중간) | 미완 |
 
 ---
 

@@ -41,12 +41,6 @@ upstream lerobot 대비 orin/ 커스텀 레이어 변경 이력 추적.
 | [03_orin_lerobot_diff.md](lerobot_upstream_check/03_orin_lerobot_diff.md) | upstream vs orin/lerobot/ 코드 변경 이력 |
 | [check_update_diff.sh](lerobot_upstream_check/check_update_diff.sh) | 점검 스크립트 |
 
-### logs/
-
-| 파일 | 내용 |
-|---|---|
-| [todo.md](logs/todo.md) | Orin 환경 개선 TODO 및 결정 이력 |
-
 ### others/
 
 | 파일 | 내용 |
