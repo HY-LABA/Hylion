@@ -3,7 +3,7 @@
 ## Project Snapshot
 
 - Project: smolVLA for Physical AI robotics workflow
-- Platform: Orin (NVIDIA Jetson AGX) 중심 실행·검증 + DGX (학습) + DataCollector (시연장 데이터 수집)
+- Platform: Orin (NVIDIA Jetson AGX) 중심 실행·검증 + DGX (학습 + 데이터 수집, 시연장 이동 운영)
 - Main development layer: `smolVLA/orin/`
 - Core objective: implement and stabilize custom behavior without touching upstream submodule code
 - 자동화 정책: spec 작성 → 모든 todo 자동 처리 → 사용자 실물 검증으로 사이클 마무리
@@ -17,7 +17,7 @@
   - `nvidia_official/`: NVIDIA PyTorch on Jetson 공식 문서
   - `seeedwiki/`: Seeed SO-101 위키
 - `smolVLA/orin/`: custom runtime, wrappers, and extensions (Orin)
-- `smolVLA/dgx/`: 학습용 (DGX)
+- `smolVLA/dgx/`: 학습 + 데이터 수집 (DGX, 시연장 직접 이동 운영)
 - `smolVLA/docs/`: project docs and operational knowledge
 - `smolVLA/docs/storage/legacy/`: 이전 워크플로우 자산 보관 (참조용)
 - `smolVLA/docs/storage/workflow_reflections/`: spec 사이클별 reflection 보고서
@@ -78,6 +78,30 @@ spec 의 모든 todo 를 **자율 처리**. 사용자는 `/observe` 로 read-onl
 - **분기**:
   - 통과 → `/wrap-spec` → spec history 보관 + reflection + 다음 spec Phase 1
   - 실패 → orchestrator 가 todo 추가 (1a, 1b…) → planner 재호출 → Phase 2 재진입
+
+#### verification_queue 환경 레벨 분류 (06 reflection 도출)
+
+각 항목에 환경 레벨 명시 — planner 가 Phase 3 검증 큐 후보 식별 시 적용:
+
+| 환경 레벨 | 의미 | prod-test-runner 자율 | Phase 3 검증 |
+|---|---|---|---|
+| `AUTO_LOCAL` | devPC 로컬 자동 (pytest·ruff·bash -n) | ✅ 자율 — 즉시 verdict | 사용자 검증 불요 |
+| `SSH_AUTO` | SSH 자율 (orin·dgx read-only) | ✅ 자율 — verdict 후 사용자 통과 확인 | SSH 가용 시 자율 |
+| `PHYS_REQUIRED` | 사용자 실물 환경 필수 (시연장·하드웨어) | ⚠️ 정적만 + 사용자 위임 | 시연장 환경 의존 |
+
+`PHYS_REQUIRED` 항목이 환경 차단으로 미검증 시 `/wrap-spec` 진입 시 BACKLOG 이관 (아래 정책 참조).
+
+#### /wrap-spec 미처리 verification_queue 처리 정책 (06 reflection 도출)
+
+`/wrap-spec` 호출 시 verification_queue 에 *미처리* (NEEDS_USER_VERIFICATION 상태로 사용자 결정 미입력) 항목이 있으면, 메인이 **항목별 명시적 처리 결정 prompt** 제시:
+
+| 결정 | 처리 |
+|---|---|
+| **무시 (BACKLOG 이관)** | verification_queue 마킹 + BACKLOG.md 활성 spec 섹션 항목 추가 + ANOMALIES `USER_OVERRIDE` 누적 |
+| **연기 (다음 사이클 재시도)** | 무시와 동일하나 BACKLOG 우선순위 "중간" + 트리거 명시 (예: "DGX 시연장 이동 시") |
+| **실패 처리 (자동 재시도)** | `/verify-result <항목> 실패` 입력으로 분기 — todo 추가 + planner 재호출 |
+
+→ 메인이 prompt 후 사용자 답 받기 전 `/wrap-spec` 진행 X. 04 BACKLOG #7 + 05 ANOMALIES #4 + 06 USER_OVERRIDE 패턴의 *명시적 정책화*.
 
 ### Phase 간 책임 매트릭스
 
@@ -143,7 +167,7 @@ spec 의 모든 todo 를 **자율 처리**. 사용자는 `/observe` 로 read-onl
 
 code-tester `MAJOR_REVISIONS` 시 일반적으론 task-executor 재호출. 단 다음 영역 변경에 대해서는 **자동 재시도 X, 사용자 보고 게이트**.
 
-- `orin/lerobot/`, `dgx/lerobot/`, `datacollector/lerobot/` (upstream 옵션 B)
+- `orin/lerobot/`, `dgx/lerobot/` (upstream 옵션 B)
 - `pyproject.toml` 류 (의존성)
 - `orin/scripts/setup_env.sh` (Jetson PyTorch 직접 설치)
 - `scripts/deploy_*.sh`
@@ -198,10 +222,6 @@ orchestrator·planner 가 다음을 plan 에 넣으려면 **사용자 답 받기
 `orin/lerobot/` 하위 코드 수정 시 함께 갱신:
 
 3. **`docs/storage/lerobot_upstream_check/03_orin_lerobot_diff.md`** — upstream 대비 `orin/lerobot/` 코드 변경 이력. inference-only 트리밍 시 이유·영향 범위 명시.
-
-`datacollector/lerobot/` 하위 코드 수정 시 함께 갱신:
-
-3-b. **`docs/storage/lerobot_upstream_check/05_datacollector_lerobot_diff.md`** — upstream 대비 `datacollector/lerobot/` 코드 변경 이력. PEP 695 등 Python 3.12+ syntax backport 시 사유·영향 범위 명시 (BACKLOG #11 (c) 옵션 진행 시 활성화).
 
 skill·hook·CLAUDE.md 갱신 시 (reflection 결과):
 

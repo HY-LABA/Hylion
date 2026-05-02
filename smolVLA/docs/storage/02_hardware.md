@@ -5,10 +5,13 @@
 
 ## 1) 컴퓨팅 장치
 
+<!-- 정정 (2026-05-02): 06_dgx_absorbs_datacollector 결정으로 4-노드 → 3-노드 구조 전환.
+     DataCollector 노드 운영 종료 — DGX 가 시연장 직접 이동 + 데이터 수집 책임 흡수.
+     아래 DataCollector 항목은 역사적 실측 기록으로 보존. -->
 - 개발 PC: Ubuntu 환경 사용 중
 - 엣지 장치: `Jetson Orin Nano Super Developer Kit`
-- 학습/파인튜닝 서버: `NVIDIA DGX Spark`
-- 데이터 수집 PC (DataCollector): x86_64 노트북 (Intel Core i3-7100U, GPU 없음 — Intel HD 620 only)
+- 학습/파인튜닝 + 데이터 수집 서버: `NVIDIA DGX Spark` (06 결정으로 DataCollector 책임 흡수 — 시연장 직접 이동 운영)
+- ~~데이터 수집 PC (DataCollector)~~: x86_64 노트북 (Intel Core i3-7100U, GPU 없음 — Intel HD 620 only) — **운영 종료 (2026-05-02, 06_dgx_absorbs_datacollector 결정 A). 실측 기록은 §5 보존.**
 
 ## 2) devPC 사양 확인 방법 및 실측
 

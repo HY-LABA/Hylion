@@ -1,51 +1,37 @@
 # docs/storage/legacy/ — 이전 워크플로우 자산 보관소
 
-본 디렉터리는 **2026-05-01 워크플로우 재구성 이전** 의 자산을 보존한다. 활성 영역에서 제거하되 맥락은 잃지 않도록 하기 위함.
+본 디렉터리는 **더 이상 활성 운영되지 않는 노드·워크플로우 자산**을 보관한다. 각 하위 폴더는 독립적인 "보관 단위"이며, 후속 사이클에서 참조 가능하도록 이력을 보존한다.
 
-## 보관 배경
+---
 
-2026-05-01, 본 프로젝트는 다음 워크플로우 전환을 시작:
+## 하위 폴더 색인
 
-| 이전 (~2026-04-30) | 이후 (2026-05-01~) |
-|---|---|
-| 3-AI 분업 (Claude / Copilot / Codex) | Claude 단일 + 서브에이전트 팀 |
-| 슬래시 커맨드 → 외부 AI 프롬프트 출력 | 슬래시 커맨드 → 서브에이전트 호출 |
-| `agent_plan.md` 의 3-AI 정책 | `.claude/agents/`·`.claude/skills/` 기반 |
+### `01_pre_subagent_workflow/`
 
-본 폴더의 파일들은 **옛 정책의 정의·맥락을 기록**한다. 참조용이며 활성 워크플로우엔 영향 없음.
+- **사유**: 2026-05-01 워크플로우 재구성 이전의 3-AI 분업 (Claude / Copilot / Codex) 자산. 서브에이전트 팀 도입으로 옛 정책 파일들이 비활성화됨.
+- **이관 일자**: 2026-05-01
+- **후속**: 새 워크플로우는 `.claude/agents/`, `.claude/skills/`, `docs/work_flow/specs/` 기반으로 운영 중. 본 폴더는 **읽기 전용 참조** 용.
+- **색인**: 해당 폴더의 `README.md` 참조.
 
-## 보관 파일
+---
 
-| 파일 | 원래 위치 | 정체 |
-|---|---|---|
-| `HANDOFF_2026-04-30.md` | `/HANDOFF.md` | 2026-04-30 세션 핸드오프 — 4-노드 아키텍처 도입, 04 마일스톤 진입 컨텍스트 |
-| `agent_plan_pre-subagent.md` | `/agent_plan.md` | 3-AI 역할 분담 정책 (Claude 기획·Copilot 코딩·Codex 테스트) |
-| `AGENTS_codex-guide.md` | `/AGENTS.md` | Codex 전용 프로젝트 가이드 |
-| `copilot-instructions_pre-subagent.md` | `/.github/copilot-instructions.md` | GitHub Copilot 전용 가이드 |
-| `CLAUDE_pre-subagent.md` | `/CLAUDE.md` (복사본 — 원본 그대로 유지) | Phase 2 에서 대대적 재작성 예정. 옛 버전 스냅샷 |
-| `current_task_pre-subagent.md` | `/docs/work_flow/context/current_task.md` | 옛 단일 활성 task 슬롯. 새 워크플로우는 `context/todos/<XX>/01_implementation.md` 로 대체 |
-| `current_test_pre-subagent.md` | `/docs/work_flow/context/current_test.md` | 옛 단일 활성 test 슬롯. 새 워크플로우는 `context/todos/<XX>/{02_code-test, 03_prod-test}.md` 로 대체 |
+### `02_datacollector_separate_node/`
 
-## 새 워크플로우 자산 위치
+- **사유**: 2026-05-02 `06_dgx_absorbs_datacollector` 사이클 결정 — DataCollector 별도 노드 (smallgaint, Ubuntu 22.04) 운영 종료. DGX 가 데이터 수집 + 학습 두 책임을 흡수하면서 DataCollector 노드 자산 전체를 legacy 이관.
+- **이관 일자**: 2026-05-02 (TODO-L2 처리)
+- **후속**: DGX 측 흡수 자산은 `dgx/interactive_cli/flows/` + `dgx/scripts/` 에 신규 배치. 본 폴더는 **읽기 전용 참조** 용.
+- **색인**: `02_datacollector_separate_node/README.md` 참조 (TODO-L2 에서 작성).
 
-활성 워크플로우 정의는 다음 위치 참조:
-
-- `CLAUDE.md` (루트) — 프로젝트 운영 룰
-- `.claude/agents/` — 서브에이전트 정의 (Phase 3 에서 추가)
-- `.claude/skills/` — 도메인 지식 모듈 (Phase 3 에서 추가)
-- `.claude/commands/` — 슬래시 커맨드 (Phase 2 에서 갱신)
-- `docs/work_flow/specs/` — 작업 스펙
-- `docs/work_flow/context/` — 진행 상태
+---
 
 ## 복구 정책
 
-이 파일들은 **읽기 전용 참조**. 다시 활성 영역으로 끌어올 일이 있으면, **새로운 이름으로 활성 위치에 복사**하고 본 폴더는 그대로 둘 것 (이력 보존).
+이 하위 폴더들은 **읽기 전용 참조**. 다시 활성 영역으로 끌어올 일이 있으면, **새로운 이름으로 활성 위치에 복사**하고 본 폴더는 그대로 둘 것 (이력 보존).
 
 ## 변경 이력
 
 | 날짜 | 변경 |
 |---|---|
-| 2026-05-01 | 초기 보관 — 4개 파일 archive (워크플로우 재구성 직전 시점) |
-| 2026-05-01 | `CLAUDE.md` 스냅샷 추가 (`CLAUDE_pre-subagent.md`) — Phase 2 재작성 직전 옛 버전 보존 |
-| 2026-05-01 | `/.codex` 빈 마커 파일 삭제 — Codex 미사용 (보관 가치 없는 0 byte 파일) |
-| 2026-05-01 | `context/current_task.md`, `current_test.md` archive — 새 `context/todos/<XX>/` 구조로 대체 |
+| 2026-05-01 | `01_pre_subagent_workflow/` 초기 보관 — 3-AI 분업 자산 8건 archive |
+| 2026-05-02 | `01_pre_subagent_workflow/` 하위로 git mv 이동 (TODO-L1) + 본 색인 README 신규 작성 |
+| 2026-05-02 | `02_datacollector_separate_node/` placeholder 추가 — 실제 이관은 TODO-L2 처리 |

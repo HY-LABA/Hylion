@@ -108,4 +108,4 @@ find docs/reference/lerobot/ -name "*.py" | xargs grep -l "<pattern>"
 ## Reference
 
 - `/CLAUDE.md` § Hard Constraints Category A (`docs/reference/` 수정 금지)
-- 옛 워크플로우 "레퍼런스 활용 규칙" — `docs/storage/legacy/CLAUDE_pre-subagent.md` 의 "## 핸드오프 프롬프트 출력 규칙" 부분
+- 옛 워크플로우 "레퍼런스 활용 규칙" — `docs/storage/legacy/01_pre_subagent_workflow/CLAUDE_pre-subagent.md` 의 "## 핸드오프 프롬프트 출력 규칙" 부분

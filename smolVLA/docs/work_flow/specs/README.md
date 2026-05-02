@@ -104,6 +104,25 @@ reflection → workflow_reflections/<날짜>_<NN_name>.md
 
 ---
 
+## 활성 spec 번호 현황 (2026-05-02 기준)
+
+<!-- 06_dgx_absorbs_datacollector 삽입으로 기존 06~09 → 07~10 시프트 (M1 갱신) -->
+
+| 번호 | spec 명 | 상태 |
+|---|---|---|
+| 01 | orin_setting | history |
+| 02 | dgx_setting | history |
+| 03 | smolvla_test_on_orin | history |
+| 04 | infra_setup | history |
+| 05 | interactive_cli | history |
+| **06** | **dgx_absorbs_datacollector** | **활성 (현 사이클)** |
+| 07 | leftarmVLA | 대기 (구 06) |
+| 08 | biarm_teleop_on_dgx | 대기 (구 07) |
+| 09 | biarm_VLA | 대기 (구 08) |
+| 10 | biarm_deploy | 대기 (구 09) |
+
+> 번호 시프트 배경: 06_dgx_absorbs_datacollector 삽입으로 기존 `06_leftarmVLA` → `07_leftarmVLA`, `07~09` → `08~10`. 상세: `06_dgx_absorbs_datacollector.md` §본 마일스톤의 위치.
+
 ## Reference
 
 - spec 작성 템플릿: [00_template.md](00_template.md)

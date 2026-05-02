@@ -4,8 +4,12 @@ Phase 3 통과 후 spec 사이클 마무리 + reflection 호출 + 다음 spec Ph
 
 ## 사전 조건
 
-- `context/verification_queue.md` 의 모든 항목 처리 완료 (통과 또는 사용자 무시 결정)
-- 미처리 항목 있으면 "/verify-result 먼저 마무리해" 안내 후 종료
+- `context/verification_queue.md` 의 모든 항목 처리 완료 (통과 / 무시 / 연기 / 실패 처리 중 하나)
+- 미처리 항목 있으면 **메인이 항목별 명시적 처리 결정 prompt 제시** (CLAUDE.md § Phase 3 § /wrap-spec 미처리 verification_queue 처리 정책 — 06 reflection 도출):
+  - **무시 (BACKLOG 이관)**: verification_queue 마킹 + BACKLOG.md 활성 spec 섹션 + ANOMALIES `USER_OVERRIDE`
+  - **연기 (다음 사이클 재시도)**: 무시와 동일 + BACKLOG 우선순위 "중간" + 트리거 명시
+  - **실패 처리**: `/verify-result <항목> 실패` 분기 → todo 추가 → planner 재호출 → Phase 2 재진입
+- 사용자 답 받기 전 본 명령 진행 X
 
 ## 실행 순서
 

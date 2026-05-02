@@ -90,11 +90,43 @@
 | 4 | `orin/examples/tutorial/smolvla/` 가 1개 파일 (`using_smolvla_example.py`) 만 남은 디렉터리 — 평탄화 (`examples/tutorial/using_smolvla_example.py`) 검토 가능. 단 upstream 구조 보존 원칙대로면 그대로 유지가 자연스러움. TODO-O3 검증 시점에 사용자와 합의 | TODO-O2b | 낮음 | 미완 |
 | 5 | 향후 마일스톤별 추론 entry point 가 늘어날 때 `orin/inference/` 의 하위 구조 결정 (archive/, milestone 별 디렉터리 등). 06_leftarmVLA TODO-14 진입 시 hil_inference.py 가 ckpt 인자로 다양한 정책을 받을 수 있는지에 따라 결정 | TODO-O2b | 낮음 (06 트리거 시 중간) | 미완 |
 | 6 | 시연장 미러링 자동 검증 스크립트 — DataCollector 측 사진·조도·색온도 자동 측정·비교 (사용자 답 E: 본 사이클은 육안+사진 결정. 06/07 학습 결과로 미러링 부족 진단 시 트리거) | TODO-M1 | 낮음 (06·07 트리거 시 중간) | 미완 |
-| 7 | Phase 3 사용자 검증 대기 7건 (X3 smoke·save_dummy / G2 first-time/resume + hil_inference / D3 16단계 / M2 시연장 측정·재현 / T1 dummy push / T2 시연장 네트워크 / T3 dry-run) — 시간·환경 의존이라 BACKLOG 이관. 상세 절차는 `context/history/04_infra_setup/verification_queue.md` 참조. 사용자 환경 셋업 (DataCollector 머신 구매, 시연장 방문) 후 처리 | wrap 시점 | 중간 | 미완 |
-| 8 | TODO-G3 dispatch 누락 (orchestrator gap) — DataCollector 측 `check_hardware.sh` 이식. G1 산출물 (`orin/tests/check_hardware.sh`) 을 `datacollector/tests/` 에 이식 + venv path 갱신. D3 사용자 셋업 시 함께 처리 권고 | wrap 시점 | 낮음 (D3 트리거 시 중간) | 미완 |
-| 9 | TODO-G4 dispatch 누락 (orchestrator gap) — DataCollector check_hardware.sh prod 검증. G3 의존. G3·D3 완료 후 자연 처리 | wrap 시점 | 낮음 (D3 트리거 시 중간) | 미완 |
-| 10 | `datacollector/scripts/setup_env.sh §3` PyTorch 설치 시 CPU wheel index 명시 (`--index-url https://download.pytorch.org/whl/cpu`) — 현재 PyPI default 가 CUDA wheel + nvidia-* 자동 dep 로 디스크 ~2GB 낭비 (GPU 없는 환경에서 절대 사용 X). CPU wheel 적용 시 ~250MB·다운로드 ~10분 → ~1분. 다음 사이클 적용 권장 | 05 D3 검증 진행 중 (2026-05-02) | 중간 | 미완 |
-| 11 | DataCollector Python 3.12 셋업 또는 lerobot 옵션 B 직접 적용 — lerobot upstream 5+ 파일 (utils/io_utils.py:93, datasets/streaming_dataset.py:58, processor/pipeline.py:255, motors/motors_bus.py:51,52) 이 PEP 695 generic syntax 사용 → Python 3.12+ 강제. 학교 WiFi 의 launchpad timeout 으로 deadsnakes PPA 막힘. 후보: (a) deadsnakes PPA — 다른 네트워크에서 시도 / (b) uv standalone Python 3.12 / (c) 옵션 B 직접 작성 — orin 패턴 미러 (`datacollector/lerobot/` 5개 파일 backport + `05_datacollector_lerobot_diff.md` 신규 작성, 04 D1 §3-5 통합 처리). (c) 가 lerobot upstream 동기화 시 매번 backport 부담이지만 즉시 진행 가능 | 05 D3 검증 lerobot import FAIL (2026-05-02) | 높음 (다음 사이클 진입 차단 가능성) | 미완 |
-| 12 | DataCollector lerobot-calibrate (follower + leader) 실 수행 + main.sh flow 0~7 완주 검증 — 본 사이클은 flow 0~2 까지만 검증. flow 3 (teleop) 부터 lerobot-record 호출 시 #11 의존. #11 처리 후 진입 가능 | 05 D3 검증 미완 (2026-05-02) | 중간 | 미완 |
-| 13 | DataCollector flow 7 분기 3건 (HF Hub push + rsync devPC 호출 + 안함) 실 검증 — 04 BACKLOG #7 T1 통합. #11·#12 의존 | 05 D3 검증 미완 (2026-05-02) | 중간 | 미완 |
-| 14 | env_check.py `_check_motor_ids()` `'NoneType' object has no attribute 'close'` 에러 — 직접 ssh 호출에선 PASS 였는데 main.sh 흐름에선 FAIL. 환경 의존 (lerobot-find-port 직후 USB 상태·timing 추정). `port_handler.openPort()` 결과 검사 후 `finally: port_handler.closePort()` 호출 패턴이 None-safe X 의심. fix: `port_handler` None check + `try: port_handler.openPort()` 자체 except 보호. 다음 사이클 진단·수정 | 05 main.sh flow 0~2 검증 (2026-05-02) | 낮음 | 미완 |
+| 7 | Phase 3 사용자 검증 대기 7건 (X3 smoke·save_dummy / G2 first-time/resume + hil_inference / D3 16단계 / M2 시연장 측정·재현 / T1 dummy push / T2 시연장 네트워크 / T3 dry-run) — 시간·환경 의존이라 BACKLOG 이관. 상세 절차는 `context/history/04_infra_setup/verification_queue.md` 참조. D3 관련 DataCollector 항목 → 완료 (06 결정 — 불요, 2026-05-02). X3·O3·G2·T1·T2·시연장 항목 → 06 V 그룹 prod 검증으로 통합 | wrap 시점 | 중간 | 일부 완료 (06 결정 적용), 잔여 → 06 V 그룹 통합 |
+| 8 | TODO-G3 dispatch 누락 (orchestrator gap) — DataCollector 측 `check_hardware.sh` 이식. G1 산출물 (`orin/tests/check_hardware.sh`) 을 `datacollector/tests/` 에 이식 + venv path 갱신. D3 사용자 셋업 시 함께 처리 권고 | wrap 시점 | 낮음 (D3 트리거 시 중간) | 완료 (06 결정 — 불요, 2026-05-02): DataCollector 머신 운영 종료. DGX 가 check_hardware 책임 흡수 (06 X3) |
+| 9 | TODO-G4 dispatch 누락 (orchestrator gap) — DataCollector check_hardware.sh prod 검증. G3 의존. G3·D3 완료 후 자연 처리 | wrap 시점 | 낮음 (D3 트리거 시 중간) | 완료 (06 결정 — 불요, 2026-05-02): DataCollector 머신 운영 종료. DGX 측 check_hardware 검증은 06 V2 prod 검증으로 통합 |
+| 10 | `datacollector/scripts/setup_env.sh §3` PyTorch 설치 시 CPU wheel index 명시 (`--index-url https://download.pytorch.org/whl/cpu`) — 현재 PyPI default 가 CUDA wheel + nvidia-* 자동 dep 로 디스크 ~2GB 낭비 (GPU 없는 환경에서 절대 사용 X). CPU wheel 적용 시 ~250MB·다운로드 ~10분 → ~1분. 다음 사이클 적용 권장 | 05 D3 검증 진행 중 (2026-05-02) | 중간 | 완료 (06 결정 — 불요, 2026-05-02): datacollector/ 노드 legacy 이관. 해당 setup_env.sh 는 `docs/storage/legacy/02_datacollector_separate_node/` 에 보관 |
+| 11 | DataCollector Python 3.12 셋업 또는 lerobot 옵션 B 직접 적용 — lerobot upstream 5+ 파일 (utils/io_utils.py:93, datasets/streaming_dataset.py:58, processor/pipeline.py:255, motors/motors_bus.py:51,52) 이 PEP 695 generic syntax 사용 → Python 3.12+ 강제. 학교 WiFi 의 launchpad timeout 으로 deadsnakes PPA 막힘. 후보: (a) deadsnakes PPA — 다른 네트워크에서 시도 / (b) uv standalone Python 3.12 / (c) 옵션 B 직접 작성 — orin 패턴 미러 (`datacollector/lerobot/` 5개 파일 backport + `05_datacollector_lerobot_diff.md` 신규 작성, 04 D1 §3-5 통합 처리). (c) 가 lerobot upstream 동기화 시 매번 backport 부담이지만 즉시 진행 가능 | 05 D3 검증 lerobot import FAIL (2026-05-02) | 높음 (다음 사이클 진입 차단 가능성) | 완료 (06 결정 — 불요, 2026-05-02): DGX 가 데이터 수집 흡수. DGX 는 이미 Python 3.12.3 + `.arm_finetune` venv 운영 중 — PEP 695 syntax 차단 무관 |
+| 12 | DataCollector lerobot-calibrate (follower + leader) 실 수행 + main.sh flow 0~7 완주 검증 — 본 사이클은 flow 0~2 까지만 검증. flow 3 (teleop) 부터 lerobot-record 호출 시 #11 의존. #11 처리 후 진입 가능 | 05 D3 검증 미완 (2026-05-02) | 중간 | 완료 (06 결정 — 불요, 2026-05-02): DataCollector 머신 운영 종료 (06 결정). DGX 측 calibrate 는 06 V2 prod 검증 (dgx flow 0~7 완주) 으로 통합 |
+| 13 | DataCollector flow 7 분기 3건 (HF Hub push + rsync devPC 호출 + 안함) 실 검증 — 04 BACKLOG #7 T1 통합. #11·#12 의존 | 05 D3 검증 미완 (2026-05-02) | 중간 | 완료 (06 결정 — 불요, 2026-05-02): DGX flow 7 옵션 H 재정의로 흡수 (06 X1 study). 분기 옵션 → (HF Hub / 로컬 dgx 보관 / Orin rsync) 로 재정의 |
+| 14 | env_check.py `_check_motor_ids()` `'NoneType' object has no attribute 'close'` 에러 — 직접 ssh 호출에선 PASS 였는데 main.sh 흐름에선 FAIL. 환경 의존 (lerobot-find-port 직후 USB 상태·timing 추정). `port_handler.openPort()` 결과 검사 후 `finally: port_handler.closePort()` 호출 패턴이 None-safe X 의심. fix: `port_handler` None check + `try: port_handler.openPort()` 자체 except 보호. 다음 사이클 진단·수정 | 05 main.sh flow 0~2 검증 (2026-05-02) | 낮음 | 미완 (06 V2 통합 처리): DGX env_check.py 통합 시 동일 패턴 진단·수정 |
+
+---
+
+## [05_interactive_cli](history/05_interactive_cli.md)
+
+> 목표: orin·dgx·datacollector 세 노드 공통 대화형 CLI 게이트웨이
+> 작성: 2026-05-01 | 사이클 종료: 2026-05-02
+
+| # | 항목 | 발견 출처 | 우선순위 | 상태 |
+|---|------|-----------|----------|------|
+| 1 | TODO-D3 미완 — datacollector/interactive_cli/ prod 검증 (flow 0~7 완주 + flow 7 분기 3건 + env_check 7단계). 04 BACKLOG #7·#8·#9 통합 대상. Python 3.12 차단 (#11) 으로 flow 3~ 진입 불가 상태 | D3 NEEDS_USER_VERIFICATION (2026-05-02) | 중간 | 완료 (06 결정 — 불요, 2026-05-02): DataCollector 머신 운영 종료. D3 datacollector 항목 모두 DGX 흡수 또는 불요 처리. DGX 측 calibrate·flow 검증은 06 V2 prod 검증으로 통합 |
+| 2 | TODO-O3 미완 — orin/interactive_cli/ prod 검증 (flow 0~5 완주 + hil_inference 50-step). 04 G2 verification_queue 통합. SSH connection timed out — 네트워크 연결 후 처리 필요 | O3 NEEDS_USER_VERIFICATION (2026-05-02) | 중간 | 미완 — 06 V 그룹 통합 처리: 06 V 그룹 prod 검증에서 orin 추론 flow 검증 통합. 04 G2 verification_queue 항목 (first-time/resume + hil_inference 50-step) 포함 |
+| 3 | TODO-X3 미완 — dgx/interactive_cli/ prod 검증 (flow 0~5 완주 + smoke_test 동의 + ckpt 케이스). 04 X3·T1·T2 verification_queue 통합. devPC 정적 검증·deploy 완료. DGX 실물 SSH 검증 대기 | X3 NEEDS_USER_VERIFICATION (2026-05-02) | 중간 | 미완 — 06 V3 통합 처리: 06 TODO-V3 (dgx/interactive_cli/ 학습 mode 회귀 검증) 에서 통합. 05 X3 의 smoke_test·save_dummy_checkpoint·ckpt 케이스 목록 검증 포함 |
+
+
+---
+
+## [06_dgx_absorbs_datacollector](history/06_dgx_absorbs_datacollector.md)
+
+> 목표: DataCollector 책임을 DGX 가 흡수 — 3-노드 (devPC + DGX + Orin) 재정의 + DGX 시연장 직접 이동 운영
+> 작성: 2026-05-02 | 완료: 2026-05-03 (자동화 영역) / Phase 3 BACKLOG 이관
+
+| # | 항목 | 발견 출처 | 우선순위 | 상태 |
+|---|------|-----------|----------|------|
+| 1 | TODO-V1 — DGX 시연장 이동 후 SO-ARM·카메라 직결 하드웨어 검증 (USB·dialout·v4l2·find-port·find-cameras·check_hardware.sh 5-step, 총 6 항목) | wrap 시점 사용자 무시 결정 (B-3, 2026-05-03) | 중간 | 미완 — 환경 의존 (DGX 시연장 이동 가능 시 처리). devPC 정적 검증 PASS. 04 BACKLOG #7·#8·#9 + 05 D3 통합 대상이었으나 DGX 흡수 후 일부만 V1 으로 재정의 |
+| 2 | TODO-V2 — dgx/interactive_cli/ 수집 mode flow 0~7 완주 검증 (calibrate·record·HF Hub push·G-4 학습 전환 prompt·BACKLOG #14 실물, 총 12 항목) | wrap 시점 사용자 무시 결정 (B-3, 2026-05-03) | 중간 | 미완 — 환경 의존. devPC 정적 검증 PASS (py_compile·ruff·bash -n·G-4 인계 체인·H-(b) rsync 제거). 04 BACKLOG #14 (env_check.py NoneType) 실물 진단 통합 |
+| 3 | TODO-V3 — dgx/interactive_cli/ 학습 mode 회귀 검증 (preflight·smoke_test 5~15분·save_dummy·ckpt 케이스 4건·G-4 단발 종료, 총 10 항목). 05 X3 통합 | wrap 시점 사용자 무시 결정 (B-3, 2026-05-03) | 중간 | 미완 — 환경 의존. devPC 정적 검증 17/17 PASS. 05 X3 (smoke_test·save_dummy·ckpt 케이스) 자연 흡수. 학교 WiFi 차단 가능 항목 (svla_so100_pickplace 다운로드) 다른 네트워크 권고 |
+| 4 | sync_ckpt_dgx_to_orin.sh 신규 작성 — 본 spec 결정 H-(b) 후 차기 사이클 (07_leftarmVLA) 위임. ckpt 전송 (DGX → Orin rsync) 책임 명확화 | X2·X3 wrap 시점 결정 (2026-05-02) | 중간 | 미완 — 07_leftarmVLA 진입 시 처리 |
+| 5 | datacollector 머신 (smallgaint) 회수 또는 다른 용도 재활용 결정 — 본 spec 자산 legacy 이관 후 머신 자체 미사용 상태 | wrap 시점 (2026-05-02) | 낮음 | 미완 — 사용자 운영 결정 |
+| 6 | M3 인계 — `.claude/skills/lerobot-reference-usage/SKILL.md` L111 의 `docs/storage/legacy/CLAUDE_pre-subagent.md` 경로 갱신 (실제 경로: `legacy/01_pre_subagent_workflow/CLAUDE_pre-subagent.md`). Category A 영역 — reflection 시점 메인 + 사용자 승인 후 처리 | L1·M3 grep 결과 (2026-05-02) | 낮음 | 미완 — reflection 시점 처리 후보 |
+| 7 | M3 잔재 — `docs/storage/lerobot_upstream_check/04_dgx_lerobot_diff.md`·`05_datacollector_lerobot_diff.md` 색인 누락 (M3 code-tester Rec) | M3 code-tester (2026-05-02) | 낮음 | 미완 — 차기 사이클 처리 |
+| 8 | spec 본문 `setup_env.sh` ↔ 실제 `setup_train_env.sh` 파일명 오기재 — 본 spec 본문은 그대로 보존 (역사적 결정), 차기 사이클 spec 작성 시 정확한 파일명 사용 | X5 task-executor 발견 (2026-05-03) | 낮음 | 미완 — 메타 |

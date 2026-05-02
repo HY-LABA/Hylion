@@ -34,7 +34,17 @@ model: sonnet
 작업 시작 전:
 - `.claude/skills/claude-md-constraints/SKILL.md` — Hard Constraints 체크리스트
 
-### 2. todo 추출 + 분석
+### 2. spec 본문 언급 파일·경로 실존 확인 (필수)
+
+spec 작성 시점에 *언급된 파일·경로* 가 실제 존재하는지 검증. *역사적 신호* (06_dgx_absorbs_datacollector wrap reflection 도출):
+
+- spec 본문의 "구현 대상", "참조" 섹션에서 언급된 파일·디렉터리 경로 추출
+- `ls` 또는 `Read` 로 *실 존재 여부* 검증. 발견된 불일치 (예: `setup_env.sh` vs 실제 `setup_train_env.sh`) 는 plan §확신 가정 절에 *오기재 정정 메모* 기록 + 해당 todo 의 task-executor 가 정확한 경로로 작업하도록 명시
+- 미존재 파일 (신규 작성 대상) 은 `(신규)` 표기 — 검증 X 정상
+
+목적: spec Phase 1 작성 시 사용자·메인이 가정한 파일명이 *실제 코드베이스* 와 어긋나는 경우, 자동화 도중 task-executor 가 발견하면 늦은 오류 감지. planner 단계에서 사전 차단.
+
+### 3. todo 추출 + 분석
 
 각 todo 마다:
 - 영향 영역 (어떤 파일·디렉터리 수정?)
@@ -42,14 +52,14 @@ model: sonnet
 - 가정 명시 (확신 vs 확인 필요)
 - Category B/C 영역 변경 포함?
 
-### 3. DAG 구성
+### 4. DAG 구성
 
 - 같은 영향 영역에 의존 없는 todo 들 → **병렬 그룹**
 - 결과 의존 todo 들 → **직렬**
 
 병렬화 원칙: **변경되기 힘든 가정** 위에서는 병렬 OK. **선결 요소 미해결** 시 가정으로 진행 X.
 
-### 4. awaits_user 분류 (Category C 룰)
+### 5. awaits_user 분류 (Category C 룰)
 
 다음 작업이 plan 에 포함되어야 하면 `awaits_user` 마킹:
 - 새 디렉터리 생성 (orin·dgx·docs 외)
@@ -60,13 +70,19 @@ model: sonnet
 - BACKLOG "높음" 우선순위 항목
 - 모호한 설계 가정
 
-### 5. Phase 3 검증 큐 후보 식별
+### 6. Phase 3 검증 큐 후보 식별 (환경 레벨 분류)
 
-각 todo 의 prod-test 가능성 분류:
-- 자동 검증 가능 (pytest, smoke test 등)
-- 사용자 실물 검증 필요 (카메라 캡처 육안, SO-ARM 동작 관찰 등)
+각 todo 의 prod-test 가능성을 다음 환경 레벨로 분류 (06 reflection 도출 — verification_queue 형식 #4):
 
-### 6. `context/plan.md` 작성
+| 환경 레벨 | 의미 | 예시 |
+|---|---|---|
+| `AUTO_LOCAL` | 자동 검증 가능 — devPC 로컬 (pytest·ruff·bash -n) | unit test, lint |
+| `SSH_AUTO` | 자동 검증 가능 — SSH 자율 (orin·dgx read-only 명령) | preflight, smoke_test, py_compile on remote |
+| `PHYS_REQUIRED` | 사용자 실물 환경 필수 — 시연장·하드웨어 직결 | SO-ARM calibrate, 카메라 캡처 육안 |
+
+→ Phase 3 검증 큐 후보 표에 본 분류 명시. 메인이 verification_queue 우선순위 결정·환경 의존 BACKLOG 이관 판단 시 활용.
+
+### 7. `context/plan.md` 작성
 
 ## 산출물 형식 — `context/plan.md`
 
@@ -104,10 +120,11 @@ model: sonnet
 
 ## Phase 3 검증 큐 후보
 
-| TODO | 검증 방식 |
-|---|---|
-| TODO-XX | 자동 — pytest 통과 시 OK |
-| TODO-YY | 사용자 실물 — 카메라 0/1 캡처 육안 확인 |
+| TODO | 환경 레벨 | 검증 방식 |
+|---|---|---|
+| TODO-XX | `AUTO_LOCAL` | pytest 통과 시 OK |
+| TODO-YY | `SSH_AUTO` | orin SSH read-only — `python -c "import ..."` |
+| TODO-ZZ | `PHYS_REQUIRED` | 사용자 실물 — 카메라 0/1 캡처 육안 확인 |
 ```
 
 ## Hard Constraints 준수

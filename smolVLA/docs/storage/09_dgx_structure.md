@@ -11,11 +11,15 @@
 
 04 이전까지 dgx/ 는 학습 전용이었으나 단일 책임이 명시적으로 정의되지 않았음. 04 에서 **4-노드 분리 아키텍처 (devPC / DataCollector / DGX / 시연장 Orin)** 가 공식화되면서 DGX 의 역할을 명확히 한다:
 
-- **DGX 의 단일 책임: 학습 전용**
-  - SO-ARM 직접 연결 X
-  - teleop 책임 X → DataCollector 로 이관 (run_teleoperate.sh 는 DataCollector 에 위치해야 함)
-  - 추론 책임 X → Orin 의 책임
-  - 데이터 수집 책임 X → DataCollector 의 책임
+<!-- 정정 (2026-05-02): 06_dgx_absorbs_datacollector 결정으로 4-노드 → 3-노드 구조로 단순화.
+     DGX 가 DataCollector 의 데이터 수집 책임 흡수 — DGX 가 시연장 직접 이동 운영.
+     본 §0 본문은 04 결정 시점 역사적 맥락 보존. 06 결정 후 변경 내용은 X2 todo 처리. -->
+
+- **DGX 의 단일 책임: 학습 전용** (04 기준 — 06 결정으로 *학습 + 데이터 수집* 으로 확장됨)
+  - SO-ARM 직접 연결 X (→ **정정**: 06 결정으로 DGX 가 시연장 이동 시 SO-ARM 직결 가능, V1 prod 검증 예정)
+  - teleop 책임 X → DataCollector 로 이관 (→ **정정**: 06 결정으로 dgx/scripts/run_teleoperate.sh 이식, X3 처리)
+  - 추론 책임 X → Orin 의 책임 (변경 없음)
+  - 데이터 수집 책임 X → DataCollector 의 책임 (→ **정정**: DataCollector 운영 종료, DGX 흡수 확정 2026-05-02)
 
 본 문서의 §5 (마이그레이션 계획) 가 TODO-X2 (마이그레이션 실행) 의 입력 사양이 된다.
 
@@ -134,9 +138,12 @@ devPC scripts/                  DGX 측 효과
                                 ※ outputs/, .arm_finetune/ 는 rsync 배포 제외
 ```
 
-DataCollector → DGX 데이터 전송 (TODO-T1 결정 후):
+<!-- 정정 (2026-05-02): DataCollector 운영 종료 (06 결정). DataCollector → DGX 전송 인터페이스 무효화.
+     DGX 가 직접 데이터 수집하므로 sync 불필요. scripts/sync_dataset_collector_to_dgx.sh 는
+     legacy 이관 완료 (docs/storage/legacy/02_datacollector_separate_node/). -->
+DataCollector → DGX 데이터 전송 (TODO-T1 결정 후) — **정정: 06 결정으로 DataCollector 운영 종료, 아래 내용은 역사적 보존**:
 - **HF Hub 경유 (권장)**: DataCollector 에서 `lerobot-record --push-to-hub` → DGX 에서 `lerobot-train --dataset.repo_id=<HF_USER>/...`
-- **rsync 직접**: `scripts/sync_dataset_collector_to_dgx.sh` (TODO-T1 결정에 따라 작성 여부)
+- **rsync 직접**: `scripts/sync_dataset_collector_to_dgx.sh` → **legacy 이관 완료 (L2, 2026-05-02)**
 
 DGX → Orin 체크포인트 전송:
 - `scripts/sync_ckpt_dgx_to_orin.sh` (devPC 경유 2-hop rsync)
@@ -280,3 +287,4 @@ DGX 에서 사용하지 않는 entrypoint (DataCollector 또는 Orin 의 책임)
 | 날짜 | 변경 |
 |---|---|
 | 2026-05-01 | 초안 작성 — 04 TODO-X1 산출물. 4-노드 분리 아키텍처에서 DGX 학습 전용 책임 명확화. run_teleoperate.sh DataCollector 이관 결정 (후보 a 채택). 5개 마이그레이션 카테고리 정의. DataCollector ↔ DGX 인터페이스는 TODO-T1 awaits_user 답에 따라 §5-3 config/ 스키마 갱신 필요 명시 |
+| 2026-05-02 | `dgx/scripts/setup_train_env.sh` §3-c 블록 추가 — 06_dgx_absorbs_datacollector TODO-X5. record·hardware·feetech extras (torchcodec cu130 인덱스 별도 + 9개 PyPI 패키지) 설치 step 삽입. Option B 채택 (dgx/pyproject.toml 미변경). |

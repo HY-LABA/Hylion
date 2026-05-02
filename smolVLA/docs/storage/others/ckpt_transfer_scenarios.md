@@ -6,7 +6,11 @@
 >       사용자가 시연장 환경 확인 후 적절한 경로를 선택할 수 있도록 가이드를 제공한다.
 > 참고 스크립트:
 >   - scripts/sync_ckpt_dgx_to_orin.sh          (케이스 1·2 — 기존 스크립트)
->   - scripts/sync_ckpt_dgx_to_datacollector.sh  (케이스 3 신규 스크립트)
+>   - ~~scripts/sync_ckpt_dgx_to_datacollector.sh~~  (케이스 3 — **legacy 이관 완료 L2**)
+> 정정 (2026-05-02): 06_dgx_absorbs_datacollector 결정으로 DataCollector 노드 운영 종료.
+>       케이스 3 (DataCollector 경유) 는 더 이상 사용되지 않음. 역사적 결정으로 본문 보존.
+>       sync_ckpt_dgx_to_datacollector.sh → legacy 이관: docs/storage/legacy/02_datacollector_separate_node/scripts_sync_ckpt_dgx_to_datacollector.sh
+>       현재 유효 케이스: 케이스 1·2 (sync_ckpt_dgx_to_orin.sh), 케이스 4 (USB 드라이브).
 
 ---
 
@@ -72,10 +76,13 @@ bash smolVLA/scripts/sync_ckpt_dgx_to_orin.sh
 
 ---
 
-### 케이스 3 — 시연장 Orin 인터넷 격리 (DataCollector 경유 우회)
+### 케이스 3 — 시연장 Orin 인터넷 격리 (DataCollector 경유 우회) — *무효화 (2026-05-02)*
+
+<!-- 정정: DataCollector 노드 운영 종료 (06 결정). 케이스 3 사용 불가. 역사적 보존. -->
 
 **조건**: 시연장 Orin 이 외부 인터넷 접근 불가 또는 devPC 에서 Orin SSH 단절.
          DataCollector 는 시연장 WiFi 에 있어 Orin 과 동일 서브넷 접근 가능.
+         **→ 06 결정: DataCollector 운영 종료. 케이스 3 사용 불가. DGX 가 시연장 직접 이동하는 방식으로 전환.**
 
 **증상 (확인 방법)**:
 ```bash

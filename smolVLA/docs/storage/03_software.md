@@ -106,7 +106,10 @@ JetPack 판별 근거:
 - Docker: 미확인 (DataCollector 책임상 불필요 — lerobot-record + push 만 수행)
 - ROS2: 미설치 (DataCollector 는 lerobot 단독)
 
-DataCollector venv 상세는 `docs/storage/07_datacollector_venv_setting.md` 참조 (셋업 후 작성).
+<!-- 정정 (2026-05-02): DataCollector 노드 운영 종료 (06_dgx_absorbs_datacollector 결정).
+     07_datacollector_venv_setting.md 는 legacy 이관됨.
+     참조 경로: docs/storage/legacy/02_datacollector_separate_node/docs_storage_07_datacollector_venv_setting.md -->
+DataCollector venv 상세는 ~~`docs/storage/07_datacollector_venv_setting.md`~~ → **legacy 이관**: `docs/storage/legacy/02_datacollector_separate_node/docs_storage_07_datacollector_venv_setting.md` 참조 (DataCollector 노드 운영 종료 — 06 결정).
 
 ## 7) 추가 확인 필요 항목
 

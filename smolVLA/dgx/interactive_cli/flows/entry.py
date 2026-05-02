@@ -1,7 +1,6 @@
 """interactive_cli flow 0·1 — 진입 확인 + 장치 선택 메뉴.
 
 flow 0: 환경 확인
-  - datacollector 노드: "이 환경에서 실행하시는 게 맞나요? [Y/n]" 확인 단계
   - orin / dgx: 확인 단계 없음 (VSCode remote-ssh 로 이미 올바른 노드에서 실행)
 
 flow 1: 장치 선택 메뉴
@@ -13,6 +12,12 @@ flow 1: 장치 선택 메뉴
     (경로 처리: Path.is_dir() 분기 + 파일 미존재 시 None 반환)
   - 환경변수 경유 값 처리: check_hardware.sh record_step() line 128~144 패턴 응용
     (특수문자 안전 처리를 위해 환경변수 경유)
+
+갱신 (2026-05-02, TODO-X2):
+  - VALID_NODES: ("orin", "dgx", "datacollector") → ("orin", "dgx")
+    datacollector 노드 운영 종료 (06_dgx_absorbs_datacollector 결정 C·F).
+  - dgx 분기: flow 3 mode 분기 (mode.py) 호출로 변경
+    (env_check 는 mode 인자 없이 smoke 로 사전 점검 — 수집/학습 분기는 mode.py 책임)
 """
 
 import argparse
@@ -29,18 +34,17 @@ except ImportError:
 # ---------------------------------------------------------------------------
 # 노드 종류 상수
 # ---------------------------------------------------------------------------
-VALID_NODES = ("orin", "dgx", "datacollector")
+# 갱신 (2026-05-02, TODO-X2): datacollector 제거 (06 결정 C·F — 노드 운영 종료)
+VALID_NODES = ("orin", "dgx")
 
 NODE_DESCRIPTIONS = {
     "orin": "Orin (추론 노드) — 학습된 ckpt 로 hil_inference 실행",
-    "dgx": "DGX (학습 노드) — 데이터셋 학습 + 체크포인트 관리",
-    "datacollector": "DataCollector (수집 노드) — teleoperation + lerobot-record + 전송",
+    "dgx": "DGX (학습·수집 노드) — 데이터 수집 + 학습 + 체크포인트 관리",
 }
 
 NODE_GUIDE = {
     "orin": "Orin 에서 실행: bash orin/interactive_cli/main.sh",
     "dgx": "DGX 에서 실행: bash dgx/interactive_cli/main.sh",
-    "datacollector": "DataCollector 머신 터미널에서: bash datacollector/interactive_cli/main.sh",
 }
 
 
@@ -99,42 +103,18 @@ def load_node_config(node_config_path: str) -> dict | None:
 def flow0_confirm_environment(node: str) -> bool:
     """flow 0: 환경 확인 단계.
 
-    datacollector 노드 전용 확인 단계 (spec line 47~50):
-      "이 환경(datacollector)에서 실행하시는 게 맞나요? [Y/n]"
-      N 응답 → 올바른 환경 안내 + False 반환
+    orin / dgx: VSCode remote-ssh 로 이미 올바른 노드에서 실행 →
+                확인 단계 없음 → True 즉시 반환.
 
-    orin / dgx: 확인 단계 없음 → True 즉시 반환.
+    갱신 (2026-05-02, TODO-X2):
+      datacollector 분기 제거 (노드 운영 종료).
+      node 가 VALID_NODES 내이면 항상 True 반환.
 
     Returns:
-        True: 계속 진행 / False: 사용자 거부 또는 잘못된 환경
+        True: 계속 진행 / False: 잘못된 노드 (이론상 도달 X)
     """
-    if node != "datacollector":
-        return True
-
-    print()
-    print("=" * 60)
-    print(" smolVLA Interactive CLI — DataCollector 노드")
-    print("=" * 60)
-    print()
-    print("이 환경(DataCollector)에서 실행하시는 게 맞나요?")
-    print(f"  현재 노드: {NODE_DESCRIPTIONS['datacollector']}")
-    print()
-
-    try:
-        answer = input("[Y/n] ").strip().lower()
-    except (EOFError, KeyboardInterrupt):
-        print()
-        return False
-
-    if answer in ("", "y", "yes"):
-        return True
-    else:
-        print()
-        print("[안내] 다른 노드를 사용하시려면:")
-        for n, guide in NODE_GUIDE.items():
-            print(f"  - {guide}")
-        print()
-        return False
+    # orin·dgx: 확인 단계 없음 (VSCode remote-ssh 로 이미 올바른 노드)
+    return True
 
 
 # ---------------------------------------------------------------------------
@@ -248,22 +228,25 @@ def main() -> int:
     # flow 2+: 각 노드별 책임 모듈 호출
     if selected == "dgx":
         from flows.env_check import flow2_env_check
-        from flows.training import run_training_flow
+        from flows.mode import flow3_mode_entry
 
         script_dir = Path(args.node_config).parent.parent  # configs/ 상위 = interactive_cli/
 
-        # flow 2: 환경 체크 (기본 smoke 시나리오로 preflight — flow 3 선택 전 사전 점검)
+        # flow 2: 환경 체크 (기본 smoke 시나리오로 preflight — mode 선택 전 사전 점검)
+        # mode 인자 없이 train 체크만 수행. 수집 환경 체크 (USB·카메라) 는
+        # mode.py 에서 수집 mode 선택 시 env_check.py 재호출 (mode="collect") 로 처리.
+        # 현재 env_check.py 는 preflight_check.sh 래퍼 (mode 파라미터 추가는 §1 명세 — TODO-X2 §7).
         if not flow2_env_check(script_dir, scenario="smoke"):
             return 1  # preflight FAIL — 종료
 
-        # flow 3~5: 학습 흐름
-        return run_training_flow(script_dir)
+        # flow 3: mode 분기 (G-4 결정 — 수집/학습/종료)
+        return flow3_mode_entry(script_dir)
 
     else:
-        # orin / datacollector: 후행 todo 에서 구현
+        # orin: 후행 todo 에서 구현
         print()
         print(f"[TODO] flow 2+ ({selected} 노드 책임) — 후행 todo 에서 구현")
-        print("       env_check.py → 노드별 책임 모듈 (inference.py / teleop.py 등)")
+        print("       env_check.py → 노드별 책임 모듈 (inference.py 등)")
         return 0
 
 

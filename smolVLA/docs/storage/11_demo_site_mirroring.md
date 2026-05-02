@@ -5,7 +5,10 @@
 > 목적: 시연장 환경을 DataCollector 인근에 재현하기 위한 절차·체크리스트 문서.
 >       사용자(인간) 책임 영역과 자동화 가능 영역을 분리하여 05_leftarmVLA 진입 전
 >       1차 미러링 셋업을 완료할 수 있도록 안내한다.
-> 형제 문서: `docs/storage/10_datacollector_structure.md` (DataCollector 구조·책임 매트릭스)
+> 형제 문서: ~~`docs/storage/10_datacollector_structure.md`~~ → **legacy 이관**: `docs/storage/legacy/02_datacollector_separate_node/docs_storage_10_datacollector_structure.md`
+> 정정 (2026-05-02): 06_dgx_absorbs_datacollector 결정으로 DataCollector 노드 운영 종료.
+>       본 문서의 "DataCollector 인근 재현" 절차는 역사적 결정으로 보존.
+>       실제 운영: DGX 가 시연장 직접 이동하여 데이터 수집 수행 (미러링 = DGX 직접 이동으로 충족).
 
 ---
 

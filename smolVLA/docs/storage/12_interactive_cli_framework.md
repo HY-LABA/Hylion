@@ -3,6 +3,10 @@
 > 작성: 2026-05-01 | task-executor | TODO-F1 study cycle 1
 > 목적: 3 노드 (orin / dgx / datacollector) 공통 boilerplate 코드 정의.
 >       F2 task 가 이 문서의 §2·§3·§4 코드를 각 노드에 그대로 복사한다.
+> 정정 (2026-05-02): 06_dgx_absorbs_datacollector 사이클 결정으로 datacollector 노드 운영 종료.
+>       본 문서의 3-노드 보일러플레이트 코드는 역사적 결정으로 보존.
+>       실제 운영은 2-노드 (orin / dgx). entry.py 의 VALID_NODES·flow 1 옵션은
+>       X2 todo 에서 orin/dgx 2 옵션으로 갱신됨 (datacollector 옵션 제거).
 
 ---
 
@@ -95,10 +99,12 @@ venv: ~/smolvla/dgx/.arm_finetune
 ```
 
 ```yaml
-# datacollector 용 node.yaml
-node: datacollector
-venv: ~/smolvla/datacollector/.hylion_collector
+# datacollector 용 node.yaml  <!-- 역사적 보존: datacollector 노드는 06 사이클 결정으로 운영 종료 -->
+# node: datacollector
+# venv: ~/smolvla/datacollector/.hylion_collector
 ```
+
+> **정정 (2026-05-02)**: datacollector node.yaml 은 더 이상 사용되지 않음. DGX 가 데이터 수집 책임 흡수 (06_dgx_absorbs_datacollector 결정 A). 실제 운영 노드: orin / dgx 2개.
 
 main.sh 는 venv 경로를 node.yaml 에서 읽지 않고 **하드코드** (각 노드 복사 시 노드별로 다름). node.yaml 은 python 레이어에서 노드 식별 전용.
 

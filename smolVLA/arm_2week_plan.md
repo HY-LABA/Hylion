@@ -12,14 +12,20 @@
 
 ## 장비 역할 분담 (병렬 운영)
 
+<!-- 06_dgx_absorbs_datacollector (2026-05-02): DataCollector 별도 노드 폐기 → 3-노드 구조로 정정.
+     DataCollector (smallgaint) 자산은 docs/storage/legacy/02_datacollector_separate_node/ 로 이관.
+     DGX 가 시연장 직접 이동 운영 + 데이터 수집 + 학습 세 책임 통합. -->
+
 - `devPC`: 코드 정리/문서화/설정 관리/배포 패키지 준비
 - `Orin`: 배포 대상, 실행/검증 전용 (실제 SO-ARM 연결 테스트 포함)
-- `DGX Spark`: 학습/튜닝 주력 환경
+- `DGX Spark`: 학습/튜닝 주력 환경 + **데이터 수집 + 시연장 직접 이동 운영** (06_dgx_absorbs_datacollector 결정 — DataCollector 역할 통합)
 - `교수님 연구실 PC (Windows + GPU)`: 백업/오버플로우 전용 (DGX 병목 시 학습 분산)
+
+> *legacy: DataCollector (smallgaint Ubuntu 22.04 PC) 는 04_infra_setup 결정 시점에 별도 노드로 운영되었으나, 06_dgx_absorbs_datacollector (2026-05-02) 사이클에서 DGX 로 흡수 결정. DataCollector 자산: `docs/storage/legacy/02_datacollector_separate_node/`*
 
 운영 원칙:
 - 실시간 제어 및 현장 검증은 Orin 기준으로 판단한다.
-- 학습 성능 실험은 DGX 기준으로 판단하며, 백업 시에만 연구실 PC 를 동원한다.
+- 학습 성능 실험 및 데이터 수집은 DGX 기준으로 판단하며, 백업 시에만 연구실 PC 를 동원한다.
 - 코드는 devPC 에서 정리 → Orin/DGX 로 배포한다.
 
 ---
@@ -86,6 +92,8 @@
 
 ### [ ] 04_infra_setup
 
+<!-- *본 가정은 06_dgx_absorbs_datacollector 사이클에서 DGX 흡수로 정정됨 (2026-05-02). 본문 텍스트는 04 결정 시점 그대로 보존. DataCollector 별도 노드 가정은 이 시점에서의 역사적 결정이며, 실제 구현 단계에서 DGX 단일 노드 흡수로 전환되었음.* -->
+
 - 목표: leftarmVLA 사이클 진입 가능한 4-노드 인프라 셋업 — devPC + DataCollector(신규) + DGX + Orin
 - 배경: smolVLA 학습 정확도는 시연장 환경 미러링에 크게 의존. DGX·Orin 은 시연장과 떨어져 있어 시연장 인근의 데이터 수집 전용 노드(DataCollector) 가 필요. 결과적으로 데이터 수집(DataCollector) → 학습(DGX) → 추론(시연장 Orin) 의 분리된 흐름이 됨.
 - 주요 작업:
@@ -101,6 +109,8 @@
   - 시연장 미러링 검증 깊이 (육안 + 사진 vs 자동 검증 스크립트)
 
 ### [ ] 05_interactive_cli
+
+<!-- *본 마일스톤의 datacollector 측 flow 구현 (datacollector/interactive_cli/) 은 06_dgx_absorbs_datacollector (2026-05-02) 사이클에서 DGX 흡수로 전환됨. 05 사이클 완료 시점 기준 datacollector 노드 구현은 미완 상태 (BACKLOG D3). DGX 흡수 후 통합: dgx/interactive_cli/ 가 수집/학습 두 모드 분기 담당. 장치 선택 옵션도 datacollector 제거 → orin/dgx 2 옵션으로 축소 (06 X2 처리).* -->
 
 - 목표: orin·dgx·datacollector 세 노드 공통 대화형 CLI 게이트웨이 — 환경 체크부터 데이터 수집·전송까지 한 명령으로 진행 가능. 04 산출물 (check_hardware·run_teleoperate·sync_dataset·push_dataset_hub) 을 사용자 친화 인터페이스로 통합.
 - 주요 작업:
@@ -119,40 +129,71 @@
   - 5단계 학습 데이터 종류 옵션 (예: 단순 pick-place / 복잡 manipulation / dual-arm coordination 등)
   - orin·dgx 측 flow 의 3~7 단계 (datacollector 와 어떤 차이점 — orin 추론 검증·dgx 학습 trigger 등)
   - 공통 console 프레임워크 코드 공유 방식 (각 노드별 중복 vs 공통 모듈 import)
-- 위치: 본 마일스톤은 04 인프라의 사용자 인터페이스 통합 — 06_leftarmVLA 진입 시점에 데이터 수집을 한 명령으로 끝낼 수 있는 환경 완성. 본 마일스톤의 종착점이 06 진입 준비 완료.
+- 위치: 본 마일스톤은 04 인프라의 사용자 인터페이스 통합. 06_dgx_absorbs_datacollector 흡수 후에는 **DGX (데이터 수집 흡수)** 가 수집·학습 두 모드를 단일 진입점 (`bash dgx/interactive_cli/main.sh`) 으로 통합하여 07_leftarmVLA 진입 준비 완료.
 
-### [ ] 06_leftarmVLA
+### [ ] 06_dgx_absorbs_datacollector
+
+<!-- 신규 삽입 (2026-05-02). 기존 06~09 → 07~10 시프트. -->
+
+- 목표: DataCollector 책임을 DGX 가 흡수 — DGX 가 시연장 직접 이동 운영하며 데이터 수집 + 학습 두 책임을 모두 수행. 기존 datacollector/ 노드 자산을 legacy 이관, dgx/interactive_cli/ 가 수집·학습 두 모드 분기 지원, dgx/ 의존성·scripts 에 데이터 수집 도구 흡수.
+- 주요 결정 사항 (Phase 1 합의, 2026-05-02):
+  - A. DGX 가 시연장 직접 이동 — 04 의 "DataCollector 별도 노드" 가정 폐기
+  - B. DGX SO-ARM·카메라 USB 직결 가능 확인 (USB·dialout·v4l2 실 검증은 V1 prod)
+  - C. 옵션 α 채택 — 단일 진입점 `bash dgx/interactive_cli/main.sh`, flow 3 단계에서 수집/학습/종료 mode 분기
+  - D. 04 BACKLOG #11·#12·#13 + 05 미검증 항목 → "완료(불요)" 마킹 (M2 처리)
+  - E. CLAUDE.md 4곳 정합 갱신 완료 (Phase 1 시점 메인 직접 수정)
+  - F. 본 spec 번호 = 06, 기존 06_leftarmVLA → 07 시프트
+- 주요 작업:
+  - [그룹 L] datacollector/ 자산 → `docs/storage/legacy/02_datacollector_separate_node/` 이관
+  - [그룹 M] arm_2week_plan.md + BACKLOG.md + docs/storage/README 정합 갱신
+  - [그룹 X] dgx/interactive_cli/ 재구현 (mode.py 신규 + 수집 flow 이식) + dgx/scripts/ 흡수 + dgx/pyproject.toml + setup_env.sh extras 추가
+  - [그룹 V] DGX 시연장 이동 하드웨어 직결 검증 + 수집/학습 mode 완주 실물 검증
+- 배경:
+  - Python 3.12 차단: 05 D3 단계에서 DataCollector (Python 3.10) 가 lerobot upstream PEP 695 syntax 로 import 실패. 학교 WiFi 가 deadsnakes PPA 차단 → 우회 불가
+  - DGX 는 이미 Python 3.12.3 + `.arm_finetune` venv 운영 중 (06_dgx_venv_setting) → BACKLOG #11 자연 우회
+  - 시연장 미러링 원칙 유지: DGX 자체가 시연장 이동 → 미러링 원칙 충족. 데이터 수집 → 학습이 DGX 한 곳으로 통합, Orin 추론과 합쳐 단순 2-step 흐름
+- spec 파일: `docs/work_flow/specs/06_dgx_absorbs_datacollector.md`
+
+### [ ] 07_leftarmVLA
+
+<!-- 구 06_leftarmVLA. 06_dgx_absorbs_datacollector (2026-05-02) 삽입으로 인해 07 로 시프트.
+     "DataCollector" 역할은 DGX (데이터 수집 흡수) 로 대체됨. -->
 
 - 목표: 단일 팔 (left arm, 휴머노이드 토르소 부착) 기준 smolVLA 파인튜닝 → Orin 배포까지 한 사이클 완주
 - 주요 작업:
   - 휴머노이드 토르소 부착 SO-ARM (left arm) calibration 및 작업 영역 재정의
-  - 풀 6 DOF 유지로 데이터 수집(DataCollector) → 학습(DGX) → 시연장 Orin 배포까지 한 사이클 완주 (자유도 축소는 적용하지 않음, 02 TODO-11 결론)
-  - 데이터 수집·전송은 05 의 interactive_cli 활용
+  - 풀 6 DOF 유지로 데이터 수집 (DGX 데이터 수집 흡수) → 학습(DGX) → 시연장 Orin 배포까지 한 사이클 완주 (자유도 축소는 적용하지 않음, 02 TODO-11 결론)
+  - 데이터 수집·전송은 05 의 interactive_cli (06 흡수 후 dgx/interactive_cli/) 활용
 - 고려사항:
   - 표준 SO-ARM 책상 mount 와 다른 좌표계·관절 한계 (어깨가 토르소에 부착되어 가용 작업 공간 변화)
   - 사전학습 smolvla_base 가 표준 SO-ARM 분포로 학습된 점 → 도메인 시프트 존재
-  - 04 에서 셋업된 DataCollector 의 시연장 미러링 환경에서 데이터 수집 (학습 정확도의 핵심)
-- 위치: 본 마일스톤은 "left arm 단일팔 사이클 자체의 검증·데모" 가 목적이며, 08 양팔 학습의 사전 단계가 아니다 (08 은 양팔 데이터로 처음부터 학습).
+  - **DGX (데이터 수집 흡수)** 가 시연장 이동 환경에서 데이터 수집 (06 결정으로 DataCollector 역할 통합)
+- 위치: 본 마일스톤은 "left arm 단일팔 사이클 자체의 검증·데모" 가 목적이며, 09 양팔 학습의 사전 단계가 아니다 (09 는 양팔 데이터로 처음부터 학습).
 
-### [ ] 07_biarm_teleop_on_dgx
+### [ ] 08_biarm_teleop_on_dgx
 
-- 목표: 양팔 (left + right SO-ARM, 토르소 부착) teleoperation 데이터 수집 환경 구축 (DataCollector 기준)
+<!-- 구 07_biarm_teleop_on_dgx. 06_dgx_absorbs_datacollector (2026-05-02) 삽입으로 인해 08 로 시프트.
+     "DataCollector 기준" → "DGX (데이터 수집 흡수) 기준" 으로 정정. -->
+
+- 목표: 양팔 (left + right SO-ARM, 토르소 부착) teleoperation 데이터 수집 환경 구축 (DGX 데이터 수집 흡수 기준)
 - 주요 작업:
   - 양팔 teleop 동작 검증 (좌·우 leader → 좌·우 follower)
   - 카메라 3대 구성 확정 및 데이터 수집 (손목 좌·우 2대 + 전체 조망 1대, base 미포함)
-- 결정사항 (07 진행 중 확정):
+- 결정사항 (08 진행 중 확정):
   - 데이터셋 카메라 키 컨벤션: `observation.images.{wrist_left, wrist_right, overview}` (또는 동등)
   - `observation.state` / `action` 12 DOF 매핑: `[left_6, right_6]` 단일 키 vs 좌·우 분리 키
 - 고려사항:
-  - 카메라 3대 구성은 smolvla_base 사전학습 분포 (보통 1~2 카메라) 와 다름 → 08 학습 시 expert 학습에 가장 큰 영향
+  - 카메라 3대 구성은 smolvla_base 사전학습 분포 (보통 1~2 카메라) 와 다름 → 09 학습 시 expert 학습에 가장 큰 영향
   - 손목 카메라는 그리퍼 동작을 가까이서 촬영 → 사전학습된 SmolVLM2 vision encoder 분포와 차이
   - 양팔이 토르소에 부착된 상태에서 teleop 시 좌·우 팔 충돌 회피 작업 영역 정의 필요
 
-### [ ] 08_biarm_VLA
+### [ ] 09_biarm_VLA
+
+<!-- 구 08_biarm_VLA. 06_dgx_absorbs_datacollector (2026-05-02) 삽입으로 인해 09 로 시프트. -->
 
 - 목표: 양팔 데이터로 smolVLA 파인튜닝 → 양팔 추론 동작 검증
 - 주요 작업:
-  - 07 에서 수집한 양팔 12 DOF + 카메라 3대 구성 데이터로 smolVLA 파인튜닝 (단일팔에서 전이하지 않고 양팔 데이터로 처음부터 학습)
+  - 08 에서 수집한 양팔 12 DOF + 카메라 3대 구성 데이터로 smolVLA 파인튜닝 (단일팔에서 전이하지 않고 양팔 데이터로 처음부터 학습)
 - 고려사항:
   - SmolVLA `max_state_dim=32` / `max_action_dim=32` padding 으로 12 DOF 양팔 수용 가능 (코드 차원 확인 완료, `docs/lerobot_study/03_smolvla_architecture.md` §A·§E 참조)
   - 카메라 3대 → smolvla_base 사전학습 분포 차이로 vision/connector 까지 푸는 풀 파인튜닝(S3) 검토 필요할 수 있음. 첫 시도는 표준 파인튜닝(S1) 부터.
@@ -160,7 +201,9 @@
 - 비상 옵션:
   - 잘 안되면 머리 위에 더듬이 카메라 다는 것 고려 (조망 카메라 보강)
 
-### [ ] 09_biarm_deploy
+### [ ] 10_biarm_deploy
+
+<!-- 구 09_biarm_deploy. 06_dgx_absorbs_datacollector (2026-05-02) 삽입으로 인해 10 으로 시프트. -->
 
 - 목표: 양팔 VLA 정책을 시연장 Orin 에 배포하여 최종 데모 가능 상태로 완성
 - 고려사항:

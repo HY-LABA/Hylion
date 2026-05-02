@@ -12,8 +12,14 @@
   - 14_dgx_cli_flow.md §2~§5 (X1 산출물)
   - dgx/scripts/smoke_test.sh — 직접 Read (line 44~45, 68~81)
   - dgx/scripts/save_dummy_checkpoint.sh — 직접 Read (line 25, 62~63)
-  - scripts/sync_ckpt_dgx_to_datacollector.sh — 직접 Read (line 6~36)
-    (devPC 전용 스크립트 — DGX 에서 직접 호출 X, 안내 출력만)
+
+갱신 (2026-05-02, TODO-X2):
+  - sync_ckpt_dgx_to_datacollector.sh 인용 제거
+    사유: DataCollector 노드 운영 종료 (06 결정). DGX → DataCollector 케이스 무효.
+    대체: 케이스 3 안내를 "ckpt sync DGX→Orin 은 차기 사이클 신규" 메시지로 교체.
+    영향 라인: L15·L54·L70·L72·L92·L494·L497 (7건) — 모두 아래와 같이 정정.
+  - run_training_flow_with_dataset(script_dir, dataset_name) 시그니처 추가
+    G-4 학습 전환 시 방금 수집한 dataset_name 을 dataset_id 로 자동 선택.
 """
 
 import subprocess
@@ -51,7 +57,11 @@ SCENARIOS = {
 SMOKE_DEFAULT_DATASET = "lerobot/svla_so100_pickplace"
 DEFAULT_POLICY_PATH = "lerobot/smolvla_base"
 
-# ckpt 케이스 안내 (sync_ckpt_dgx_to_datacollector.sh line 19~22 인용)
+# ckpt 케이스 안내
+# 갱신 (2026-05-02, TODO-X2):
+#   sync_ckpt_dgx_to_datacollector.sh 인용 제거 — DataCollector 노드 운영 종료 (06 결정).
+#   케이스 3 (DataCollector 우회) 무효 → "차기 사이클 신규" 안내로 교체.
+#   케이스 4 각주에서 sync_ckpt_dgx_to_datacollector.sh 라인 인용 제거.
 CKPT_CASES = {
     "1": {
         "label": "케이스 1·2 — Orin 과 동일 네트워크 / devPC 2-hop",
@@ -64,15 +74,13 @@ CKPT_CASES = {
         ),
     },
     "2": {
-        "label": "케이스 3 — 시연장 Orin 인터넷 격리 (DataCollector 우회)",
+        "label": "케이스 3 — 시연장 Orin 인터넷 격리 (ckpt sync 신규 예정)",
         "guide": (
-            "devPC 에서 실행:\n"
-            "  bash smolVLA/scripts/sync_ckpt_dgx_to_datacollector.sh\n"
-            "  또는 특정 run 지정:\n"
-            "  bash smolVLA/scripts/sync_ckpt_dgx_to_datacollector.sh --run <run_name>\n"
+            "[안내] DataCollector 노드가 06 결정으로 운영 종료됨.\n"
+            "  DGX → DataCollector 우회 경로는 현재 무효입니다.\n"
             "\n"
-            "  이후 DataCollector -> Orin 전송은 DataCollector 에서 수동 수행.\n"
-            "  (docs/storage/others/ckpt_transfer_scenarios.md §3 참조)\n"
+            "  DGX → Orin 직접 ckpt sync 스크립트는 차기 사이클 (07_leftarmVLA) 에서 신규 작성 예정.\n"
+            "  현재는 케이스 1·2 (동일 네트워크 또는 devPC 2-hop) 또는 케이스 4 (USB) 를 사용하세요.\n"
         ),
     },
     "3": {
@@ -80,7 +88,8 @@ CKPT_CASES = {
         "guide": (
             "전송 방법:\n"
             "  docs/storage/others/ckpt_transfer_scenarios.md 에서\n"
-            "  케이스 1~4 중 해당하는 절차를 따르세요.\n"
+            "  케이스 1·2·4 중 해당하는 절차를 따르세요.\n"
+            "  (케이스 3 DataCollector 우회는 06 결정으로 무효 — 차기 사이클 신규 예정)\n"
         ),
     },
     "4": {
@@ -88,9 +97,6 @@ CKPT_CASES = {
         "guide": (
             "USB 드라이브 절차:\n"
             "  docs/storage/others/ckpt_transfer_scenarios.md §4 를 따르세요.\n"
-            "\n"
-            "  (sync_ckpt_dgx_to_datacollector.sh line 22 인용:\n"
-            "   케이스 4: Orin USB 드라이브만 가능 → USB 절차)\n"
         ),
     },
 }
@@ -491,14 +497,13 @@ def _show_ckpt_management(output_dir: str | None) -> None:
 
     14_dgx_cli_flow.md §5-3 ckpt 전송 분기 UI:
       케이스 1·2 → devPC 에서 sync_ckpt_dgx_to_orin.sh 실행
-      케이스 3   → devPC 에서 sync_ckpt_dgx_to_datacollector.sh 실행
+      케이스 3   → 차기 사이클 신규 예정 (DataCollector 우회 무효 — 06 결정)
       나중에     → 안내만
 
-    sync_ckpt_dgx_to_datacollector.sh line 19~22 케이스 설명 인용:
-      케이스 1: 동일 광역 네트워크 → sync_ckpt_dgx_to_orin.sh 직접
-      케이스 2: Orin 인터넷 가능, 다른 서브넷 → 2-hop
-      케이스 3: Orin 인터넷 격리 → 본 스크립트 (DataCollector 우회)
-      케이스 4: USB 드라이브
+    갱신 (2026-05-02, TODO-X2):
+      케이스 설명 출처를 sync_ckpt_dgx_to_datacollector.sh 에서
+      docs/storage/others/ckpt_transfer_scenarios.md 로 변경.
+      (DataCollector 노드 운영 종료 — 스크립트 legacy 이관)
     """
     print()
     print("=" * 60)
@@ -659,6 +664,56 @@ def run_training_flow(script_dir: Path) -> int:
         dataset_repo_id = flow4_select_dataset(script_dir, scenario)
         if dataset_repo_id is None:
             return 0  # 사용자 종료 선택
+
+        # flow 5: 학습 + ckpt 관리
+        success = flow5_train_and_manage_ckpt(script_dir, scenario, dataset_repo_id)
+
+        return 0 if success else 1
+
+    except KeyboardInterrupt:
+        print()
+        print("[training] Ctrl+C — 종료합니다.")
+        return 0
+
+
+def run_training_flow_with_dataset(
+    script_dir: Path,
+    dataset_name: str | None = None,
+) -> int:
+    """flow 3~5 순차 실행 — G-4 수집 후 학습 전환 시 dataset_name 자동 선택.
+
+    mode.py 의 G-4 학습 전환 prompt 에서 호출:
+      from flows.training import run_training_flow_with_dataset
+      return run_training_flow_with_dataset(script_dir, dataset_name=dataset_name)
+
+    dataset_name 이 주어지면 flow 4 에서 자동 선택 (사용자 입력 없이 진행).
+    dataset_name 이 None 이면 run_training_flow 와 동일 (flow 4 사용자 입력).
+
+    Args:
+        script_dir: dgx/interactive_cli/ 디렉터리 경로
+        dataset_name: 방금 수집한 데이터셋 이름 (repo_id 의 <name> 부분)
+                      G-4 에서 ~/smolvla/dgx/data/<dataset_name> 로 자동 매핑.
+
+    Returns:
+        0: 정상 완료 / 1: 오류 또는 사용자 중단
+    """
+    try:
+        # flow 3: 시나리오 선택
+        scenario = flow3_select_scenario(script_dir)
+        if scenario is None:
+            return 0
+
+        # flow 4: 데이터셋 선택 (dataset_name 자동 선택 또는 사용자 입력)
+        if dataset_name and scenario != "smoke":
+            # G-4: 방금 수집한 데이터셋 자동 선택
+            local_path = f"~/smolvla/dgx/data/{dataset_name}"
+            print()
+            print(f"[training] 방금 수집한 데이터셋 자동 선택: {local_path}")
+            dataset_repo_id = local_path
+        else:
+            dataset_repo_id = flow4_select_dataset(script_dir, scenario)
+            if dataset_repo_id is None:
+                return 0
 
         # flow 5: 학습 + ckpt 관리
         success = flow5_train_and_manage_ckpt(script_dir, scenario, dataset_repo_id)

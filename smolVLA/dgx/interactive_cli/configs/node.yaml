@@ -1,7 +1,12 @@
 # dgx 노드 식별자 + 환경 설정
 # F2 task 산출물 — 2026-05-01
+# 갱신: 2026-05-02 (TODO-X2) — responsibilities 에 data_collection 추가
+#         (06_dgx_absorbs_datacollector 결정: DGX 가 학습 + 데이터 수집 두 책임 흡수)
 #
 # 주의: venv 경로는 main.sh 에 하드코드 (bash 레이어 전용).
 #       본 파일의 venv 는 python 레이어에서 참조 전용.
 node: dgx
 venv: ~/smolvla/dgx/.arm_finetune
+responsibilities:
+  - training
+  - data_collection

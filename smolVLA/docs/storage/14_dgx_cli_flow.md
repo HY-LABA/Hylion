@@ -1,38 +1,23 @@
 # 14_dgx_cli_flow.md
 
-> 작성: 2026-05-01 | task-executor | TODO-X1 study cycle 1
-> 목적: dgx/interactive_cli/flows/training.py 의 설계 입력.
->       X2 task 는 본 문서의 §3~§6 결정(사용자 합의 후)대로 구현한다.
+> 작성: 2026-05-01 | task-executor | TODO-X1 study cycle 1 (05 spec 학습 flow 원안)
+> 갱신: 2026-05-02 | task-executor | TODO-X1 study cycle 1 (06 spec — 학습+수집 통합)
+> 목적: dgx/interactive_cli/ 의 통합 flow 설계 입력.
+>       X2 task 는 본 문서의 §1~§5 결정(사용자 결정 G·H 후)대로 구현한다.
 
 ---
 
-## §1 flow 2 (환경 체크 — preflight_check.sh 활용) 동작
+## §1 flow 2 환경 체크 — 학습·수집 통합
 
 ### 1-1) 위치
 
-F1 boilerplate (entry.py flow 0·1) 이후 `env_check.py` 가 담당.
-dgx 의 `env_check.py` 는 `preflight_check.sh` 를 subprocess 로 호출하는 래퍼.
+flow 0·1 (entry.py boilerplate) 이후 `env_check.py` 가 담당.
+DGX 가 학습 + 수집 두 책임을 모두 흡수하므로 flow 2 는 두 환경을 통합 체크.
 
-### 1-2) preflight_check.sh 직접 Read 결과 (인용)
+### 1-2) 학습 환경 체크 (기존 — 05 TODO-X1 확정)
 
-`dgx/scripts/preflight_check.sh` line 1~36 인용:
+`dgx/scripts/preflight_check.sh` 기반 5단계:
 
-```bash
-# 사용:
-#   bash preflight_check.sh smoke   # 1 step 검증용 (필요 메모리 20 GB)
-#   bash preflight_check.sh s1      # 04 / 06 1차 학습 (35 GB)
-#   bash preflight_check.sh s3      # 06 2차 학습 — VLM 까지 풀 학습 (65 GB)
-#   bash preflight_check.sh lora    # LoRA fallback (28 GB)
-#
-# 통과 조건 (모두 만족해야 exit 0):
-#   1. HF_HOME 격리 경로로 설정됨
-#   2. venv 가 활성화돼 있고 SmolVLA venv 임
-#   3. 가용 메모리(가용 RAM = MemAvailable) >= 필요 메모리 + 안전 마진(10 GB)
-#   4. Walking RL 프로세스가 보호 정책 준수 (정보 출력만, 절대 kill X)
-#   5. Ollama gemma3 미로드 (또는 사용자 명시 동의)
-```
-
-5가지 체크 항목:
 | # | 체크 | FAIL 조건 |
 |---|---|---|
 | 1 | venv / 환경변수 격리 | VIRTUAL_ENV 미일치 또는 HF_HOME 미설정 또는 CUDA_VISIBLE_DEVICES != "0" |
@@ -41,309 +26,510 @@ dgx 의 `env_check.py` 는 `preflight_check.sh` 를 subprocess 로 호출하는 
 | 4 | Ollama GPU 점유 | nvidia-smi 에 ollama 프로세스 있으면 FAIL |
 | 5 | 디스크 가용량 | /home/laba 가용 < 50 GiB |
 
-### 1-3) env_check.py 구현 패턴 (X2 입력)
+`preflight_check.sh` 인용 (line 22~32):
+```bash
+# 사용:
+#   bash preflight_check.sh smoke   # 1 step 검증용 (필요 메모리 20 GB)
+#   bash preflight_check.sh s1      # 04 / 06 1차 학습 (35 GB)
+#   bash preflight_check.sh s3      # 06 2차 학습 — VLM 까지 풀 학습 (65 GB)
+#   bash preflight_check.sh lora    # LoRA fallback (28 GB)
+```
 
-F1 §5 (`docs/storage/12_interactive_cli_framework.md`) 의 orin env_check.py 패턴을 dgx 에 맞게 변형:
+### 1-3) 수집 환경 체크 (신규 — 06 TODO-X1 추가)
+
+수집 mode 진입 전 추가로 확인할 항목:
+
+| # | 체크 | 대응 |
+|---|---|---|
+| 6 | USB 포트 존재 | `/dev/ttyACM0` (leader), `/dev/ttyACM1` (follower) 존재 확인 |
+| 7 | dialout 그룹 | `groups` 명령으로 현재 사용자의 dialout 멤버십 확인 |
+| 8 | v4l2 카메라 | `/dev/video*` 디바이스 존재 + OpenCV 인덱스 probe |
+| 9 | SO-ARM 포트 응답 | `lerobot-find-port` 비대화형 호출 또는 pyserial serial.Serial 임시 open 검증 |
+
+비고:
+- 체크 항목 6~9는 수집 mode 선택 후 진입 시에만 실행 (학습 mode 선택 시 skip).
+- env_check.py 는 mode 인자 (`"collect"` / `"train"`) 를 받아 해당 체크만 실행.
+- 패턴 기반: `docs/storage/legacy/02_datacollector_separate_node/docs_storage_15_datacollector_cli_flow.md §1` 의 datacollector env_check 5단계 미러 (venv→항목1·2 대신 6~9로 대체).
+
+### 1-4) env_check.py 구현 패턴 (X2 입력)
 
 ```python
 # dgx/interactive_cli/flows/env_check.py — X2 구현 시 참고
 import subprocess, sys
 from pathlib import Path
 
-def run_env_check(script_dir: Path, scenario: str = "smoke") -> bool:
-    """preflight_check.sh 를 subprocess 로 호출.
+def flow2_env_check(script_dir: Path, scenario: str = "smoke", mode: str = "train") -> bool:
+    """preflight_check.sh 호출 (학습 공통) + 수집 추가 체크 (mode="collect" 시).
 
     Args:
         script_dir: interactive_cli/ 디렉터리 경로
-        scenario:   "smoke"|"s1"|"s3"|"lora" (사용자가 선택하거나 기본값 smoke)
+        scenario:   "smoke"|"s1"|"s3"|"lora" (학습 시나리오)
+        mode:       "train"|"collect" — 수집 mode 시 USB·카메라·SO-ARM 추가 체크
 
     Returns:
-        True: preflight PASS / False: FAIL
+        True: PASS / False: FAIL
     """
     preflight = script_dir.parent / "scripts" / "preflight_check.sh"
-    result = subprocess.run(
-        ["bash", str(preflight), scenario],
-        check=False
-    )
-    return result.returncode == 0
-```
+    result = subprocess.run(["bash", str(preflight), scenario], check=False)
+    if result.returncode != 0:
+        return False
 
-비고: `setup_train_env.sh` (line 51: `source "${VENV_DIR}/bin/activate"`) 는 flow 2 이전에 main.sh 에서 이미 호출됨. env_check 에서 재호출 불필요.
+    if mode == "collect":
+        return _check_hardware_collect()
+    return True
+
+
+def _check_hardware_collect() -> bool:
+    """수집 환경 하드웨어 체크 (항목 6~9).
+    datacollector env_check.py §1 미러 (dgx 경로 맞춤).
+    """
+    ...  # X2 구현 — USB 포트, dialout, v4l2, SO-ARM 포트 체크
+```
 
 ---
 
-## §2 flow 3~ 후보 옵션 정리
+## §2 flow 3 mode 분기 — 사용자 결정 G 대상
 
-### 2-1) 분석 기반
+### 2-1) 배경
 
-직접 Read 한 스크립트:
-- `dgx/scripts/preflight_check.sh` — 5체크 게이트
-- `dgx/scripts/smoke_test.sh` — lerobot-train --steps=1 (5~15분, 다운로드 포함)
-- `dgx/scripts/save_dummy_checkpoint.sh` — --save_checkpoint=true steps=1
-- `scripts/sync_ckpt_dgx_to_datacollector.sh` — 케이스 3 우회 전송
-- `docs/storage/09_dgx_structure.md` — dgx/ 책임 매트릭스
+06 spec 결정 C: 단일 진입점 `bash dgx/interactive_cli/main.sh` + flow 3 단계에서
+*수집 / 학습 / 종료* mode 질문 분기 (옵션 α).
 
-### 2-2) 후보 A — 4단계 순차
+flow 2 (env_check) 완료 후 사용자에게 mode 선택 메뉴를 제시.
+
+### 2-2) 후보 G-1 — 단발 종료 (한 mode 진행 후 CLI 종료)
 
 ```
-flow 3: preflight 재확인 (시나리오 선택 포함)
-flow 4: 데이터셋 선택 (HF Hub repo_id / 로컬 rsync 결과 중 선택)
-flow 5: 학습 trigger (smoke → 실 학습 분기, 사용자 동의 게이트 포함)
-flow 6: 체크포인트 관리 (저장 경로 확인 + sync_ckpt 호출 분기)
+[flow 3] 무엇을 하겠습니까?
+  (1) 데이터 수집 → flow 4~7 (teleop → record → transfer)
+  (2) 학습        → flow 3~5 (시나리오 선택 → 데이터셋 → 학습+ckpt)
+  (3) 종료
 ```
 
-특징:
-- 각 단계가 명확히 분리 → 단계별 재실행·스킵 쉬움
-- 사용자가 flow 5 직전에 명시적 동의 → smoke_test 5~15분 + 다운로드 제어 가능
-- flow 6 에서 sync_ckpt_dgx_to_datacollector 호출 여부를 사용자가 결정
-
-### 2-3) 후보 B — 2단계 통합
-
-```
-flow 3: preflight + 학습 trigger 통합
-         (preflight 통과 즉시 smoke 또는 실 학습 시작 — 사용자 동의 1회)
-flow 4: ckpt 관리 (로컬 확인 + 전송 분기)
-```
-
-특징:
-- 단계 수 감소 → UX 단순
-- 데이터셋 선택·ckpt 전송은 CLI 외부 (인자로 직접 지정) → 숙련 사용자에 적합
-- smoke_test 5~15분 실행이 통합 게이트에 숨겨짐 → 첫 사용자에게 불명확
-
-### 2-4) 후보 C — 3단계 (환경 + 데이터셋 + 학습·ckpt 통합)
-
-```
-flow 3: preflight 재확인 + 시나리오 선택 (smoke/s1/s3/lora)
-flow 4: 데이터셋 선택 (HF Hub repo_id / 로컬)
-flow 5: 학습 + ckpt 관리 통합
-         smoke 선택 시 → smoke_test.sh 호출 (동의 게이트 포함)
-         실 학습 선택 시 → lerobot-train 직접 호출 + --save_checkpoint=true + ckpt 전송 분기
-```
-
-특징:
-- 데이터셋 선택을 명시적으로 분리 (HF Hub / 로컬 datacollector/ rsync 결과)
-- 학습·ckpt 관리를 flow 5 한 단계에서 처리 → 흐름이 자연스러움
-- smoke test 사용자 동의 게이트를 flow 5 시작 시 노출
-
-### 2-5) 옵션 비교 표
-
-| 항목 | 후보 A (4단계) | 후보 B (2단계) | 후보 C (3단계) |
-|---|---|---|---|
-| 단계 수 | 4 | 2 | 3 |
-| 데이터셋 선택 UI | flow 4 포함 | CLI 외부 (인자 지정) | flow 4 포함 |
-| smoke 동의 게이트 위치 | flow 5 진입 전 | flow 3 통합 (숨겨짐) | flow 5 진입 전 |
-| ckpt 관리 | flow 6 분리 | flow 4 통합 | flow 5 통합 |
-| 숙련도 요구 | 낮음 (안내 충분) | 높음 (인자 직접 지정) | 중간 |
-| X2 구현 복잡도 | 높음 | 낮음 | 중간 |
-
----
-
-## §3 데이터셋 선택 메커니즘 (§4 학습 trigger 전 입력)
-
-### 3-1) 후보 소스
-
-| 소스 | 형식 | 레퍼런스 |
-|---|---|---|
-| HF Hub repo_id | `lerobot/svla_so100_pickplace` 형식 | smoke_test.sh line 68: `--dataset.repo_id=lerobot/svla_so100_pickplace` |
-| 로컬 rsync 결과 | `~/smolvla/dgx/datasets/<name>` | 09_dgx_structure.md §4-3 (HF Hub vs rsync 직접 — T1 미결) |
-| 04 T1 dummy push 결과 | `<HF_USER>/dummy_so100_...` | T1 DataCollector push_dataset_hub.sh — HF Hub 경로 |
-
-### 3-2) smoke_test.sh 의 하드코드 데이터셋
-
-`smoke_test.sh` line 68~69 인용:
-```bash
-lerobot-train \
-    --policy.path=lerobot/smolvla_base \
-    --dataset.repo_id=lerobot/svla_so100_pickplace \
-```
-
-smoke test 는 고정 데이터셋 (`lerobot/svla_so100_pickplace`) 사용. 최초 실행 시 100MB 이상 다운로드 가능 — CLAUDE.md §prod-test-runner 자율성 "큰 다운로드 (>100MB) 는 사용자 동의 필요" 해당.
-
-### 3-3) 실 학습 데이터셋 선택 UI 후보
-
-후보 A (대화형 입력):
-```
-어떤 데이터셋으로 학습하겠습니까?
-1. HF Hub repo_id 직접 입력
-2. 로컬 ~/smolvla/dgx/datasets/ 에서 선택
-3. 기본 smoke test 데이터셋 사용 (lerobot/svla_so100_pickplace)
-```
-
-후보 B (인자 직접 지정):
-```bash
-bash dgx/interactive_cli/main.sh --dataset lerobot/svla_so100_pickplace
-```
-
-후보 A 가 interactive_cli 취지에 맞음 (단계별 안내). 후보 B 는 숙련 사용자용 단축 경로로 병행 제공 가능.
-
-### 3-4) config/dataset_repos.json 연동
-
-`dgx/config/dataset_repos.json` (04 X2 신규 — placeholder):
-- DataCollector 에서 수신하는 HF 데이터셋 repo_id 목록
-- interactive_cli flow 4 에서 이 파일을 읽어 선택지로 제공 가능
-- 현재 T1 미결 (HF Hub vs rsync) — 스키마 확정 후 X2 구현
-
----
-
-## §4 학습 trigger (smoke_test 사용자 동의 게이트 위치 / 실 학습 호출)
-
-### 4-1) smoke_test.sh 직접 Read 결과
-
-`dgx/scripts/smoke_test.sh` 핵심 구조 인용:
-
-```bash
-# line 24~32: preflight → 1-step 학습
-bash "${DGX_DIR}/scripts/preflight_check.sh" smoke || exit 1
-
-# line 44~45: 소요 시간 경고
-echo "  최초 실행 시 모델·데이터셋 다운로드로 5~15분 소요됩니다."
-
-# line 68~81: lerobot-train --steps=1 --save_checkpoint=false
-lerobot-train \
-    --policy.path=lerobot/smolvla_base \
-    --dataset.repo_id=lerobot/svla_so100_pickplace \
-    --steps=1 \
-    --save_checkpoint=false \
+mode.py 구조 (단발):
+```python
+def flow3_select_mode() -> str | None:
+    """단발 종료 — 한 mode 실행 후 리턴."""
+    # 선택 → mode 실행 → return
+    # 재진입 루프 없음
     ...
 ```
 
-`save_dummy_checkpoint.sh` 의 차이점 (line 63: `--save_checkpoint=true`, line 62: `--save_freq=1`):
-- smoke_test → 검증 전용 (저장 X)
-- save_dummy_checkpoint → ckpt 생성 목적 (저장 O)
+특징:
+- 구현 단순. 수집 후 학습하려면 CLI 재시작 필요.
+- UX: 초보자에게 명확 (한 번에 한 가지 일)
+- 제약: 수집→학습 연속 흐름을 한 세션에서 달성 불가
 
-### 4-2) 사용자 동의 게이트 위치 결정 (X1 핵심)
-
-smoke_test.sh 호출 전 interactive_cli 내부에서 동의 게이트 포함 여부:
-
-**포함 (권고)**: interactive_cli 가 "smoke test 는 5~15분 소요 + 최초 실행 시 svla_so100_pickplace 다운로드가 발생합니다. 계속하겠습니까? [Y/n]" prompt 제공.
-- CLAUDE.md 자율성 정책 ("큰 다운로드 >100MB 사용자 동의 필요") 충족
-- 사용자가 실수로 학습 trigger 방지
-
-**미포함**: smoke_test.sh 자체 경고 메시지 (line 44~45) 에 의존.
-- interactive_cli 를 통하지 않는 직접 호출과 동일한 경험
-
-**결정 필요**: 사용자 합의 후 X2 구현에서 결정.
-
-### 4-3) 학습 단계 분기 구조 (후보)
+### 2-3) 후보 G-2 — 재진입 루프 (mode 완료 후 메뉴 재출력)
 
 ```
-flow 5 진입 시:
-  1. "smoke test 로 검증 먼저 하겠습니까, 실 학습으로 바로 진행하겠습니까?"
-     → (a) smoke test: 동의 게이트 → smoke_test.sh 호출 → 결과 출력
-     → (b) 실 학습:    시나리오 선택 (s1/s3/lora) → preflight (해당 메모리 기준) → lerobot-train 호출
-
-  2. 실 학습 옵션 파라미터:
-     --policy.path     (기본: lerobot/smolvla_base)
-     --dataset.repo_id (§3 선택 결과)
-     --steps           (사용자 입력 또는 기본값)
-     --save_checkpoint (항상 true — ckpt 관리 flow 6 에서 사용)
-     --output_dir      (기본: dgx/outputs/train/<run_name>)
-     --wandb.enable    (사용자 선택)
+[flow 3] 무엇을 하겠습니까?
+  (1) 데이터 수집
+  (2) 학습
+  (3) 종료
 ```
+
+mode 완료 후 다시 flow 3 메뉴로 돌아옴. `(3) 종료` 선택 시 CLI 종료.
+
+mode.py 구조 (루프):
+```python
+def flow3_mode_loop(script_dir: Path) -> int:
+    """재진입 루프 — mode 완료 후 메뉴 재출력."""
+    while True:
+        mode = _ask_mode()          # (1)/(2)/(3)
+        if mode is None or mode == "exit":
+            return 0
+        if mode == "collect":
+            _run_collect_flow(script_dir)   # flow 4~7
+        elif mode == "train":
+            _run_train_flow(script_dir)     # flow 3~5 (기존 training.py 흐름)
+        # 완료 후 루프 재진입
+```
+
+특징:
+- 수집 후 학습, 학습 후 다시 수집 — 한 세션에서 가능
+- UX: 세션 유지 편리. 단, 각 mode 진입 시 env_check 재실행 여부 결정 필요
+- 구현 복잡도: 중간 (루프 상태 관리 + 오류 시 재진입 보장)
+
+### 2-4) 후보 G-3 — 수집→학습 직렬 옵션 추가
+
+```
+[flow 3] 무엇을 하겠습니까?
+  (1) 데이터 수집 후 바로 학습 (수집→학습 직렬 실행)
+  (2) 데이터 수집만
+  (3) 학습만
+  (4) 종료
+```
+
+mode.py 구조:
+```python
+def flow3_select_mode() -> str | None:
+    """4 옵션 단발 — (1) collect_then_train, (2) collect, (3) train, (4) exit."""
+    ...
+
+def run_collect_then_train(script_dir: Path) -> int:
+    """수집 완료 후 자동으로 학습 flow 진입."""
+    rc = run_collect_flow(script_dir)
+    if rc == 0:
+        print("[mode] 수집 완료 → 학습 flow 자동 진입")
+        return run_train_flow(script_dir)
+    return rc
+```
+
+특징:
+- 수집→학습 자연 흐름 옵션 추가 (시연장에서 수집 직후 학습까지 원클릭)
+- UX: 파워 유저 대상. 초보자에게 복잡할 수 있음
+- 제약: 수집 데이터셋이 곧바로 학습 데이터셋으로 연결되는 자동 전달 로직 필요
+
+### 2-5) mode.py 코드 구조 비교
+
+| 항목 | G-1 단발 | G-2 루프 | G-3 직렬 옵션 |
+|---|---|---|---|
+| 메뉴 항목 수 | 3 | 3 | 4 |
+| 수집→학습 연속 | 불가 (재시작) | 가능 (루프) | 가능 (직렬 옵션) |
+| mode.py 복잡도 | 낮음 | 중간 | 중간 |
+| env_check 재실행 | 불필요 | 필요 고려 | 필요 고려 |
+| 권장 사용자 | 초보자 | 일반 | 파워 유저 |
+| X2 구현 복잡도 | 낮음 | 중간 | 중간 |
+
+**trade-off 요약**:
+- G-1: 가장 단순·명확. 수집→학습 연속은 CLI 재시작. DataCollector 단독 운영 시 패턴과 동일
+- G-2: 한 세션에서 mode 전환 가능. 루프 상태 관리 필요. 시연장 운영 시 편리
+- G-3: 수집→학습 원클릭 + 분리 옵션 병존. 옵션 수 증가. 직렬 흐름 자동화 경로 확보
 
 ---
 
-## §5 체크포인트 관리 (저장·전송 — sync_ckpt_dgx_to_datacollector 호출 분기)
+## §3 수집 mode flow 3·4·5·6·7 — datacollector 이식
 
-### 5-1) 저장 경로 구조
+### 3-1) 전체 흐름 (datacollector flow 2~7 이식)
+
+mode = "수집" 선택 시 진입. 수집 환경 체크 (§1 항목 6~9) 후:
+
+```
+[수집 mode]
+flow 3(수집): 텔레오퍼레이션 실행 (teleop.py)
+    ↓
+flow 4(수집): 텔레오퍼레이션 완료 확인 (teleop.py 내 flow4_confirm_teleop)
+    ↓
+flow 5(수집): 학습 종류 선택 (data_kind.py)
+    ↓
+flow 6(수집): lerobot-record 실행 (record.py)
+    ↓
+flow 7(수집): 전송 방식 선택 (transfer.py — H 결정 적용)
+```
+
+### 3-2) teleop.py 이식 변경 사항
+
+원본: `legacy/02_datacollector_separate_node/datacollector/interactive_cli/flows/teleop.py`
+
+이식 시 변경 필요 항목:
+
+| 항목 | datacollector 원본 | dgx 이식 후 |
+|---|---|---|
+| scripts/ 경로 | `script_dir.parent.parent / "scripts" / "run_teleoperate.sh"` | 동일 패턴 유지 (dgx/scripts/ 로 경로 자동 해석) |
+| venv 전제 | `.hylion_collector` | `.arm_finetune` (main.sh 에서 이미 activate) |
+| 스크립트 존재 | `datacollector/scripts/run_teleoperate.sh` | `dgx/scripts/run_teleoperate.sh` (X3 이식 대상) |
+| flow 번호 표기 | flow 3, flow 4 | mode 분기 후 수집 flow 번호 (G 결정에 따라 재번호 가능) |
+
+`teleop.py` 핵심 함수 시그니처 (그대로 재사용):
+```python
+def flow3_teleoperate(script_dir: Path) -> int: ...
+def flow4_confirm_teleop(script_dir: Path, prev_returncode: int) -> bool: ...
+```
+
+### 3-3) data_kind.py 이식 변경 사항
+
+원본: `legacy/02_datacollector_separate_node/datacollector/interactive_cli/flows/data_kind.py`
+
+`DATA_KIND_OPTIONS` 딕셔너리 (5개 옵션) 그대로 재사용 가능:
+```python
+# data_kind.py line 31~72: DATA_KIND_OPTIONS — 변경 불필요
+DATA_KIND_OPTIONS: dict[int, dict] = {
+    1: {"name": "단순 pick-place", "single_task": "Pick up the object and place it in the target area.", ...},
+    2: {"name": "push (밀기)", ...},
+    3: {"name": "stack (쌓기)", ...},
+    4: {"name": "drawer open/close", ...},
+    5: {"name": "handover (물건 전달)", ...},
+}
+```
+
+`DataKindResult` NamedTuple 및 `flow5_select_data_kind()` 함수 그대로 재사용.
+변경 항목: 없음 (데이터 종류 상수·로직 독립적).
+
+### 3-4) record.py 이식 변경 사항
+
+원본: `legacy/02_datacollector_separate_node/datacollector/interactive_cli/flows/record.py`
+
+| 항목 | datacollector 원본 | dgx 이식 후 |
+|---|---|---|
+| `data_root` 경로 | `~/smolvla/datacollector/data/<dataset_name>` (line 194) | `~/smolvla/dgx/data/<dataset_name>` |
+| `run_teleoperate.sh` 포트 상수 | `FOLLOWER_PORT="/dev/ttyACM1"`, `LEADER_PORT="/dev/ttyACM0"` (그대로) | 동일 |
+| `ROBOT_TYPE` / `TELEOP_TYPE` | `"so101_follower"` / `"so101_leader"` (그대로) | 동일 |
+| draccus 인자 | `lerobot_record.py DatasetRecordConfig` 기반 (그대로) | 동일 |
+
+레퍼런스 직접 인용 (record.py line 157~216 `build_record_args` 패턴 그대로):
+```python
+def build_record_args(
+    data_kind_choice: int,
+    repo_id: str,
+    num_episodes: int,
+    cam_wrist_left_index: int = 0,
+    cam_overview_index: int = 1,
+) -> list[str]:
+    ...
+    data_root = os.path.expanduser(f"~/smolvla/dgx/data/{dataset_name}")  # 경로 변경
+    ...
+```
+
+`lerobot-record` draccus 인자 고정 부분 (레퍼런스 인용 — `docs_storage_15_datacollector_cli_flow.md §4` 확정값):
+
+| 인자 | 값 | 근거 |
+|---|---|---|
+| `--robot.type` | `so101_follower` | run_teleoperate.sh line 29 |
+| `--robot.port` | `/dev/ttyACM1` | run_teleoperate.sh line 19 (FOLLOWER_PORT) |
+| `--robot.id` | `my_awesome_follower_arm` | run_teleoperate.sh line 21 |
+| `--teleop.type` | `so101_leader` | run_teleoperate.sh line 35 |
+| `--teleop.port` | `/dev/ttyACM0` | run_teleoperate.sh line 20 (LEADER_PORT) |
+| `--teleop.id` | `my_awesome_leader_arm` | run_teleoperate.sh line 22 |
+| `--dataset.push_to_hub` | `false` | flow 7 에서 별도 처리 |
+| `--dataset.streaming_encoding` | `true` | lerobot_record.py line 33 예시 |
+| `--dataset.encoder_threads` | `2` | lerobot_record.py line 33 예시 |
+| `--dataset.fps` | `30` | DatasetRecordConfig.fps 기본값 |
+| `--robot.cameras` | `{wrist_left: ..., overview: ...}` + `fourcc: MJPG` | USB 2.0 대역 절약 (record.py line 183~189 주석) |
+
+### 3-5) flow 7 전송 분기 (H 결정 대상 — §5 참조)
+
+transfer.py 의 3분기 메뉴가 H 결정에 따라 재정의됨. 상세는 §5.
+
+---
+
+## §4 학습 mode flow 3~ — 기존 training.py 흐름 그대로
+
+### 4-1) 개요
+
+mode = "학습" 선택 시 진입. 05 TODO-X1 에서 결정한 옵션 C 3단계 구조 그대로:
+
+```
+[학습 mode]
+flow 3(학습): preflight 재확인 + 시나리오 선택 (smoke/s1/s3/lora)
+    ↓
+flow 4(학습): 데이터셋 선택 (HF Hub repo_id / 로컬 dgx/datasets/ / 기본값)
+    ↓
+flow 5(학습): 학습 실행 + ckpt 관리 통합
+              smoke 선택 시 → smoke_test.sh (동의 게이트 포함)
+              실 학습 선택 시 → lerobot-train draccus 인자 동적 생성
+              ckpt 전송: 케이스 목록 출력 + 사용자 선택
+```
+
+### 4-2) 학습 ckpt 관리 (기존 §5 보존)
 
 `save_dummy_checkpoint.sh` line 25 인용:
 ```bash
 OUTPUT_DIR="${DGX_DIR}/outputs/train/${RUN_NAME}"
 # 체크포인트: ${OUTPUT_DIR}/checkpoints/000001/pretrained_model/
-#   - config.json
-#   - train_config.json
-#   - model.safetensors  (약 900 MB)
+#   - config.json, train_config.json, model.safetensors (~900 MB)
 ```
 
-학습 완료 후 `dgx/outputs/train/<run_name>/checkpoints/<step>/pretrained_model/` 에 저장.
+ckpt 전송 케이스 안내 (training.py 의 CKPT_CASES 그대로):
+- 케이스 1·2: Orin 과 동일 네트워크 / devPC 2-hop → `sync_ckpt_dgx_to_orin.sh`
+- 케이스 3: 시연장 Orin 인터넷 격리 → `sync_ckpt_dgx_to_datacollector.sh` (DataCollector 경유)
+- 케이스 4: USB 드라이브
 
-### 5-2) sync_ckpt_dgx_to_datacollector.sh 직접 Read 결과
-
-`scripts/sync_ckpt_dgx_to_datacollector.sh` 인용:
-
-```bash
-# line 6~24: 케이스 분류
-#   케이스 1: Orin 과 devPC·DGX 동일 광역 네트워크 → sync_ckpt_dgx_to_orin.sh 직접
-#   케이스 2: Orin 인터넷 가능, 다른 서브넷 → sync_ckpt_dgx_to_orin.sh devPC 2-hop
-#   케이스 3: Orin 인터넷 격리 → 본 스크립트 (DGX → DataCollector) + 수동 DataCollector → Orin
-#   케이스 4: USB 드라이브만 가능
-
-# 사용 (line 7~9):
-#   bash sync_ckpt_dgx_to_datacollector.sh                   # 가장 최근 run last 체크포인트
-#   bash sync_ckpt_dgx_to_datacollector.sh --run leftarm_v1  # 특정 run
-#   bash sync_ckpt_dgx_to_datacollector.sh --dry-run         # dry-run
-
-# 동작 (line 28~36):
-#   1. SSH 로 DGX 의 체크포인트 경로 식별
-#   2. DGX → devPC 임시 디렉터리 rsync
-#   3. devPC → DataCollector rsync
-#   4. devPC 임시 정리 + DataCollector 측 파일 크기 검증
-#   5. 다음 단계 안내 (DataCollector → Orin 수동)
-```
-
-비고: `sync_ckpt_dgx_to_datacollector.sh` 는 **devPC 에서 실행** 하는 스크립트 (DGX 에서 실행 X). interactive_cli 가 DGX 에서 동작하므로, flow 6 에서 "devPC 에서 다음 스크립트를 실행하세요" 안내 출력 후 종료하는 패턴이 적합.
-
-### 5-3) ckpt 전송 분기 UI 후보
-
-```
-학습 완료. 체크포인트가 저장되었습니다:
-  경로: ~/smolvla/dgx/outputs/train/<run_name>/checkpoints/<step>/pretrained_model/
-
-체크포인트를 Orin 에 전송하겠습니까?
-1. 케이스 1·2 (Orin 과 동일 네트워크) — devPC 에서 sync_ckpt_dgx_to_orin.sh 실행
-2. 케이스 3 (시연장 Orin 격리) — devPC 에서 sync_ckpt_dgx_to_datacollector.sh 실행
-3. 나중에 직접 전송 (안내만)
-
-→ 선택 결과에 따라 해당 명령 출력 + 클립보드 복사 가능 안내
-```
-
-interactive_cli (DGX 프로세스) 가 실제 rsync 를 실행하지는 않음 — devPC 에서 실행할 명령 안내만.
-
-### 5-4) 04 T2 verification_queue 연결
-
-04 T2 verification_queue "시연장 네트워크 케이스 분류" 는 X3 prod 에서:
-- 시연장 네트워크 환경 확인 → 케이스 3 이면 `sync_ckpt_dgx_to_datacollector.sh` 실행 검증
-- interactive_cli 의 flow 6 안내 메시지가 T2 검증의 사용자 절차 가이드 역할
+interactive_cli (DGX 프로세스) 는 rsync 직접 실행 X → devPC 에서 실행할 명령 안내만.
 
 ---
 
-## §6 awaits_user-C 발송 내용
+## §5 flow 7 전송 분기 — 사용자 결정 H 대상
 
-dgx interactive_cli 의 flow 3~ 단계 구체 책임을 선택해주세요.
+### 5-1) 배경
 
-`dgx/scripts/{setup_train_env, preflight_check, smoke_test, save_dummy_checkpoint}.sh` 직접 Read + `docs/storage/09_dgx_structure.md` 분석 결과 다음 후보를 도출했습니다:
+datacollector 원본 transfer.py 의 3분기:
+```
+(1) HF Hub 업로드
+(2) rsync → DGX  ← DGX 가 자기 자신 → 무의미
+(3) 안함 (로컬 저장)
+```
 
-**(A) 4단계 순차** — preflight 재확인 (시나리오 선택) → 데이터셋 선택 (HF/로컬) → 학습 trigger (smoke·실 학습 분기, 동의 게이트 포함) → 체크포인트 관리 (저장 확인·전송 안내)
+DGX 가 DataCollector 역할을 흡수하면 "(2) rsync → DGX" 는 자기 자신에게 전송하는 옵션이 되어 무의미. 옵션 재정의 필요.
 
-**(B) 2단계 통합** — preflight + 학습 trigger 통합 (smoke 또는 실 학습), 데이터셋·ckpt 관리는 CLI 외부 (사용자가 인자 직접 지정)
+### 5-2) 후보 H-1 — 기존 그대로 보존
 
-**(C) 3단계 (권고)** — preflight 재확인 + 시나리오 선택 → 데이터셋 선택 (HF Hub / 로컬) → 학습 + ckpt 관리 통합 (smoke 동의 게이트 포함)
+```
+(1) HF Hub 업로드
+(2) rsync DGX (자기 자신 → 무의미하나 삭제 X 보존)
+(3) 안함 (로컬 저장 유지)
+```
 
-**추가 결정 사항**:
+transfer.py 구조: `transfer.py` 원본 그대로. `_guide_rsync_to_dgx()` 함수를 경고 메시지만 변경:
+```python
+def _guide_rsync_to_dgx_self(repo_id: str) -> None:
+    """H-1: 자기 자신 rsync → 무의미 경고 안내."""
+    print("[flow 7] 참고: DGX 가 수집 노드이므로 'rsync DGX' 는 현재 머신에 이미 저장됨.")
+    print("  로컬 저장 경로를 확인하세요.")
+```
 
-- smoke_test 5~15분 + svla_so100_pickplace 다운로드 (>100MB 가능) 에 대한 interactive_cli 내부 동의 게이트 포함 여부
-  - 포함 권고 (CLAUDE.md 자율성 정책 충족)
-- 데이터셋 선택 UI 포함 여부 (후보 A·C 포함 / 후보 B 미포함)
-- ckpt 전송 안내 방식 (케이스 안내 출력만 vs 케이스 자동 감지)
+trade-off: 코드 변경 최소. 단, UX 혼란 (무의미 옵션 노출).
 
-**영향**: X2 의 `dgx/interactive_cli/flows/training.py` 구조 결정:
-- 옵션 A·C 채택 시: 데이터셋 선택 UI + smoke 동의 게이트 + ckpt 전송 안내 포함
-- 옵션 B 채택 시: 최소 구조 (preflight 연동 + 결과 출력만)
+### 5-3) 후보 H-2 — 옵션 재정의 (spec 권고)
+
+06 spec `사용자 결정 H` 항목 직접 인용:
+> "기존 (HF Hub / rsync DGX / 안함) → 신규 (HF Hub / 로컬 dgx 보관 / Orin rsync)"
+
+```
+(1) HF Hub 업로드
+(2) 로컬 DGX 보관 (dgx/data/<dataset>/ 에 저장 확인)
+(3) Orin rsync (devPC 에서 실행할 명령 안내)
+```
+
+transfer.py 구조:
+```python
+def flow7_select_transfer_h2(script_dir: Path, local_dataset_path: str, repo_id: str) -> None:
+    """H-2: 3 옵션 재정의."""
+    # (1) → _transfer_to_hub(...)          # 그대로
+    # (2) → _keep_local_dgx(...)           # 로컬 보관 안내 (경로 확인)
+    # (3) → _guide_rsync_to_orin(...)      # Orin rsync 명령 안내
+```
+
+`_guide_rsync_to_orin()` 내용:
+```python
+def _guide_rsync_to_orin(repo_id: str) -> None:
+    dataset_name = repo_id.split("/")[-1]
+    print("[flow 7] Orin rsync 전송 안내")
+    print("  devPC 에서 실행하세요:")
+    print(f"  bash smolVLA/scripts/sync_dataset_dgx_to_orin.sh --dataset {dataset_name}")
+    print("  (스크립트 신규 작성 필요 — 07_leftarmVLA 사이클 X 할당 예정)")
+```
+
+trade-off: spec 의 권고안. Orin rsync 는 현재 `sync_dataset_dgx_to_orin.sh` 미존재 (07 이후 신규). 안내 메시지로만 처리.
+
+### 5-4) 후보 H-3 — 단순화 (HF Hub + 로컬 dgx 보관)
+
+```
+(1) HF Hub 업로드
+(2) 로컬 DGX 보관 (dgx/data/<dataset>/)
+```
+
+Orin rsync 옵션은 별도 ckpt sync 단계로 분리. transfer.py 는 2 옵션만 관리.
+
+transfer.py 구조:
+```python
+def flow7_select_transfer_h3(script_dir: Path, local_dataset_path: str, repo_id: str) -> None:
+    """H-3: 2 옵션 단순화."""
+    # (1) → _transfer_to_hub(...)
+    # (2) → _keep_local_dgx(...)
+    # Orin rsync 는 별도 학습 mode ckpt 관리 (flow 5 학습) 로 위임
+```
+
+trade-off: 옵션 단순·명확. Orin rsync 를 수집 완료 직후 제공하지 않음 (학습 mode 의 ckpt 케이스 안내로 통합). 데이터셋(수집 결과)과 ckpt(학습 결과)의 전송 경로가 분리되어 역할이 명확.
+
+### 5-5) 각 후보 transfer.py 구조 비교
+
+| 항목 | H-1 보존 | H-2 재정의 | H-3 단순화 |
+|---|---|---|---|
+| 옵션 수 | 3 | 3 | 2 |
+| Orin rsync | 없음 | 안내 포함 | 없음 (별도 단계) |
+| 코드 변경 | 최소 (경고만) | 중간 (옵션 재정의) | 낮음 (옵션 제거) |
+| spec 정합 | 낮음 (무의미 옵션) | 높음 (spec 권고) | 중간 |
+| UX 명확성 | 낮음 (혼란) | 중간 | 높음 |
+| sync 스크립트 의존 | 없음 | `sync_dataset_dgx_to_orin.sh` (미존재) | 없음 |
 
 ---
 
-## §7 설계 결정 요약 (사용자 합의 전 현재 상태)
+## §6 awaits_user G·H 발송 명세
 
-| 항목 | 현재 상태 | 결정 필요 여부 |
+X1 study 완료 — orchestrator 가 사용자에게 아래 두 결정 요청.
+
+### G 결정 발송 내용
+
+dgx interactive_cli 의 flow 3 mode 분기 구조를 선택해주세요.
+
+`datacollector/interactive_cli/flows/{teleop,data_kind,record,transfer}.py` 직접 Read + `14_dgx_cli_flow.md §1~§5` 분석 결과 다음 3 후보를 도출했습니다:
+
+**(G-1) 단발 종료** — 한 mode (수집 또는 학습) 실행 후 CLI 종료.
+- trade-off: 구현 단순. 수집→학습 연속은 CLI 재시작 필요.
+
+**(G-2) 재진입 루프** — mode 완료 후 다시 flow 3 메뉴로 돌아옴. (3) 종료 선택 시 CLI 종료.
+- trade-off: 한 세션에서 수집→학습 전환 가능. 루프 상태 관리 구현 필요.
+
+**(G-3) 수집→학습 직렬 옵션 추가** — `(1) 수집→학습 직렬 / (2) 수집만 / (3) 학습만 / (4) 종료`. 수집 직후 학습 자동 진입 옵션 추가.
+- trade-off: 원클릭 수집+학습. 옵션 4개로 증가. 직렬 흐름 자동 전달 로직 추가 필요.
+
+**영향**: X2 의 `dgx/interactive_cli/flows/mode.py` 구조 결정.
+- G-1: `flow3_select_mode() -> str | None` 단발
+- G-2: `flow3_mode_loop(script_dir: Path) -> int` 루프
+- G-3: 4 옵션 + `run_collect_then_train()` 직렬 함수
+
+**사용자 결정 전 X2 dispatch X** 안내: G 결정 없이 X2 는 mode.py 구조를 확정할 수 없음.
+
+### H 결정 발송 내용
+
+dgx interactive_cli flow 7 (데이터 전송) 분기 옵션 재정의 방향을 선택해주세요.
+
+datacollector 원본의 `(2) rsync → DGX` 옵션이 DGX 흡수 후 자기 자신으로의 전송이 되어 무의미해집니다. 다음 3 후보를 도출했습니다:
+
+**(H-1) 기존 그대로 보존** — `(1) HF Hub / (2) rsync DGX (무의미 경고 추가) / (3) 안함`.
+- trade-off: 코드 변경 최소. 무의미 옵션 노출로 UX 혼란.
+
+**(H-2) 옵션 재정의** — `(1) HF Hub / (2) 로컬 DGX 보관 / (3) Orin rsync 안내`.
+- trade-off: spec 권고안. Orin rsync 스크립트 (`sync_dataset_dgx_to_orin.sh`) 는 현재 미존재 → 안내 메시지만 출력 (07 이후 구현).
+
+**(H-3) 단순화** — `(1) HF Hub / (2) 로컬 DGX 보관`. Orin rsync 는 학습 mode 의 ckpt 관리 단계로 분리.
+- trade-off: 가장 단순·명확. 데이터셋 전송과 ckpt 전송 역할 분리.
+
+**영향**: X2 의 `dgx/interactive_cli/flows/transfer.py` 구조 결정.
+- H-1: 원본 `flow7_select_transfer()` 최소 수정
+- H-2: 옵션 (2)→로컬보관, (3)→Orin rsync 안내 함수 신규
+- H-3: 옵션 (2)→로컬보관, (3) 제거. 2 옵션 구조
+
+**사용자 결정 전 X2 dispatch X** 안내: H 결정 없이 X2 는 transfer.py 옵션을 확정할 수 없음.
+
+---
+
+## §7 X2 인계 항목 (이식 대상 + 수정 필요 사항)
+
+### 이식 대상 4 파일
+
+| 원본 경로 | 대상 경로 | 주요 수정 |
 |---|---|---|
-| preflight_check.sh 호출 방식 | subprocess env_check.py 래퍼 (F1 §5 패턴) | X — 확정 |
-| flow 3~ 단계 구조 | A(4단계)/B(2단계)/C(3단계) 후보 | **Y — awaits_user** |
-| 데이터셋 선택 UI | 후보 A·C 포함 / 후보 B 미포함 | Y — awaits_user |
-| smoke_test 동의 게이트 | 포함 권고 (CLAUDE.md §prod-test-runner) | Y — awaits_user |
-| ckpt 전송 | devPC 에서 실행할 명령 안내 (CLI X) | X — 구조 확정 |
-| sync_ckpt_dgx_to_datacollector | 케이스 3 전용, devPC 실행 스크립트 | X — 확정 |
-| training.py 위치 | `dgx/interactive_cli/flows/training.py` | X — spec 확정 |
+| `legacy/.../datacollector/interactive_cli/flows/teleop.py` | `dgx/interactive_cli/flows/teleop.py` | scripts 경로 자동 해석 (부모 경로 구조 동일), flow 번호 표기 갱신 |
+| `legacy/.../datacollector/interactive_cli/flows/data_kind.py` | `dgx/interactive_cli/flows/data_kind.py` | 변경 없음 (DATA_KIND_OPTIONS 독립) |
+| `legacy/.../datacollector/interactive_cli/flows/record.py` | `dgx/interactive_cli/flows/record.py` | `data_root` 경로: `~/smolvla/datacollector/data/` → `~/smolvla/dgx/data/` (1 라인) |
+| `legacy/.../datacollector/interactive_cli/flows/transfer.py` | `dgx/interactive_cli/flows/transfer.py` | H 결정에 따른 옵션 재정의 |
+
+### entry.py 수정 필요 (X2 담당)
+
+현재 `dgx/interactive_cli/flows/entry.py` 의 `VALID_NODES` + `NODE_DESCRIPTIONS` + `NODE_GUIDE`:
+- `VALID_NODES = ("orin", "dgx", "datacollector")` → `("orin", "dgx")` 로 변경
+- `NODE_DESCRIPTIONS["datacollector"]` 행 제거
+- `NODE_GUIDE["datacollector"]` 행 제거
+- `flow0_confirm_environment()` 내 `node != "datacollector"` 조건 → 항상 True (orin·dgx 둘 다 확인 단계 없음)
+
+변경 이유: DataCollector 노드 운영 종료 (06 결정 C·F).
+
+변경 후 entry.py `main()` 분기:
+```python
+if selected == "dgx":
+    # flow 2: env_check (mode 인자 없이 — G 결정 후 mode.py 에서 mode 선택)
+    if not flow2_env_check(script_dir, scenario="smoke"):
+        return 1
+    # flow 3: mode 분기 (mode.py — G 결정 적용)
+    from flows.mode import flow3_mode_entry
+    return flow3_mode_entry(script_dir)
+elif selected == "orin":
+    # orin: 기존 inference.py 흐름
+    ...
+```
+
+### configs/node.yaml 수정 (X2 담당)
+
+```yaml
+# dgx/interactive_cli/configs/node.yaml 갱신
+node: dgx
+venv: ~/smolvla/dgx/.arm_finetune
+responsibilities:
+  - training
+  - data_collection   # 신규 추가
+```
 
 ---
 
@@ -351,4 +537,5 @@ dgx interactive_cli 의 flow 3~ 단계 구체 책임을 선택해주세요.
 
 | 날짜 | 변경 |
 |---|---|
-| 2026-05-01 | 초안 작성 — 05 TODO-X1 study 산출물. preflight·smoke_test·save_dummy_checkpoint·sync_ckpt_dgx_to_datacollector 직접 Read + 인용. 3 후보 (A·B·C) 도출. §6 awaits_user-C 발송 명세 포함. |
+| 2026-05-01 | 초안 작성 — 05 TODO-X1 study 산출물. preflight·smoke_test·save_dummy_checkpoint·sync_ckpt_dgx_to_datacollector 직접 Read + 인용. 3 후보 (A·B·C) 도출. §6 awaits_user-C 발송 명세 포함. 사용자 옵션 C (3단계) 결정. |
+| 2026-05-02 | 06 TODO-X1 study 갱신 — 학습+수집 통합. §1 env_check 수집 항목 추가. §2 mode 분기 G-1·G-2·G-3 후보. §3 datacollector flow 이식 (4 파일 변경 사항 명세). §4 기존 학습 flow 보존. §5 flow 7 전송 분기 H-1·H-2·H-3 후보. §6 G·H awaits_user 발송 명세. §7 X2 인계 항목. |

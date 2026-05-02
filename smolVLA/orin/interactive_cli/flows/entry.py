@@ -1,7 +1,6 @@
 """interactive_cli flow 0·1·2+ — 진입 확인 + 장치 선택 + 노드별 책임 모듈 호출.
 
 flow 0: 환경 확인
-  - datacollector 노드: "이 환경에서 실행하시는 게 맞나요? [Y/n]" 확인 단계
   - orin / dgx: 확인 단계 없음 (VSCode remote-ssh 로 이미 올바른 노드에서 실행)
 
 flow 1: 장치 선택 메뉴
@@ -10,13 +9,19 @@ flow 1: 장치 선택 메뉴
 
 flow 2+: 노드별 책임 모듈 호출 (O2 에서 orin 분기 구현)
   - orin: env_check.py (flow 2) → inference.py (flow 3·4·5)
-  - dgx / datacollector: 후행 todo 에서 구현
+  - dgx: 후행 todo 에서 구현
 
 설계 기반:
   - node.yaml 로딩: hil_inference.py load_gate_config() line 80~120 패턴 응용
     (경로 처리: Path.is_dir() 분기 + 파일 미존재 시 None 반환)
   - 환경변수 경유 값 처리: check_hardware.sh record_step() line 128~144 패턴 응용
     (특수문자 안전 처리를 위해 환경변수 경유)
+
+갱신 (2026-05-02, TODO-X2):
+  - VALID_NODES: ("orin", "dgx", "datacollector") → ("orin", "dgx")
+    datacollector 노드 운영 종료 (06_dgx_absorbs_datacollector 결정 C·F).
+  - flow 0 datacollector 확인 분기 제거.
+  - flow 1 안내 메뉴 2 옵션으로 축소.
 """
 
 import argparse
@@ -40,18 +45,17 @@ except ImportError:
 # ---------------------------------------------------------------------------
 # 노드 종류 상수
 # ---------------------------------------------------------------------------
-VALID_NODES = ("orin", "dgx", "datacollector")
+# 갱신 (2026-05-02, TODO-X2): datacollector 제거 (06 결정 C·F — 노드 운영 종료)
+VALID_NODES = ("orin", "dgx")
 
 NODE_DESCRIPTIONS = {
     "orin": "Orin (추론 노드) — 학습된 ckpt 로 hil_inference 실행",
-    "dgx": "DGX (학습 노드) — 데이터셋 학습 + 체크포인트 관리",
-    "datacollector": "DataCollector (수집 노드) — teleoperation + lerobot-record + 전송",
+    "dgx": "DGX (학습·수집 노드) — 데이터 수집 + 학습 + 체크포인트 관리",
 }
 
 NODE_GUIDE = {
     "orin": "Orin 에서 실행: bash orin/interactive_cli/main.sh",
     "dgx": "DGX 에서 실행: bash dgx/interactive_cli/main.sh",
-    "datacollector": "DataCollector 머신 터미널에서: bash datacollector/interactive_cli/main.sh",
 }
 
 
@@ -110,42 +114,17 @@ def load_node_config(node_config_path: str) -> dict | None:
 def flow0_confirm_environment(node: str) -> bool:
     """flow 0: 환경 확인 단계.
 
-    datacollector 노드 전용 확인 단계 (spec line 47~50):
-      "이 환경(datacollector)에서 실행하시는 게 맞나요? [Y/n]"
-      N 응답 → 올바른 환경 안내 + False 반환
+    orin / dgx: VSCode remote-ssh 로 이미 올바른 노드에서 실행 →
+                확인 단계 없음 → True 즉시 반환.
 
-    orin / dgx: 확인 단계 없음 → True 즉시 반환.
+    갱신 (2026-05-02, TODO-X2):
+      datacollector 분기 제거 (노드 운영 종료 — 06 결정 C·F).
 
     Returns:
-        True: 계속 진행 / False: 사용자 거부 또는 잘못된 환경
+        True: 계속 진행 / False: 잘못된 노드 (이론상 도달 X)
     """
-    if node != "datacollector":
-        return True
-
-    print()
-    print("=" * 60)
-    print(" smolVLA Interactive CLI — DataCollector 노드")
-    print("=" * 60)
-    print()
-    print("이 환경(DataCollector)에서 실행하시는 게 맞나요?")
-    print(f"  현재 노드: {NODE_DESCRIPTIONS['datacollector']}")
-    print()
-
-    try:
-        answer = input("[Y/n] ").strip().lower()
-    except (EOFError, KeyboardInterrupt):
-        print()
-        return False
-
-    if answer in ("", "y", "yes"):
-        return True
-    else:
-        print()
-        print("[안내] 다른 노드를 사용하시려면:")
-        for n, guide in NODE_GUIDE.items():
-            print(f"  - {guide}")
-        print()
-        return False
+    # orin·dgx: 확인 단계 없음 (VSCode remote-ssh 로 이미 올바른 노드)
+    return True
 
 
 # ---------------------------------------------------------------------------
@@ -245,10 +224,10 @@ def _run_node_flows(node: str, script_dir: Path) -> int:
         return run_inference_flow(script_dir)
 
     else:
-        # dgx / datacollector: 후행 todo 에서 구현
+        # dgx: 후행 todo 에서 구현 (X2 완료 후 dgx entry.py 에서 mode.py 호출)
         print()
         print(f"[TODO] flow 2+ ({node} 노드 책임) — 후행 todo 에서 구현")
-        print("       env_check.py → 노드별 책임 모듈 (training.py / teleop.py 등)")
+        print("       DGX 에서 실행: bash dgx/interactive_cli/main.sh")
         return 0
 
 

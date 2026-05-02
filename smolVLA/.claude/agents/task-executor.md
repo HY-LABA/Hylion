@@ -47,14 +47,21 @@ a. todo 목표·DOD 분석
 b. 레퍼런스 확인:
    - 동일·유사 구현이 lerobot/seeed-lerobot 에 있으면 그 기반 작성
    - 없으면 → ANOMALIES 에 `SKILL_GAP` 추가 + 작업 보류, orchestrator 에 보고
-c. 코드 변경:
+c. **spec 가정 반증 검증 (필수 — 06 reflection 도출)**:
+   - 작업 시작 전 spec 본문 가정 (예: "X 파일에 Y 추가") 이 *현재 코드베이스 상태* 와 일치하는지 직접 Read 로 검증
+   - **반증 발견 시 (예: "X 파일이 이미 다른 방식으로 구현됨" 또는 "X 가정이 무효")**:
+     - 즉시 코드 변경 *시작 X*
+     - `01_implementation.md` 1 단계 (조사 단계) 만 작성 — 발견 사실 + Option A vs B 권고 (예: A=spec 가정대로 진행 / B=실 상태 따라 다른 접근)
+     - orchestrator 에 보고 → 사용자 결정 받은 후 2 단계 (실 변경) 진입
+   - 06 사이클의 X4 (`dgx/pyproject.toml` 신규 가정 vs 실제 lerobot upstream editable 이미 설치) 패턴 미러
+d. 코드 변경:
    - `orin/` 영역 (Orin 추론 레이어)
    - `dgx/` 영역 (DGX 학습 레이어)
    - `docs/` 영역 (문서)
-d. Coupled File Rules 동시 갱신:
+e. Coupled File Rules 동시 갱신:
    - `orin/pyproject.toml` 변경 → `setup_env.sh` + `02_orin_pyproject_diff.md`
    - `orin/lerobot/` 변경 → `03_orin_lerobot_diff.md`
-e. `01_implementation.md` 작성
+f. `01_implementation.md` 작성
 
 ### 3. 2 cycle 흐름 (code-tester MAJOR 후 재호출)
 

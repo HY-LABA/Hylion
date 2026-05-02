@@ -166,9 +166,13 @@ devPC scripts/                  Orin 측 효과
 └── sync_ckpt_dgx_to_orin.sh    DGX 학습 ckpt → orin/checkpoints/<run_name>/
 ```
 
-본 04 마일스톤 종료 후 추가될 것 (TODO-T3):
-- `scripts/deploy_datacollector.sh` (DataCollector 측 배포)
-- `scripts/sync_dataset_collector_to_dgx.sh` (TODO-T1 결정에 따라 — HF Hub 면 미작성)
+<!-- 정정 (2026-05-02): 아래 T3 예정 항목은 06_dgx_absorbs_datacollector 결정으로 무효화됨.
+     scripts/deploy_datacollector.sh → legacy 이관 (docs/storage/legacy/02_datacollector_separate_node/).
+     scripts/sync_dataset_collector_to_dgx.sh → legacy 이관 (DataCollector 노드 운영 종료, DGX 직접 이동).
+     본 텍스트는 04 결정 시점 맥락 보존용으로 유지. -->
+본 04 마일스톤 종료 후 추가될 것 (TODO-T3) — *아래 항목은 06 결정으로 불요화됨*:
+- `scripts/deploy_datacollector.sh` (DataCollector 측 배포) — **legacy 이관 완료 (L2)**
+- `scripts/sync_dataset_collector_to_dgx.sh` (TODO-T1 결정에 따라 — HF Hub 면 미작성) — **legacy 이관 완료 (L2)**
 
 ### 4-2) HuggingFace Hub
 

@@ -65,6 +65,36 @@ pip install \
 echo "[setup] lerobot[smolvla,training] editable 설치 중..."
 pip install -e "${LEROBOT_SRC}[smolvla,training]" --quiet
 
+# ── 3-c. record + hardware + feetech extras 설치 ───────────────────────────────
+# 06_dgx_absorbs_datacollector: DGX 가 데이터 수집 책임 흡수 — record·hardware·feetech extras 추가.
+# Option B (pyproject.toml 미변경): DGX 가 lerobot upstream editable 설치 + 9 entrypoint 등록됨.
+#   본 step 은 record/hardware/feetech extras 패키지 추가 설치만 (Option B — pyproject 신규 X).
+#
+# torchcodec: PyPI 기본 인덱스에서는 cu130 wheel 미제공 → cu130 인덱스 별도 지정 필요.
+#   먼저 설치하면 이후 일반 pip install 명령에서 torchcodec 조건 중복 없이 skip.
+echo "[setup] torchcodec (>=0.3.0,<0.11.0, cu130 wheel) 설치 중..."
+pip install \
+    'torchcodec>=0.3.0,<0.11.0' \
+    --index-url https://download.pytorch.org/whl/cu130 \
+    --quiet
+
+# record extras: LeRobotDataset 포맷 저장 + HF Hub + 비디오 인코딩
+# hardware extras: SO-ARM 모터 제어 + 키보드 입력
+# feetech extras: Feetech 서보 직접 구동
+# 버전 범위: datacollector/pyproject.toml record/hardware/feetech extras 직접 인용 (line 40-61)
+echo "[setup] record + hardware + feetech extras 설치 중..."
+pip install \
+    'datasets>=4.0.0,<5.0.0' \
+    'pandas>=2.0.0,<3.0.0' \
+    'pyarrow>=21.0.0,<30.0.0' \
+    'av>=15.0.0,<16.0.0' \
+    'jsonlines>=4.0.0,<5.0.0' \
+    'pynput>=1.7.8,<1.9.0' \
+    'pyserial>=3.5,<4.0' \
+    'deepdiff>=7.0.1,<9.0.0' \
+    'feetech-servo-sdk>=1.0.0,<2.0.0' \
+    --quiet
+
 # ── 4. 환경변수 자동 적용 (.venv/bin/activate 끝에 export 추가) ─────────────────
 # - HF_HOME: Walking RL / 시스템 디폴트 캐시와 격리
 # - PYTORCH_CUDA_ALLOC_CONF: 메모리 단편화 방지 (UMA 환경에서 OOM 마진 확보)
