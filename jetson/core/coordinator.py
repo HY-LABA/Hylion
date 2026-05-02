@@ -15,7 +15,7 @@ CHAT_STANDBY_COOLDOWN_SEC = 1.2
 
 from jetson.cloud.groq_client import GroqClient, build_action_json_from_stt
 from jetson.core.brain.network_probe import is_online
-from jetson.expression.mouth_servo import cleanup_gpio
+from jetson.expression.mouth_servo import cleanup_gpio, MouthServoController
 from jetson.expression.wake_word import build_wake_word_listener
 from jetson.expression.speaker import DEFAULT_CLOVA_SPEAKER, build_tts_backend
 from jetson.expression.microphone import record_to_wav
@@ -92,7 +92,11 @@ def _build_turn_services(online: bool):
 		try:
 			client = GroqClient()
 			_probe_real_groq_connection(client)
-			tts_backend = build_tts_backend(is_online=True, speaker=DEFAULT_CLOVA_SPEAKER)
+			tts_backend = build_tts_backend(
+				is_online=True,
+				speaker=DEFAULT_CLOVA_SPEAKER,
+				tts_provider="clova",
+			)
 			return True, client, tts_backend
 		except Exception as exc:
 			print(f"[Hybrid] online route unavailable -> fallback to offline stub: {exc}")
@@ -117,14 +121,25 @@ def _route_action(action_json: dict) -> None:
 	sleep(0.2)
 
 
-def _speak_reply_if_any(action_json: dict, stage: str, tts_backend) -> None:
+def _speak_reply_if_any(action_json: dict, stage: str, tts_backend, mouth_servo=None) -> None:
 	reply_text = str(action_json.get("reply_text", "")).strip()
 	if not reply_text:
 		print(f"[Speaker] {stage} -> no reply_text; skip")
 		return
 
 	try:
-		elapsed = tts_backend.speak_with_lipsync(reply_text)
+		tts_params = action_json.get("tts", {}) if isinstance(action_json.get("tts"), dict) else {}
+		elapsed = tts_backend.speak_with_lipsync(
+			reply_text,
+			mouth_servo=mouth_servo,
+			speaker=str(tts_params.get("speaker", DEFAULT_CLOVA_SPEAKER)),
+			voice=tts_params.get("voice"),
+			pitch=tts_params.get("pitch"),
+			rate=tts_params.get("rate"),
+			speed=tts_params.get("speed"),
+			volume=tts_params.get("volume"),
+			audio_format=tts_params.get("format"),
+		)
 		print(f"[Speaker] {stage} -> done ({elapsed:.2f}s)")
 	except Exception as exc:
 		print(f"[Speaker] {stage} -> failed: {exc}")
@@ -159,6 +174,11 @@ def run_live_pipeline(
     wakeword_listener,
 ) -> None:
 	session_id = f"sess-live-{uuid4().hex[:8]}"
+	
+	# Initialize mouth servo for lip-sync
+	mouth_servo = MouthServoController(pin=33)
+	# MouthServoController initializes on first use, no explicit init() needed
+	print(f"[MouthServo] created (available: {mouth_servo.is_available})")
 
 	print("HYlion coordinator wake-word mode")
 	print("- Real microphone capture")
@@ -182,7 +202,7 @@ def run_live_pipeline(
 		# Issue greeting action to enter chat mode
 		greeting_action = _build_greeting_action(session_id=session_id)
 		_print_block("ACTION_JSON (GREETING)", greeting_action)
-		_speak_reply_if_any(greeting_action, stage="greeting", tts_backend=tts_backend)
+		_speak_reply_if_any(greeting_action, stage="greeting", tts_backend=tts_backend, mouth_servo=mouth_servo)
 
 		in_chat_mode = True
 
@@ -227,7 +247,7 @@ def run_live_pipeline(
 			_print_block("ACTION_JSON", action_json)
 
 			intent = action_json.get("intent", "unknown")
-			_speak_reply_if_any(action_json, stage=f"before_{intent}", tts_backend=tts_backend)
+			_speak_reply_if_any(action_json, stage=f"before_{intent}", tts_backend=tts_backend, mouth_servo=mouth_servo)
 
 			if intent == "chat":
 				# Chat continues; listen for next utterance
@@ -248,7 +268,7 @@ def run_live_pipeline(
 
 			standby_action = _build_standby_action(session_id=session_id, reason=f"auto_after_{intent}")
 			_print_block("ACTION_JSON (AUTO-STANDBY)", standby_action)
-			_speak_reply_if_any(standby_action, stage=f"after_{intent}", tts_backend=tts_backend)
+			_speak_reply_if_any(standby_action, stage=f"after_{intent}", tts_backend=tts_backend, mouth_servo=mouth_servo)
 			if AUTO_STANDBY_COOLDOWN_SEC > 0:
 				print(f"[Mode] standby cooldown for {AUTO_STANDBY_COOLDOWN_SEC:.1f}s before re-arming wake word.")
 				sleep(AUTO_STANDBY_COOLDOWN_SEC)
