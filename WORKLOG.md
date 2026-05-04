@@ -621,3 +621,24 @@
   - `data/reply/` root 소유 디렉터리 정리 (사용자 권한으로 이전)
   - 미사용 패키지(`faster-whisper`, `ctranslate2`, `av`, `onnxruntime`) 정리 검토 (~300MB)
   - `scripts/deploy_jetson.sh`가 venv activate 가정하도록 정비 검토
+
+### 2026-05-05 (프로젝트 전체 흐름도 문서화 + 코디네이터 정리)
+
+- 한 줄 요약:
+  - 현재 동작 기준으로 프로젝트 전체 모듈/파일 구조와 런타임 데이터 흐름을 도식화한 문서 추가. 동시에 코디네이터의 STT warm-up과 wake_word listener를 단일 경로로 단순화한 변경분(이전 세션 잔여)을 같이 정리해 push.
+- 수정/추가 파일:
+  - `docs/09_project_flow_overview.md` (신규) — ASCII 흐름도 + 모듈 트리 + Mermaid flowchart, 빈 스텁 영역(`perception`, `arm`, `safety`, `scenarios`, `state_machine/fsm.py`, `nuc/bhl`, `comm/{nuc,orin}`, `comm/mock_bridge.py`)을 ❌ 표시로 명시
+  - `jetson/core/coordinator.py` — 시작 시 `warm_up_stt()` 호출 추가, 기본 whisper 모델 `base` → `small`, 기동 배너 정리, `WakeWordActivation.source` 출력 제거
+  - `jetson/expression/stt_whisper.py` — `warm_up()` 공개 함수 추가, `DEFAULT_MODEL_SIZE` `base` → `small`
+  - `jetson/expression/wake_word.py` — Plan A/Plan B 이중 디바이스 경로 제거, 단일 device_keyword/sample_rate로 단순화 (44.1kHz 캡처 → 16kHz Python 리샘플 단일 경로)
+  - `jetson/expression/requirements.txt` (신규) — venv 재현용 의존성 명세 (PyTorch JP6.0 wheel + openai-whisper + openwakeword + Jetson.GPIO 등)
+  - `WORKLOG.md`
+- 결과:
+  - `coordinator.py main()` 진입 시 whisper small 모델을 즉시 GPU 로드 → 첫 발화 지연 제거
+  - wake word 코드 라인 수 감소, 분기 로그도 한 줄로 정리
+- 메모(저장소 위생):
+  - `data/episodes/*.wav`, `data/reply/*.mp3`, root의 `Error`(0B 파일)은 이번 커밋에 포함하지 않음. `.gitignore` 의 `.mp3`/`.wav` 룰이 와일드카드(`*.mp3`/`*.wav`)가 빠져있어 untracked로 보이는 상태 — 다음 세션에서 gitignore 보강 필요.
+- 다음 환경에서 할 일:
+  - `.gitignore` 의 `.mp3`/`.wav` → `*.mp3`/`*.wav` 보강 + `data/episodes/`, `data/reply/`, root `Error` 처리 결정
+  - whisper `small` 모델로 GPU/지연 측정 재확인 후 모델 사이즈 확정
+  - SMOLVLA/BHL 라우팅(_route_action) 실제 구현 진입점 결정

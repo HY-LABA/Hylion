@@ -1,0 +1,60 @@
+# Hylion Jetson 런타임 의존성 (Orin Nano Super 8GB / JetPack 6.2.2 / CUDA 12.6)
+#
+# venv 위치: jetson/expression/.venv
+#
+# 신규 환경 구성 절차:
+#   1) virtualenv -p python3.10 jetson/expression/.venv
+#   2) source jetson/expression/.venv/bin/activate
+#   3) pip install -r jetson/expression/requirements.txt
+#   4) (cusparselt 시스템 미설치 시) activate 끝에 LD_LIBRARY_PATH 추가:
+#        echo 'export LD_LIBRARY_PATH=$VIRTUAL_ENV/lib/python3.10/site-packages/nvidia/cusparselt/lib:$LD_LIBRARY_PATH' \
+#          >> jetson/expression/.venv/bin/activate
+#   5) deactivate && source jetson/expression/.venv/bin/activate (LD_LIBRARY_PATH 적용)
+#   6) python -c "import torch; assert torch.cuda.is_available()"  # 검증
+#   7) openwakeword 모델 가중치 다운로드 (pip wheel은 코드만 포함):
+#        python -c "from openwakeword.utils import download_models; download_models()"
+#      → ~/.../site-packages/openwakeword/resources/models/ 에 .tflite/.onnx 캐시
+#
+# 시스템 요건 (apt 패키지 — venv와 별개):
+#   sudo apt install libopenblas-dev libopenmpi-dev libomp-dev
+#   (JetPack 6.2.2 기본 이미지엔 이미 포함돼있는 경우가 많음)
+#
+# 환경 결정 근거: smolVLA/docs/storage/05_orin_venv_setting.md (PyTorch JP 6.0 wheel 채택 이유)
+# 백엔드 선택 근거: WORKLOG.md 2026-05-04 (faster-whisper → openai-whisper)
+
+
+# ── PyTorch (NVIDIA JP 6.0 공식 redist wheel, CUDA 12.6 forward-compatible) ──
+# JP 6.2 공식 배포는 컨테이너 전용이라 nv24.08 wheel을 의도적으로 선택
+torch @ https://developer.download.nvidia.com/compute/redist/jp/v61/pytorch/torch-2.5.0a0+872d972e41.nv24.08.17622132-cp310-cp310-linux_aarch64.whl
+
+# torch 2.5.0a0 가 동적으로 로드하는 cuSPARSELt — 시스템 미설치 시 pip 번들 사용
+nvidia-cusparselt-cu12==0.8.1
+
+# torch 2.5.0a0 ABI: NumPy 1.x 만 호환 (2.x 설치 시 _ARRAY_API 경고 + 일부 연산 실패)
+numpy>=1.24,<2
+
+
+# ── STT (openai-whisper, PyTorch 백엔드) ──
+openai-whisper
+
+
+# ── 마이크 / wake word ──
+sounddevice
+openwakeword
+
+
+# ── 클라우드 LLM ──
+groq
+
+
+# ── TTS (Clova mp3 duration 측정용) ──
+mutagen
+
+
+# ── 입 모양 서보 (Jetson 40-pin 헤더 GPIO) ──
+# Jetson.GPIO 가 import 안 되면 mouth_servo 가 조용히 비활성화되므로 venv에도 설치 필요
+Jetson.GPIO==2.1.12
+
+
+# ── 테스트 ──
+pytest

@@ -14,7 +14,7 @@ _MODEL_CACHE: Dict[str, Any] = {}
 # developer laptops. compute_type is kept as a parameter for API compatibility:
 # "float16" → fp16 path on GPU (default openai-whisper behavior on cuda),
 # "int8" / others → fp32 path (openai-whisper does not support int8 quantization).
-DEFAULT_MODEL_SIZE = "base"
+DEFAULT_MODEL_SIZE = "small"
 DEFAULT_DEVICE = "cuda"
 DEFAULT_COMPUTE_TYPE = "float16"
 CPU_FALLBACK_COMPUTE_TYPE = "int8"
@@ -57,6 +57,15 @@ def _get_model(
 
     _MODEL_CACHE[cache_key] = model
     return model
+
+
+def warm_up(
+    model_size: str = DEFAULT_MODEL_SIZE,
+    compute_type: str = DEFAULT_COMPUTE_TYPE,
+    device: str = DEFAULT_DEVICE,
+) -> None:
+    """Eagerly load the whisper model so the first transcribe_wav call is fast."""
+    _get_model(model_size=model_size, compute_type=compute_type, device=device)
 
 
 def transcribe_wav(

@@ -23,7 +23,7 @@ from jetson.expression.mouth_servo import cleanup_gpio, MouthServoController
 from jetson.expression.wake_word import build_wake_word_listener
 from jetson.expression.speaker import DEFAULT_CLOVA_SPEAKER, build_tts_backend
 from jetson.expression.microphone import record_to_wav
-from jetson.expression.stt_whisper import build_input_event, transcribe_wav
+from jetson.expression.stt_whisper import build_input_event, transcribe_wav, warm_up as warm_up_stt
 
 
 
@@ -205,19 +205,13 @@ def run_live_pipeline(
 	# MouthServoController initializes on first use, no explicit init() needed
 	print(f"[MouthServo] created (available: {mouth_servo.is_available})")
 
-	print("HYlion coordinator wake-word mode")
-	print("- Real microphone capture")
-	print("- Wake word trigger")
-	print("- Whisper STT")
-	print("- Real Groq action generation")
-	print("- Auto standby after each completed turn")
 	print("Waiting for wake word...")
 
 	while True:
 		activation = wakeword_listener.wait_for_wake_word()
 		print(
 			f"[Wake Word] label={activation.label}, score={activation.score:.3f}, "
-			f"source={activation.source}, device={activation.device_name}"
+			f"device={activation.device_name}"
 		)
 
 		online = is_online()
@@ -321,7 +315,7 @@ def _parse_args() -> argparse.Namespace:
 	parser = argparse.ArgumentParser(description="Run live mic->Whisper->Groq coordinator loop.")
 	parser.add_argument("--record-sec", type=float, default=4.0, help="Microphone record duration per turn")
 	parser.add_argument("--preferred-keyword", default="USB", help="Preferred mic device name keyword")
-	parser.add_argument("--whisper-model-size", default="base", help="faster-whisper model size")
+	parser.add_argument("--whisper-model-size", default="small", help="openai-whisper model size (tiny/base/small/medium/large)")
 	parser.add_argument("--whisper-language", default="ko", help="Whisper language hint")
 	return parser.parse_args()
 
@@ -331,6 +325,8 @@ def main() -> None:
 	wakeword_listener = None
 	try:
 		wakeword_listener = build_wake_word_listener()
+		print(f"[STT] warming up whisper '{args.whisper_model_size}' model...")
+		warm_up_stt(model_size=args.whisper_model_size)
 		run_live_pipeline(
 			record_sec=args.record_sec,
 			preferred_keyword=args.preferred_keyword,
