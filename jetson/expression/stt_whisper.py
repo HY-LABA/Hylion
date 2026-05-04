@@ -9,6 +9,14 @@ from uuid import uuid4
 
 _MODEL_CACHE: Dict[str, Any] = {}
 
+# parameters: defaults tuned for Jetson with CUDA available.
+# On startup we try GPU float16 first, then fall back to CPU int8 if CUDA / cuDNN
+# isn't available so the pipeline still works on developer laptops.
+DEFAULT_MODEL_SIZE = "base"
+DEFAULT_DEVICE = "cuda"
+DEFAULT_COMPUTE_TYPE = "float16"
+CPU_FALLBACK_COMPUTE_TYPE = "int8"
+
 
 @dataclass(frozen=True)
 class STTResult:
@@ -16,8 +24,12 @@ class STTResult:
     language: str
 
 
-def _get_model(model_size: str = "small", compute_type: str = "int8") -> Any:
-    cache_key = f"{model_size}:{compute_type}"
+def _get_model(
+    model_size: str = DEFAULT_MODEL_SIZE,
+    compute_type: str = DEFAULT_COMPUTE_TYPE,
+    device: str = DEFAULT_DEVICE,
+) -> Any:
+    cache_key = f"{model_size}:{compute_type}:{device}"
     if cache_key in _MODEL_CACHE:
         return _MODEL_CACHE[cache_key]
 
@@ -28,22 +40,35 @@ def _get_model(model_size: str = "small", compute_type: str = "int8") -> Any:
             "faster-whisper is not installed. Install it on TARGET Ubuntu environment first."
         ) from exc
 
-    model = WhisperModel(model_size, compute_type=compute_type)
+    try:
+        model = WhisperModel(model_size, device=device, compute_type=compute_type)
+        print(f"[STT] loaded faster-whisper '{model_size}' on {device} ({compute_type})")
+    except Exception as exc:
+        if device == "cpu" and compute_type == CPU_FALLBACK_COMPUTE_TYPE:
+            raise
+        print(f"[STT] {device}/{compute_type} unavailable ({exc}); falling back to cpu/{CPU_FALLBACK_COMPUTE_TYPE}")
+        cache_key = f"{model_size}:{CPU_FALLBACK_COMPUTE_TYPE}:cpu"
+        if cache_key in _MODEL_CACHE:
+            return _MODEL_CACHE[cache_key]
+        model = WhisperModel(model_size, device="cpu", compute_type=CPU_FALLBACK_COMPUTE_TYPE)
+        print(f"[STT] loaded faster-whisper '{model_size}' on cpu ({CPU_FALLBACK_COMPUTE_TYPE})")
+
     _MODEL_CACHE[cache_key] = model
     return model
 
 
 def transcribe_wav(
     wav_path: str,
-    model_size: str = "small",
+    model_size: str = DEFAULT_MODEL_SIZE,
     language: Optional[str] = "ko",
-    compute_type: str = "int8",
+    compute_type: str = DEFAULT_COMPUTE_TYPE,
+    device: str = DEFAULT_DEVICE,
 ) -> STTResult:
     path = Path(wav_path)
     if not path.exists():
         raise FileNotFoundError(f"WAV file not found: {path}")
 
-    model = _get_model(model_size=model_size, compute_type=compute_type)
+    model = _get_model(model_size=model_size, compute_type=compute_type, device=device)
 
     segments, info = model.transcribe(
         str(path),

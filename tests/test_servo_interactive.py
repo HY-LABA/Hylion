@@ -15,6 +15,31 @@ from jetson.expression.mouth_servo import MouthServoController
 import threading
 
 
+# MG90S spec: ~0.1s/60° no-load. Hold PWM = delta * SPEED + SETTLE so the
+# jaw reaches the target in a single command instead of stopping mid-travel.
+MOVE_SPEED_SEC_PER_DEG = 0.004
+MOVE_SETTLE_SEC = 0.15
+
+_last_angle: float | None = None
+
+
+def drive_to_angle(servo: MouthServoController, angle: float) -> None:
+	"""Move servo to angle, holding PWM long enough for the move to complete."""
+	global _last_angle
+	if not servo.is_available:
+		return
+	target = max(0.0, min(180.0, angle))
+	delta = 180.0 if _last_angle is None else abs(target - _last_angle)
+	duration = delta * MOVE_SPEED_SEC_PER_DEG + MOVE_SETTLE_SEC
+	original = servo.move_interval_sec
+	try:
+		servo.move_interval_sec = duration
+		servo.move_to_angle(target)
+	finally:
+		servo.move_interval_sec = original
+	_last_angle = target
+
+
 def print_servo_info(servo: MouthServoController) -> None:
     """현재 서보 파라미터 출력"""
     print("\n📋 현재 서보 설정:")
@@ -65,7 +90,7 @@ def test_angle_sequence(servo: MouthServoController) -> None:
         
         if servo.is_available:
             print(f"  🔧 모터 제어 중...", flush=True)
-            servo.move_to_angle(angle)
+            drive_to_angle(servo, angle)
             print(f"  ✅ 완료")
         else:
             print(f"  ⚠️  (하드웨어 없음 - 시뮬레이션 모드)")
@@ -176,40 +201,40 @@ def interactive_mode():
                     
                     if servo.is_available:
                         print(f"\n  🔧 모터를 {angle}°로 이동 중...")
-                        servo.move_to_angle(angle)
+                        drive_to_angle(servo, angle)
                         print(f"  ✅ 완료")
                     else:
                         print(f"  ⚠️  (하드웨어 없음)")
-                
+
                 except ValueError:
                     print(f"❌ 올바른 숫자를 입력하세요 (예: 15.5)")
-            
+
             elif command == "close":
                 angle = servo.closed_angle
                 print(f"\n🔽 닫는 중 ({angle}°)...")
                 print_angle_info(angle, servo)
                 if servo.is_available:
-                    servo.move_to_angle(angle)
+                    drive_to_angle(servo, angle)
                     print("✅ 완료")
                 else:
                     print("⚠️  (하드웨어 없음)")
-            
+
             elif command == "open_min":
                 angle = servo.open_angle_min
                 print(f"\n🔼 최소 열기 ({angle}°)...")
                 print_angle_info(angle, servo)
                 if servo.is_available:
-                    servo.move_to_angle(angle)
+                    drive_to_angle(servo, angle)
                     print("✅ 완료")
                 else:
                     print("⚠️  (하드웨어 없음)")
-            
+
             elif command == "open_max":
                 angle = servo.open_angle_max
                 print(f"\n🔼 최대 열기 ({angle}°)...")
                 print_angle_info(angle, servo)
                 if servo.is_available:
-                    servo.move_to_angle(angle)
+                    drive_to_angle(servo, angle)
                     print("✅ 완료")
                 else:
                     print("⚠️  (하드웨어 없음)")

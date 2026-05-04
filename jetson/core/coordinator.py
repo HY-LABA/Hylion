@@ -10,8 +10,12 @@ from uuid import uuid4
 # parameters
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 LIVE_AUDIO_DIR = PROJECT_ROOT / "data" / "episodes"
+SESSION_LOG_DIR = PROJECT_ROOT / "data" / "sessions"
 AUTO_STANDBY_COOLDOWN_SEC = 1.5
 CHAT_STANDBY_COOLDOWN_SEC = 1.2
+# parameter: number of recent (user, assistant) turn pairs kept in the LLM context.
+# Increase for longer memory at the cost of more tokens / latency per request.
+MAX_HISTORY_TURNS = 10
 
 from jetson.cloud.groq_client import GroqClient, build_action_json_from_stt
 from jetson.core.brain.network_probe import is_online
@@ -28,6 +32,21 @@ def _print_block(title: str, payload: dict) -> None:
 	print(title)
 	print("=" * 72)
 	print(json.dumps(payload, ensure_ascii=False, indent=2))
+
+
+def _append_session_log(session_id: str, entry: dict) -> None:
+	SESSION_LOG_DIR.mkdir(parents=True, exist_ok=True)
+	log_path = SESSION_LOG_DIR / f"{session_id}.jsonl"
+	stamped = {"timestamp": datetime.now(timezone.utc).isoformat(), **entry}
+	with log_path.open("a", encoding="utf-8") as fh:
+		fh.write(json.dumps(stamped, ensure_ascii=False) + "\n")
+
+
+def _truncate_history(history: list[dict], max_turns: int) -> list[dict]:
+	max_messages = max_turns * 2
+	if len(history) <= max_messages:
+		return history
+	return history[-max_messages:]
 
 
 def _build_standby_action(session_id: str, reason: str = "task_completed") -> dict:
@@ -139,6 +158,8 @@ def _speak_reply_if_any(action_json: dict, stage: str, tts_backend, mouth_servo=
 			speed=tts_params.get("speed"),
 			volume=tts_params.get("volume"),
 			audio_format=tts_params.get("format"),
+			emotion=tts_params.get("emotion"),
+			emotion_strength=tts_params.get("emotion_strength"),
 		)
 		print(f"[Speaker] {stage} -> done ({elapsed:.2f}s)")
 	except Exception as exc:
@@ -174,7 +195,11 @@ def run_live_pipeline(
     wakeword_listener,
 ) -> None:
 	session_id = f"sess-live-{uuid4().hex[:8]}"
-	
+	# Conversation memory persists across wake-word re-activations within a single
+	# program run; restarting the process starts a fresh session_id and empty history.
+	history: list[dict] = []
+	_append_session_log(session_id, {"event": "session_start", "session_id": session_id})
+
 	# Initialize mouth servo for lip-sync
 	mouth_servo = MouthServoController(pin=33)
 	# MouthServoController initializes on first use, no explicit init() needed
@@ -199,10 +224,12 @@ def run_live_pipeline(
 		print(f"[Network] is_online={online}")
 		online, llm_backend, tts_backend = _build_turn_services(online)
 
-		# Issue greeting action to enter chat mode
+		# Issue greeting action to enter chat mode (greeting is a meta-event and is
+		# intentionally NOT added to LLM history so it doesn't pollute the dialogue).
 		greeting_action = _build_greeting_action(session_id=session_id)
 		_print_block("ACTION_JSON (GREETING)", greeting_action)
 		_speak_reply_if_any(greeting_action, stage="greeting", tts_backend=tts_backend, mouth_servo=mouth_servo)
+		_append_session_log(session_id, {"event": "wake_activation", "label": activation.label, "score": activation.score})
 
 		in_chat_mode = True
 
@@ -237,6 +264,7 @@ def run_live_pipeline(
 					stt_text=stt_result.text,
 					session_id=session_id,
 					in_chat_mode=in_chat_mode,
+					history=history,
 				)
 			else:
 				action_json = llm_backend.build_action_json_from_stt(
@@ -247,11 +275,24 @@ def run_live_pipeline(
 			_print_block("ACTION_JSON", action_json)
 
 			intent = action_json.get("intent", "unknown")
+			reply_text = str(action_json.get("reply_text", "")).strip()
+			# Update conversation memory with this turn (user utterance + assistant reply).
+			history.append({"role": "user", "content": stt_result.text})
+			if reply_text:
+				history.append({"role": "assistant", "content": reply_text})
+			history = _truncate_history(history, MAX_HISTORY_TURNS)
+			_append_session_log(session_id, {
+				"event": "turn",
+				"intent": intent,
+				"user_text": stt_result.text,
+				"assistant_text": reply_text,
+			})
+
 			_speak_reply_if_any(action_json, stage=f"before_{intent}", tts_backend=tts_backend, mouth_servo=mouth_servo)
 
-			if intent == "chat":
-				# Chat continues; listen for next utterance
-				print("[Mode] chat loop continues. Listening for next utterance.")
+			if intent in {"chat", "unknown"}:
+				# Chat (or unknown — re-prompt the user) continues; listen for next utterance
+				print(f"[Mode] {intent} -> chat loop continues. Listening for next utterance.")
 				continue
 
 			if intent == "standby":
@@ -280,7 +321,7 @@ def _parse_args() -> argparse.Namespace:
 	parser = argparse.ArgumentParser(description="Run live mic->Whisper->Groq coordinator loop.")
 	parser.add_argument("--record-sec", type=float, default=4.0, help="Microphone record duration per turn")
 	parser.add_argument("--preferred-keyword", default="USB", help="Preferred mic device name keyword")
-	parser.add_argument("--whisper-model-size", default="small", help="faster-whisper model size")
+	parser.add_argument("--whisper-model-size", default="base", help="faster-whisper model size")
 	parser.add_argument("--whisper-language", default="ko", help="Whisper language hint")
 	return parser.parse_args()
 

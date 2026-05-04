@@ -53,6 +53,12 @@ def _get_reply_dir():
     return fallback
 
 REPLY_DIR = _get_reply_dir()
+# DEFAULT_CLOVA_SPEAKER: Clova Premium TTS 화자명.
+# 감정(emotion) 파라미터 지원 화자 예시 (Clova Premium 기준):
+# nara | vara | vmikyung | vdain | vyuna | vgoeun | vdaeseong
+# emotion 미지원 화자(예: 현재 기본값 nhajun)는 emotion 값을 보내도 무시됨.
+# 정확한 지원 목록과 emotion index(0=중립, 1=슬픔, 2=기쁨, 3=분노 등)는
+# 화자별로 다르므로 Clova Premium TTS 공식 문서를 참고해 변경할 것.
 DEFAULT_CLOVA_SPEAKER = "nhajun"
 DEFAULT_TTS_PROVIDER = "auto"
 
@@ -67,6 +73,8 @@ class TTSParams:
     speed: int = 0
     volume: int = 0
     audio_format: str = "mp3"
+    emotion: int = 0
+    emotion_strength: int = 1
 
 
 def _read_env_file() -> dict:
@@ -124,9 +132,11 @@ class ClovaTTSClient:
         voice: str = DEFAULT_CLOVA_SPEAKER,
         pitch: int = 0,
         rate: Optional[int] = None,
-        speed: int = 0,
+        speed: int = -3,
         volume: int = 0,
         audio_format: str = "mp3",
+        emotion: int = 0,
+        emotion_strength: int = 1,
     ) -> bool:
         if not self.is_available:
             logger.warning("Clova credentials not found. Skip Clova synthesis.")
@@ -141,6 +151,8 @@ class ClovaTTSClient:
             "speed": str(actual_speed),
             "volume": str(volume),
             "format": audio_format,
+            "emotion": str(emotion),
+            "emotion-strength": str(emotion_strength),
         }
         data = urllib.parse.urlencode(payload).encode("utf-8")
         req = urllib.request.Request(self.endpoint, data=data, method="POST")
@@ -209,9 +221,11 @@ class Speaker:
         voice: str = DEFAULT_CLOVA_SPEAKER,
         pitch: int = 0,
         rate: Optional[int] = None,
-        speed: int = 0,
+        speed: int = -3,
         volume: int = 0,
         audio_format: str = "mp3",
+        emotion: int = 0,
+        emotion_strength: int = 1,
     ):
         self.enable_lipsync = enable_lipsync
         self.last_audio_file = None
@@ -225,6 +239,8 @@ class Speaker:
             speed=speed,
             volume=volume,
             audio_format=audio_format,
+            emotion=emotion,
+            emotion_strength=emotion_strength,
         )
 
         if self.tts_provider == "auto":
@@ -233,7 +249,8 @@ class Speaker:
         logger.info(
             f"TTS provider: {self.tts_provider} "
             f"(voice={self.tts_defaults.voice}, pitch={self.tts_defaults.pitch}, "
-            f"rate={self.tts_defaults.rate}, speed={self.tts_defaults.speed})"
+            f"rate={self.tts_defaults.rate}, speed={self.tts_defaults.speed}, "
+            f"emotion={self.tts_defaults.emotion}, emotion_strength={self.tts_defaults.emotion_strength})"
         )
         
         # USB 스피커 자동 감지
@@ -267,6 +284,8 @@ class Speaker:
         speed: Optional[int],
         volume: Optional[int],
         audio_format: Optional[str],
+        emotion: Optional[int],
+        emotion_strength: Optional[int],
     ) -> TTSParams:
         return TTSParams(
             voice=voice or speaker or self.tts_defaults.voice,
@@ -275,6 +294,8 @@ class Speaker:
             speed=self.tts_defaults.speed if speed is None else speed,
             volume=self.tts_defaults.volume if volume is None else volume,
             audio_format=self.tts_defaults.audio_format if audio_format is None else audio_format,
+            emotion=self.tts_defaults.emotion if emotion is None else emotion,
+            emotion_strength=self.tts_defaults.emotion_strength if emotion_strength is None else emotion_strength,
         )
         
     def _synthesize_with_gtts(self, reply_text: str, output_file: str) -> bool:
@@ -301,6 +322,8 @@ class Speaker:
         speed: Optional[int] = None,
         volume: Optional[int] = None,
         audio_format: Optional[str] = None,
+        emotion: Optional[int] = None,
+        emotion_strength: Optional[int] = None,
     ) -> Optional[str]:
         """TTS 음성 MP3 생성 (Clova 우선, 실패 시 gTTS fallback)"""
         if not reply_text or not reply_text.strip():
@@ -319,6 +342,8 @@ class Speaker:
                 speed=speed,
                 volume=volume,
                 audio_format=audio_format,
+                emotion=emotion,
+                emotion_strength=emotion_strength,
             )
 
             synthesized = False
@@ -332,6 +357,8 @@ class Speaker:
                     speed=params.speed,
                     volume=params.volume,
                     audio_format=params.audio_format,
+                    emotion=params.emotion,
+                    emotion_strength=params.emotion_strength,
                 )
                 if not synthesized:
                     logger.warning("Clova TTS 실패, gTTS fallback 시도")
@@ -409,18 +436,20 @@ class Speaker:
         speed: Optional[int] = None,
         volume: Optional[int] = None,
         audio_format: Optional[str] = None,
+        emotion: Optional[int] = None,
+        emotion_strength: Optional[int] = None,
     ) -> float:
         """
         음성 합성 → 재생 → 입 서보 동기화
-        
+
         Returns:
             경과 시간 (초)
         """
         if not reply_text or not reply_text.strip():
             return 0.0
-        
+
         start_time = time.time()
-        
+
         # 1. 음성 합성
         audio_file = self.synthesize_reply_audio(
             reply_text=reply_text,
@@ -431,6 +460,8 @@ class Speaker:
             speed=speed,
             volume=volume,
             audio_format=audio_format,
+            emotion=emotion,
+            emotion_strength=emotion_strength,
         )
         if not audio_file:
             duration = len(reply_text) / 10.0
@@ -493,6 +524,8 @@ class MockSpeaker:
         speed: Optional[int] = None,
         volume: Optional[int] = None,
         audio_format: Optional[str] = None,
+        emotion: Optional[int] = None,
+        emotion_strength: Optional[int] = None,
     ) -> Optional[str]:
         self.last_text = reply_text
         logger.info(f"[MOCK] TTS: {reply_text}")
@@ -521,13 +554,15 @@ class MockSpeaker:
         speed: Optional[int] = None,
         volume: Optional[int] = None,
         audio_format: Optional[str] = None,
+        emotion: Optional[int] = None,
+        emotion_strength: Optional[int] = None,
     ) -> float:
         """Mock: 텍스트 출력 및 대기"""
         if not reply_text or not reply_text.strip():
             return 0.0
-        
+
         start_time = time.time()
-        
+
         audio_file = self.synthesize_reply_audio(
             reply_text=reply_text,
             speaker=speaker,
@@ -537,6 +572,8 @@ class MockSpeaker:
             speed=speed,
             volume=volume,
             audio_format=audio_format,
+            emotion=emotion,
+            emotion_strength=emotion_strength,
         )
         duration = self.get_audio_duration_sec(audio_file)
         
@@ -570,6 +607,8 @@ def build_tts_backend(
     speed: int = 0,
     volume: int = 0,
     audio_format: str = "mp3",
+    emotion: int = 0,
+    emotion_strength: int = 1,
 ):
     """
     TTS 백엔드 생성
@@ -600,4 +639,6 @@ def build_tts_backend(
             speed=speed,
             volume=volume,
             audio_format=audio_format,
+            emotion=emotion,
+            emotion_strength=emotion_strength,
         )

@@ -22,10 +22,10 @@ class MouthServoController:
 		servo_model: str = "MG90S",
 		min_pulse_ms: float = 0.5,
 		max_pulse_ms: float = 2.5,
-		closed_angle: float = 0.0,
-		open_angle_min: float = 8.0,
-		open_angle_max: float = 30.0,
-		move_interval_sec: float = 0.07,
+		closed_angle: float = 120.0,
+		open_angle_min: float = 70.0,
+		open_angle_max: float = 120.0,
+		move_interval_sec: float = 0.18,
 	) -> None:
 		self.pin = pin
 		self.pwm_hz = pwm_hz
@@ -95,13 +95,29 @@ class MouthServoController:
 
 		self.initialize()
 		end_ts = time.monotonic() + duration_sec
+		mid = (self.open_angle_min + self.open_angle_max) / 2.0
+		toggle = True
 
 		while time.monotonic() < end_ts and not stop_event.is_set():
-			angle = random.uniform(self.open_angle_min, self.open_angle_max)
+			# Alternate halves so every step is a big swing instead of a small drift.
+			if toggle:
+				angle = random.uniform(self.open_angle_min, mid)
+			else:
+				angle = random.uniform(mid, self.open_angle_max)
+			toggle = not toggle
 			remaining = end_ts - time.monotonic()
 			self._drive_angle_for_duration(angle, min(self.move_interval_sec, max(0.0, remaining)))
 
-		self._drive_angle_for_duration(self.closed_angle, min(self.move_interval_sec, max(0.0, end_ts - time.monotonic())))
+		# Always return to the closed position when speech ends, regardless of
+		# remaining time. Hold long enough for a worst-case swing across the open range.
+		self._return_to_closed()
+
+	def _return_to_closed(self) -> None:
+		span = abs(self.open_angle_max - self.open_angle_min)
+		full_span = max(span, abs(self.closed_angle - self.open_angle_min), abs(self.closed_angle - self.open_angle_max))
+		# MG90S ~0.1s/60° no-load -> ~0.0017s/°. Use 0.004s/° + 0.1s settle for safety.
+		duration = full_span * 0.004 + 0.1
+		self._drive_angle_for_duration(self.closed_angle, duration)
 
 	def cleanup(self) -> None:
 		if not self._available:
@@ -110,7 +126,7 @@ class MouthServoController:
 			return
 
 		try:
-			self._drive_angle_for_duration(self.closed_angle, 0.08)
+			self._return_to_closed()
 		finally:
 			# Do cleanup only for this pin to avoid side effects on other GPIO users.
 			GPIO.cleanup(self.pin)

@@ -6,7 +6,7 @@ import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 from uuid import uuid4
 
 
@@ -22,27 +22,16 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_ACTION_SCHEMA_PATH = PROJECT_ROOT / "configs" / "schemas" / "action.schema.json"
 
 BASE_SYSTEM_PROMPT = (
-	"너는 키 1미터의 귀여운 파란색 사자 휴머노이드 로봇 '하이리온(HYlion)'이야. "
-	"친절하고 씩씩하며, 명령을 완벽하게 수행하는 똑똑한 로봇 조수지.\n"
-	"사용자의 음성 입력 텍스트를 분석하여, 반드시 하단에 제공된 JSON 스키마 규격에 완벽히 "
-	"일치하는 JSON 객체로만 응답해. 마크다운이나 다른 부연 설명은 절대 금지야.\n"
-	"- intent와 gait_cmd는 스키마의 enum 값 중 가장 적절한 것을 선택해. "
-	"(move나 stop이 아니면 gait_cmd는 none)\n"
-	"- reply_text는 하이리온의 씩씩하고 친절한 성격을 담아 사용자가 들을 자연스러운 한국어 "
-	"음성 대사를 작성해. 반드시 완전한 문장으로 작성해.\n"
-	"- requires_smolvla는 intent가 pick_place일 때만 true야.\n"
-	"- requires_bhl은 intent가 move나 stop일 때만 true야.\n"
-	"- intent가 chat이면 사용자와 자연스럽게 대화하고, reply_text는 1~2문장의 따뜻하고 "
-	"용기 있는 말투로 작성해.\n"
-	"- 사용자가 대화를 마무리/종료하려는 의도라고 판단되면 intent를 standby로 설정해. "
-	"이 판단은 반드시 대화 맥락까지 포함해 LLM이 직접 수행해.\n"
-	"- 아래 [INTENT KEYWORD OVERRIDES] 섹션의 각 intent 키워드 칸이 비어있지 않다면, "
-	"해당 키워드가 포함된 입력은 반드시 그 intent로 분류해.\n"
-	"- 아래 캐릭터 설정을 reply_text 톤에 반영해:\n"
-	"  용맹하고 따뜻한 가슴을 가진 라이온 하트, 가장 온도가 높다는 푸른 불꽃의 모습을 닮은 "
-	"갈기로 주변을 따뜻하게 밝히며 사랑의 실천을 이어나간다.\n"
-	"  학생들의 사랑을 받으며 더 귀여워진 하이리온의 정체성을 소중히 여기고, 한양대를 가꾸는 "
-	"가드너 취미를 가진다.\n"
+	"너는 키 1미터의 귀여운 파란색 사자 휴머노이드 로봇 '하이리온(HYlion)'이야. 친절하고 씩씩하며, 명령을 완벽하게 수행하는 똑똑한 로봇 조수지. 사용자의 음성 입력 텍스트를 분석하여, 반드시 하단에 제공된 JSON 스키마 규격에 완벽히 일치하는 JSON 객체로만 응답해. 마크다운이나 다른 부연 설명은 절대 금지야. "
+	"- intent와 gait_cmd는 스키마의 enum 값 중 가장 적절한 것을 선택해. (move나 stop이 아니면 gait_cmd는 none) "
+	"- reply_text는 하이리온의 씩씩하고 친절한 성격을 담아 사용자가 들을 자연스러운 한국어 음성 대사를 작성해. 반드시 완전한 문장으로 작성해. "
+	"- requires_smolvla는 intent가 pick_place일 때만 true야. "
+	"- requires_bhl은 intent가 move나 stop일 때만 true야. "
+	"- intent가 chat이면 사용자와 자연스럽게 대화하고, reply_text는 1~2문장의 따뜻하고 용기 있는 7살 정도의 어린 남자아이 말투로 작성해. "
+	"- 사용자가 대화를 마무리/종료하려는 의도라고 판단되면 intent를 standby로 설정해. 이 판단은 반드시 대화 맥락까지 포함해 LLM이 직접 수행해. "
+	"- 만약 intent가 unknown으로 분류된다면, reply_text는 '무슨 말인지 잘 모르겠어요. 다시 말씀해 주시겠어요?'로 작성해. "
+	"- 아래 [INTENT KEYWORD OVERRIDES] 섹션의 각 intent 키워드 칸이 비어있지 않다면, 해당 키워드가 포함된 입력은 반드시 그 intent로 분류해. "
+	"- 아래 캐릭터 설정을 reply_text 내용에 반영해: 용맹하고 따뜻한 가슴을 가진 라이온 하트, 가장 온도가 높다는 푸른 불꽃의 모습을 닮은 갈기로 주변을 따뜻하게 밝히며 사랑의 실천을 이어나간다. 학생들의 사랑을 받으며 더 귀여워진 하이리온의 정체성을 소중히 여기고, 한양대를 가꾸는 가드너 취미를 가진다. "
 	"- 반드시 JSON 객체 하나만 출력해."
 )
 
@@ -52,8 +41,8 @@ INTENT_KEYWORD_OVERRIDES_TEMPLATE = (
 	"- chat:\n"
 	"- pick_place:\n"
 	"- move:\n"
-	"- stop:\n"
-	"- standby:\n"
+	"- stop:멈춰\n"
+	"- standby:쉬어, 수고, 휴식\n"
 )
 
 
@@ -89,15 +78,16 @@ class GroqClient:
 		retry_delay_sec: float = 0.4,
 		timeout_sec: Optional[float] = 15.0,
 		json_mode: bool = True,
+		history: Optional[List[Dict[str, str]]] = None,
 	) -> GroqCallResult:
 		client = self._get_or_create_client()
 		if client is None:
 			return GroqCallResult(ok=False, content="", error="groq_client_unavailable")
 
-		messages = [
-			{"role": "system", "content": system_prompt},
-			{"role": "user", "content": user_text},
-		]
+		messages: List[Dict[str, str]] = [{"role": "system", "content": system_prompt}]
+		if history:
+			messages.extend(history)
+		messages.append({"role": "user", "content": user_text})
 
 		last_error: Optional[str] = None
 		max_attempts = max(1, retries + 1)
@@ -139,8 +129,9 @@ class LocalLLMClient:
 		retry_delay_sec: float = 0.0,
 		timeout_sec: Optional[float] = 10.0,
 		json_mode: bool = True,
+		history: Optional[List[Dict[str, str]]] = None,
 	) -> GroqCallResult:
-		_ = (system_prompt, user_text, model, temperature, retries, retry_delay_sec, timeout_sec, json_mode)
+		_ = (system_prompt, user_text, model, temperature, retries, retry_delay_sec, timeout_sec, json_mode, history)
 		return GroqCallResult(ok=False, content="", error="local_llm_not_implemented")
 
 
@@ -241,6 +232,7 @@ def build_action_json_from_stt(
 	local_client: Optional[Any] = None,
 	in_chat_mode: bool = False,
 	schema_path: Path = DEFAULT_ACTION_SCHEMA_PATH,
+	history: Optional[List[Dict[str, str]]] = None,
 ) -> Dict[str, Any]:
 	schema_content = load_action_schema_content(schema_path=schema_path)
 	final_system_prompt = system_prompt or build_system_prompt(schema_content)
@@ -249,6 +241,7 @@ def build_action_json_from_stt(
 		system_prompt=final_system_prompt,
 		user_text=stt_text,
 		json_mode=True,
+		history=history,
 	)
 	if cloud_call.ok:
 		try:
@@ -267,6 +260,7 @@ def build_action_json_from_stt(
 		system_prompt=final_system_prompt,
 		user_text=stt_text,
 		json_mode=True,
+		history=history,
 	)
 	if local_call.ok:
 		try:

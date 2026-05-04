@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -23,17 +24,16 @@ except Exception:  # pragma: no cover - Jetson target dependency
     openwakeword = None
 
 
-# parameters
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-DEFAULT_WAKEWORD_MODEL_PATH = str(PROJECT_ROOT / "checkpoints" / "wakeword" / "Hey_Hyleon.onnx")
-DEFAULT_WAKEWORD_MODEL = DEFAULT_WAKEWORD_MODEL_PATH
-DEFAULT_WAKEWORD_THRESHOLD = 0.5
-DEFAULT_PLAN_A_DEVICE_KEYWORD = "plughw"
-DEFAULT_PLAN_B_DEVICE_KEYWORD = ""
-DEFAULT_PLAN_A_SAMPLE_RATE = 16000
-DEFAULT_PLAN_B_SAMPLE_RATE = 44100
-DEFAULT_WAKEWORD_BLOCK_MS = 80
-DEFAULT_BATON_TOUCH_DELAY_SEC = 0.5
+DEFAULT_WAKEWORD_MODEL_PATH = str(PROJECT_ROOT / "checkpoints" / "wakeword" / "Hey_Hyleon.tflite")
+DEFAULT_WAKEWORD_MODEL = os.getenv("HYLION_WAKEWORD_MODEL", DEFAULT_WAKEWORD_MODEL_PATH)
+DEFAULT_WAKEWORD_THRESHOLD = float(os.getenv("HYLION_WAKEWORD_THRESHOLD", "0.5"))
+DEFAULT_PLAN_A_DEVICE_KEYWORD = os.getenv("HYLION_WAKEWORD_PLAN_A_DEVICE_KEYWORD", "plughw")
+DEFAULT_PLAN_B_DEVICE_KEYWORD = os.getenv("HYLION_WAKEWORD_PLAN_B_DEVICE_KEYWORD", "")
+DEFAULT_PLAN_A_SAMPLE_RATE = int(os.getenv("HYLION_WAKEWORD_PLAN_A_SAMPLE_RATE", "16000"))
+DEFAULT_PLAN_B_SAMPLE_RATE = int(os.getenv("HYLION_WAKEWORD_PLAN_B_SAMPLE_RATE", "44100"))
+DEFAULT_WAKEWORD_BLOCK_MS = int(os.getenv("HYLION_WAKEWORD_BLOCK_MS", "80"))
+DEFAULT_BATON_TOUCH_DELAY_SEC = float(os.getenv("HYLION_WAKEWORD_BATON_TOUCH_DELAY_SEC", "0.5"))
 
 
 @dataclass(frozen=True)
@@ -56,7 +56,7 @@ class WakeWordConfig:
     plan_b_sample_rate: int = DEFAULT_PLAN_B_SAMPLE_RATE
     block_ms: int = DEFAULT_WAKEWORD_BLOCK_MS
     baton_touch_delay_sec: float = DEFAULT_BATON_TOUCH_DELAY_SEC
-    inference_framework: str = "onnx"
+    inference_framework: str = "tflite"
     vad_threshold: float = 0.0
 
 
@@ -81,20 +81,27 @@ class WakeWordListener:
     def _build_model(self):
         model_value = str(self.config.model_name).strip()
         if not model_value:
-            raise RuntimeError("Wake word model path is empty")
+            raise RuntimeError("Wake word model is empty")
 
-        model_path = Path(model_value).expanduser()
-        if not model_path.is_absolute():
-            model_path = (PROJECT_ROOT / model_path).resolve()
-        if not model_path.exists():
-            raise RuntimeError(
-                f"Wake word model file not found: {model_path}. "
-                "Set WAKE_WORD_MODEL_PATH to a valid custom model path."
-            )
+        # If the value looks like a file path, resolve it relative to the project
+        # root and verify it exists. Otherwise treat it as an openWakeWord built-in
+        # alias (e.g. "hey_jarvis") and pass it through untouched.
+        looks_like_path = any(sep in model_value for sep in ("/", "\\")) or model_value.endswith((".tflite", ".onnx"))
+        if looks_like_path:
+            model_path = Path(model_value).expanduser()
+            if not model_path.is_absolute():
+                model_path = (PROJECT_ROOT / model_path).resolve()
+            if not model_path.exists():
+                raise RuntimeError(
+                    f"Wake word model file not found: {model_path}. "
+                    "Set HYLION_WAKEWORD_MODEL to a valid model path or built-in alias."
+                )
+            wakeword_models = [str(model_path)]
+        else:
+            wakeword_models = [model_value]
 
-        # Use custom ONNX model path directly.
         return openwakeword.Model(
-            wakeword_models=[str(model_path)],
+            wakeword_models=wakeword_models,
             inference_framework=self.config.inference_framework,
             vad_threshold=self.config.vad_threshold,
         )
@@ -190,6 +197,26 @@ class WakeWordListener:
             source_label="Plan B (Python resample)",
         )
 
+    def _reset_model_state(self) -> None:
+        # openWakeWord keeps an internal melspectrogram + prediction buffer. Without an
+        # explicit reset, the next wait_for_wake_word() call can re-trigger off the
+        # leftover state from the last detection even if the new audio is silence.
+        reset_fn = getattr(self._model, "reset", None)
+        if callable(reset_fn):
+            try:
+                reset_fn()
+            except Exception as exc:
+                print(f"[WakeWord] model.reset() failed: {exc}")
+            return
+
+        prediction_buffer = getattr(self._model, "prediction_buffer", None)
+        if isinstance(prediction_buffer, dict):
+            for key, value in prediction_buffer.items():
+                try:
+                    value.clear()
+                except Exception:
+                    prediction_buffer[key] = type(value)()
+
     def _to_int16_array(self, raw_chunk) -> np.ndarray:
         if isinstance(raw_chunk, tuple):
             raw_chunk = raw_chunk[0]
@@ -256,16 +283,6 @@ class WakeWordListener:
             device_name=self._device_name,
         )
 
-    def _reset_model_state(self) -> None:
-        # Some wake-word backends keep temporal state across predict calls.
-        # Reset on each re-arm to reduce stale-score immediate retriggers.
-        reset_fn = getattr(self._model, "reset", None)
-        if callable(reset_fn):
-            try:
-                reset_fn()
-            except Exception:
-                pass
-
     def wait_for_wake_word(self) -> WakeWordActivation:
         """Block until the configured wake word is detected.
 
@@ -279,8 +296,11 @@ class WakeWordListener:
             raise RuntimeError("WakeWordListener is already closed")
 
         if self._stream is None:
+            # Fresh stream means a fresh detection session; clear any state left over
+            # from the previous activation so we don't immediately re-fire on stale
+            # internal buffers.
+            self._reset_model_state()
             self._open_with_plan_a_or_b()
-        self._reset_model_state()
 
         try:
             while True:
