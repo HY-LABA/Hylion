@@ -20,6 +20,18 @@
     영향 라인: L15·L54·L70·L72·L92·L494·L497 (7건) — 모두 아래와 같이 정정.
   - run_training_flow_with_dataset(script_dir, dataset_name) 시그니처 추가
     G-4 학습 전환 시 방금 수집한 dataset_name 을 dataset_id 로 자동 선택.
+
+갱신 (2026-05-03, TODO-D2):
+  - _select_start_ckpt() 추가 — 시작 ckpt 케이스 4건 분기 UI
+    케이스 none:          --policy.path=lerobot/smolvla_base (사전학습 시작)
+    케이스 dummy:         save_dummy_checkpoint.sh 산출물 경로 (T1 의존 X — 1 step ckpt)
+    케이스 fine-tune-step: 실 학습 중간 체크포인트 --policy.path=<step>/pretrained_model/
+    케이스 fine-tune-last: --resume + config_path=<last>/pretrained_model/train_config.json
+    레퍼런스: docs/reference/lerobot/src/lerobot/configs/train.py
+      resume: bool = False (L49)
+      checkpoint_path: Path | None (L84)
+      elif self.resume: self.checkpoint_path = policy_dir.parent (L94~111)
+    단, 실 fine-tune 케이스 (step·last) 는 T2 산출물 의존 — D2 시점엔 코드 분기 정합 만 검증.
 """
 
 import subprocess
@@ -281,7 +293,7 @@ def flow4_select_dataset(script_dir: Path, scenario: str) -> str | None:
 
         if choice == 2:
             if not local_datasets:
-                print("  로컬 데이터셋이 없습니다. 먼저 DataCollector 에서 rsync 를 실행하세요.")
+                print("  로컬 데이터셋이 없습니다. DGX 에서 lerobot-record 로 데이터 수집 후 학습을 진행하세요.")
                 continue
             return _select_local_dataset(local_datasets)
 
@@ -380,6 +392,115 @@ def _run_smoke_test(script_dir: Path) -> bool:
     return result.returncode == 0
 
 
+def _select_start_ckpt(script_dir: Path) -> tuple[str, str | None, str | None]:
+    """시작 ckpt 케이스 4건 분기 UI.
+
+    레퍼런스: docs/reference/lerobot/src/lerobot/configs/train.py
+      - resume: bool = False (L49)
+      - checkpoint_path: Path | None = field(init=False, default=None) (L84)
+      - elif self.resume: self.checkpoint_path = policy_dir.parent (L94~111)
+        → --resume + --config_path=<last>/pretrained_model/train_config.json
+
+    4가지 시작 ckpt 케이스:
+      none:           --policy.path=lerobot/smolvla_base (사전학습 시작)
+      dummy:          --policy.path=<dummy_ckpt>/pretrained_model (save_dummy_checkpoint.sh 산출물)
+      fine-tune-step: --policy.path=<output_dir>/checkpoints/<step>/pretrained_model
+      fine-tune-last: --resume (+ config_path 자동 해석: <output_dir>/checkpoints/last/pretrained_model/train_config.json)
+
+    주의: fine-tune-step·fine-tune-last 는 T2 산출물 의존.
+          D2 시점엔 코드 분기 정합 만 검증 (실 실행은 T2 완료 후).
+
+    Returns:
+        (ckpt_case, policy_path_or_none, config_path_or_none)
+        ckpt_case: "none" | "dummy" | "fine-tune-step" | "fine-tune-last"
+        policy_path_or_none: --policy.path 값 (fine-tune-last 시 None)
+        config_path_or_none: --config_path 값 (fine-tune-last 시만 사용)
+    """
+    print()
+    print("=" * 60)
+    print(" 시작 체크포인트 선택")
+    print("=" * 60)
+    print()
+    print("어떤 체크포인트에서 학습을 시작하겠습니까?")
+    print()
+    print("  1. 사전학습 (none)        — lerobot/smolvla_base 로드 후 fine-tune 시작")
+    print("     --policy.path=lerobot/smolvla_base")
+    print()
+    print("  2. dummy 체크포인트       — save_dummy_checkpoint.sh 산출물 (1 step ckpt)")
+    print("     경로: dgx/outputs/train/dummy_ckpt/checkpoints/000001/pretrained_model/")
+    print()
+    print("  3. 실 학습 중간 단계      — T2 산출물 필요 (checkpoints/<step>/pretrained_model/)")
+    print("     [T2 의존 — D2 시점 코드 분기만 검증, 실 실행은 T2 완료 후]")
+    print()
+    print("  4. 마지막 저장 (last)     — --resume 으로 이어서 학습")
+    print("     경로: dgx/outputs/train/<run>/checkpoints/last/pretrained_model/train_config.json")
+    print("     [T2 의존 — D2 시점 코드 분기만 검증]")
+    print()
+    print("  5. 취소")
+    print()
+
+    dgx_dir = str(script_dir.parent)
+    dummy_ckpt_path = f"{dgx_dir}/outputs/train/dummy_ckpt/checkpoints/000001/pretrained_model"
+
+    while True:
+        try:
+            raw = _prompt("번호 선택 [1~5]: ")
+        except KeyboardInterrupt:
+            return "none", DEFAULT_POLICY_PATH, None
+
+        if not raw.isdigit():
+            print("  숫자를 입력하세요.")
+            continue
+
+        choice = int(raw)
+
+        if choice == 1:
+            # none: 사전학습 시작
+            print(f"\n[ckpt] 사전학습 시작: --policy.path={DEFAULT_POLICY_PATH}")
+            return "none", DEFAULT_POLICY_PATH, None
+
+        elif choice == 2:
+            # dummy: save_dummy_checkpoint.sh 산출물
+            print(f"\n[ckpt] dummy 체크포인트: {dummy_ckpt_path}")
+            return "dummy", dummy_ckpt_path, None
+
+        elif choice == 3:
+            # fine-tune-step: 실 학습 중간 체크포인트 경로 입력
+            print()
+            print("  실 학습 체크포인트 경로 입력 (예: ~/smolvla/dgx/outputs/train/<run>/checkpoints/001000/pretrained_model)")
+            try:
+                path_input = _prompt("  경로: ")
+            except KeyboardInterrupt:
+                continue
+            if not path_input:
+                print("  경로가 비어있습니다. 다시 입력하세요.")
+                continue
+            print(f"\n[ckpt] fine-tune-step: --policy.path={path_input}")
+            return "fine-tune-step", path_input, None
+
+        elif choice == 4:
+            # fine-tune-last: --resume + config_path
+            print()
+            print("  이어서 학습할 run 이름 또는 output_dir 경로 입력")
+            print("  (예: ~/smolvla/dgx/outputs/train/<run>)")
+            try:
+                run_dir = _prompt("  output_dir: ")
+            except KeyboardInterrupt:
+                continue
+            if not run_dir:
+                print("  경로가 비어있습니다. 다시 입력하세요.")
+                continue
+            config_path = f"{run_dir}/checkpoints/last/pretrained_model/train_config.json"
+            print(f"\n[ckpt] fine-tune-last: --resume --config_path={config_path}")
+            return "fine-tune-last", None, config_path
+
+        elif choice == 5:
+            return "none", DEFAULT_POLICY_PATH, None
+
+        else:
+            print("  1~5 중 하나를 입력하세요.")
+
+
 def _run_real_training(
     script_dir: Path,
     scenario: str,
@@ -404,6 +525,13 @@ def _run_real_training(
         --rename_map='{"observation.images.top":"observation.images.camera1",...}'
         --wandb.enable=false
 
+    ckpt 케이스 4건 (TODO-D2 갱신):
+      none:           --policy.path=lerobot/smolvla_base
+      dummy:          --policy.path=<dummy_ckpt>/pretrained_model
+      fine-tune-step: --policy.path=<step>/pretrained_model
+      fine-tune-last: --resume --config_path=<last>/pretrained_model/train_config.json
+        (레퍼런스: lerobot/configs/train.py L49·L84·L94-111)
+
     실 학습 시 steps 는 사용자 입력 받음.
 
     Returns:
@@ -415,9 +543,14 @@ def _run_real_training(
 
     print()
     print("실 학습 파라미터 설정:")
-    print(f"  기본 policy:   {DEFAULT_POLICY_PATH}")
     print(f"  데이터셋:      {dataset_repo_id}")
     print()
+
+    # 시작 ckpt 선택 (4건 분기)
+    ckpt_case, policy_path, config_path = _select_start_ckpt(script_dir)
+
+    # fine-tune-last 는 resume 모드 — output_dir 은 run_dir 에서 자동 결정됨
+    is_resume = (ckpt_case == "fine-tune-last")
 
     # steps 입력
     while True:
@@ -433,7 +566,7 @@ def _run_real_training(
             break
         print("  양의 정수를 입력하세요.")
 
-    # run_name 입력
+    # run_name 입력 (resume 시에도 출력 구분용)
     try:
         run_name_input = _prompt(f"run 이름 입력 (기본: {run_name_default}): ")
     except KeyboardInterrupt:
@@ -451,33 +584,65 @@ def _run_real_training(
     dgx_dir = str(script_dir.parent)
     output_dir = f"{dgx_dir}/outputs/train/{run_name}"
 
-    cmd = [
-        "lerobot-train",
-        f"--policy.path={DEFAULT_POLICY_PATH}",
-        f"--dataset.repo_id={dataset_repo_id}",
-        "--batch_size=8",
-        f"--steps={steps}",
-        "--log_freq=50",
-        f"--save_freq={save_freq}",
-        "--save_checkpoint=true",
-        "--num_workers=4",
-        f"--output_dir={output_dir}",
-        f"--job_name={run_name}",
-        "--policy.device=cuda",
-        "--policy.push_to_hub=false",
-        "--rename_map={\"observation.images.top\":\"observation.images.camera1\","
-        "\"observation.images.wrist\":\"observation.images.camera2\"}",
-        f"--wandb.enable={'true' if use_wandb else 'false'}",
-    ]
+    # lerobot-train 인자 구성
+    # 레퍼런스: lerobot/configs/train.py
+    #   resume=False (L49): --policy.path 로 시작
+    #   resume=True (L94):  --resume + --config_path=<train_config.json 경로>
+    if is_resume:
+        # fine-tune-last: --resume 모드
+        # train.py L94-111: resume 시 config_path 에서 checkpoint_path 결정
+        cmd = [
+            "lerobot-train",
+            "--resume",
+            f"--config_path={config_path}",
+            f"--dataset.repo_id={dataset_repo_id}",
+            "--batch_size=8",
+            f"--steps={steps}",
+            "--log_freq=50",
+            f"--save_freq={save_freq}",
+            "--save_checkpoint=true",
+            "--num_workers=4",
+            f"--job_name={run_name}",
+            "--policy.device=cuda",
+            "--policy.push_to_hub=false",
+            "--rename_map={\"observation.images.top\":\"observation.images.camera1\","
+            "\"observation.images.wrist\":\"observation.images.camera2\"}",
+            f"--wandb.enable={'true' if use_wandb else 'false'}",
+        ]
+    else:
+        # none / dummy / fine-tune-step: --policy.path 로 시작
+        cmd = [
+            "lerobot-train",
+            f"--policy.path={policy_path}",
+            f"--dataset.repo_id={dataset_repo_id}",
+            "--batch_size=8",
+            f"--steps={steps}",
+            "--log_freq=50",
+            f"--save_freq={save_freq}",
+            "--save_checkpoint=true",
+            "--num_workers=4",
+            f"--output_dir={output_dir}",
+            f"--job_name={run_name}",
+            "--policy.device=cuda",
+            "--policy.push_to_hub=false",
+            "--rename_map={\"observation.images.top\":\"observation.images.camera1\","
+            "\"observation.images.wrist\":\"observation.images.camera2\"}",
+            f"--wandb.enable={'true' if use_wandb else 'false'}",
+        ]
 
     print()
     print("=" * 60)
     print(" 실 학습 시작")
     print("=" * 60)
-    print(f"  run:        {run_name}")
-    print(f"  steps:      {steps}")
-    print(f"  save_freq:  {save_freq}")
-    print(f"  output_dir: {output_dir}")
+    print(f"  ckpt 케이스: {ckpt_case}")
+    if is_resume:
+        print(f"  config_path: {config_path}")
+    else:
+        print(f"  policy:      {policy_path}")
+        print(f"  output_dir:  {output_dir}")
+    print(f"  run:         {run_name}")
+    print(f"  steps:       {steps}")
+    print(f"  save_freq:   {save_freq}")
     print()
     print("  (Ctrl+C 로 중단 가능 — 마지막 save_checkpoint 까지 저장됨)")
     print("=" * 60)
@@ -486,10 +651,10 @@ def _run_real_training(
     result = subprocess.run(cmd, check=False)
 
     if result.returncode == 0:
-        return True, output_dir
+        return True, output_dir if not is_resume else None
     else:
         print(f"\n[ERROR] lerobot-train 종료 코드: {result.returncode}")
-        return False, output_dir
+        return False, output_dir if not is_resume else None
 
 
 def _show_ckpt_management(output_dir: str | None) -> None:

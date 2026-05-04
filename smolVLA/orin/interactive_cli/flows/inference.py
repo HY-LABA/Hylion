@@ -58,8 +58,8 @@ def flow3_select_ckpt() -> tuple[str, str | None, str | None]:
     print()
     print("사용할 모델 checkpoint 소스를 선택하세요:")
     print()
-    print(f"  1. HF Hub repo_id 입력  (예: lerobot/smolvla_base, <username>/<repo>)")
-    print(f"  2. 로컬 ckpt 경로 직접 입력")
+    print("  1. HF Hub repo_id 입력  (예: lerobot/smolvla_base, <username>/<repo>)")
+    print("  2. 로컬 ckpt 경로 직접 입력")
     print(f"  3. 기본값 사용  ({DEFAULT_MODEL_ID})")
     print()
 
@@ -85,8 +85,8 @@ def flow3_select_ckpt() -> tuple[str, str | None, str | None]:
 def _flow3_hub_input() -> tuple[str, str | None, str | None]:
     """소스 1: HF Hub repo_id 입력."""
     print()
-    print(f"  HF Hub repo_id 를 입력하세요.")
-    print(f"  (예: lerobot/smolvla_base, <username>/<repo>)")
+    print("  HF Hub repo_id 를 입력하세요.")
+    print("  (예: lerobot/smolvla_base, <username>/<repo>)")
     print(f"  빈 줄 입력 시 기본값 사용 ({DEFAULT_MODEL_ID})")
     print()
 

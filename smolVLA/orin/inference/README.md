@@ -44,7 +44,59 @@
 
 ---
 
+## 사전 단계 — 카메라 인덱스 발견 (03 BACKLOG #15)
+
+hil_inference.py 실행 전 **반드시** 카메라 인덱스를 확인하라.
+Linux 에서 카메라 인덱스(/dev/videoN)는 재부팅·USB 재연결 시 변경될 수 있다.
+
+```bash
+source ~/smolvla/orin/.hylion_arm/bin/activate
+lerobot-find-cameras opencv
+```
+
+출력 예시:
+
+```
+--- Detected Cameras ---
+Camera #0:
+  Name: OpenCV Camera @ /dev/video2
+  Type: OpenCV
+  Id: /dev/video2
+  ...
+Camera #1:
+  Name: OpenCV Camera @ /dev/video4
+  Type: OpenCV
+  Id: /dev/video4
+  ...
+```
+
+위 결과를 바탕으로 `--cameras top:2,wrist:4` (또는 해당하는 인덱스) 를 명시한다.
+
+**자동 발견 fallback**: `--cameras` 를 생략하면 `OpenCVCamera.find_cameras()` 로 자동 발견.
+발견 수가 정확히 2 대일 때만 자동 적용 (첫 번째 → top, 두 번째 → wrist).
+자동 발견 실패 또는 2 대가 아니면 기본값 `top:0,wrist:1` 로 후퇴하며 경고를 출력한다.
+
+## wrist 카메라 플립 (03 BACKLOG #16)
+
+wrist 카메라를 거꾸로 장착한 경우 `--flip-cameras wrist` 를 추가하라.
+이미지가 수직 반전되어 policy 에 전달된다.
+
+사전학습 분포(svla_so100_pickplace)의 wrist 카메라 방향과의 정합 여부는
+08_leftarmVLA 진입 시 확인 예정 (03 BACKLOG #11).
+
+`--gate-json` 으로 `orin/config/cameras.json` 을 지정하면 `wrist.flip: true` 설정이
+자동 반영된다 (`check_hardware.sh` 생성 cache).
+
+---
+
 ## 사용 예시
+
+### Step 1 — 카메라 인덱스 확인
+
+```bash
+source ~/smolvla/orin/.hylion_arm/bin/activate
+lerobot-find-cameras opencv
+```
 
 ### dry-run 모드 (action 만 dump, follower 미동작)
 
@@ -72,6 +124,20 @@ python ~/smolvla/orin/inference/hil_inference.py \
 ```
 
 비상정지: Ctrl+C — SIGINT 핸들러가 현재 step 마무리 후 graceful disconnect.
+
+### gate-json 통합 (자동 인자 채우기)
+
+`orin/config/` 에 `ports.json` + `cameras.json` 이 있으면:
+
+```bash
+python ~/smolvla/orin/inference/hil_inference.py \
+    --mode dry-run \
+    --gate-json ~/smolvla/orin/config/ \
+    --max-steps 5 \
+    --output-json /tmp/hil_dryrun.json
+```
+
+`--follower-port`, `--cameras`, `--flip-cameras` 를 자동으로 채운다 (CLI 직접 지정이 우선).
 
 ---
 

@@ -1,6 +1,6 @@
 #!/bin/bash
 # Jetson Orin (L4T R36.x / JetPack 6.2.2) 독립 Python 환경 구성 스크립트
-# 실행 위치: Orin (~/smolvla/scripts/setup_env.sh)
+# 실행 위치: Orin (~/smolvla/orin/scripts/setup_env.sh)
 #
 # JetPack 6.2.2 (R36.5.0) 기준:
 #   CUDA 12.6, Python 3.10 (cp310)
@@ -13,7 +13,19 @@
 
 set -e
 
-SMOLVLA_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+# ── Pre-flight: dpkg 중단 상태 체크 ────────────────────────────────────────────
+# dpkg 중단 상태에서 apt-get install 이 즉시 실패. 앞단에서 체크하여 사용자가
+# 빠르게 원인을 파악할 수 있도록 안내한다. (02 BACKLOG #8)
+if dpkg --audit 2>&1 | grep -q .; then
+    echo "[setup] ERROR: dpkg 중단 상태가 감지되었습니다."
+    echo "[setup]   아래 명령을 먼저 실행하여 복구한 후 재시도하세요:"
+    echo "[setup]     sudo dpkg --configure -a"
+    echo "[setup]   복구 후: bash $(realpath "$0")"
+    exit 1
+fi
+
+SMOLVLA_DIR="$(cd "$(dirname "$0")/.." && pwd)"   # = ~/smolvla/orin (orin 서브디렉터리)
+SMOLVLA_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"  # = ~/smolvla (smolVLA 프로젝트 루트)
 VENV_DIR="${SMOLVLA_DIR}/.hylion_arm"  # orin/.hylion_arm (hidden, orin 디렉터리 안). dgx/.arm_finetune 과 격리
 
 # Python 3.10 우선 (jp6/cu126 wheel이 cp310만 제공)
@@ -91,11 +103,20 @@ pip install "numpy>=1.24.0,<2" --force-reinstall --quiet
 
 # ── 3-b. torchvision (Jetson aarch64 + CUDA 12.6 + PyTorch 2.5 대응 wheel) ───
 # PyPI torchvision wheel은 Jetson CUDA 빌드가 아니어서 ABI 불일치 가능성이 있다.
-# 따라서 Orin에서는 사전빌드 wheel을 수동 1회 설치하는 방식을 사용한다.
+# 따라서 Orin에서는 사전빌드 wheel을 사용한다. (02 BACKLOG #7)
+# wheel 파일은 smolVLA/docs/storage/others/ 에 보관된다.
+TORCHVISION_WHL="${SMOLVLA_ROOT}/docs/storage/others/torchvision-0.20.0a0+afc54f7-cp310-cp310-linux_aarch64.whl"
 if ! python -c "import torchvision" >/dev/null 2>&1; then
-    echo "[setup] torchvision 미설치 — 수동 1회 설치 필요"
-    echo "[setup]   devPC: scp smolVLA/docs/storage/others/torchvision-0.20.0a0+afc54f7-cp310-cp310-linux_aarch64.whl orin:~/"
-    echo "[setup]   Orin:  pip install ~/torchvision-0.20.0a0+afc54f7-cp310-cp310-linux_aarch64.whl --no-deps --force-reinstall"
+    if [ -f "$TORCHVISION_WHL" ]; then
+        echo "[setup] torchvision 미설치 — 로컬 wheel 자동 설치 중..."
+        pip install "$TORCHVISION_WHL" --no-deps --force-reinstall --quiet
+        echo "[setup] torchvision 설치 완료: $(python -c 'import torchvision; print(torchvision.__version__)')"
+    else
+        echo "[setup] WARN: torchvision wheel 미발견 (${TORCHVISION_WHL})"
+        echo "[setup]   devPC에서 wheel을 먼저 전송하세요:"
+        echo "[setup]     scp smolVLA/docs/storage/others/torchvision-0.20.0a0+afc54f7-cp310-cp310-linux_aarch64.whl orin:~/smolvla/docs/storage/others/"
+        echo "[setup]   전송 후 재실행하세요: bash $(realpath "$0")"
+    fi
 else
     echo "[setup] torchvision 설치 확인: $(python -c 'import torchvision; print(torchvision.__version__)')"
 fi

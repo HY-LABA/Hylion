@@ -68,6 +68,19 @@ spec 의 모든 todo 를 **자율 처리**. 사용자는 `/observe` 로 read-onl
 - planner 가 "사용자 결정 필요" 분류한 todo 는 답 받기 전까지 dispatch X.
 - 의존 없는 다른 todo 는 계속 진행 (병렬화 핵심).
 
+#### walkthrough 중 ad-hoc 변경 처리 정책 (07 reflection 도출)
+
+사용자 walkthrough 도중 spec 본문에 없는 즉석 변경 요청이 발생하면 orchestrator 가 **자율 판정 우선** — 사용자 prompt 부담 최소화:
+
+| 유형 | 기본 처리 | 사용자 prompt |
+|---|---|---|
+| 환경 즉석 조치 (pip·export·`.env` 신규 등, 코드 미변경) | 즉시 실행 + BACKLOG 메모 | 없음 |
+| 단일 파일 1~30줄, 회귀 위험 낮음, 영향 범위 명확 | 즉시 적용 + 사후 보고 + BACKLOG 메모 | 없음 |
+| Cross-file 변경, 30줄 초과, 또는 Category B 영역 | todo 신규 등록 → task-executor → code-test → prod-test 정식 흐름 | 없음 (정책상 자동) |
+| 위 어디에도 모호 (영향 범위 불명·아키텍처 변경 시사) | 사용자에게 분기 prompt 1회 | 1회 (모호 시만) |
+
+**핵심**: orchestrator 자율 판정이 default. 사용자 prompt 는 모호 케이스 *only* — prompt fatigue 회피 (07 deny-only 모델 정신 일관). ad-hoc 변경 발생 시 BACKLOG 활성 spec 섹션에 `[ad-hoc] <내용>` 메모 등록 의무 (사후 추적 누락 차단).
+
 ### Phase 3 — Verification (사용자)
 
 메인 Claude 의 "검증 가나?" 신호 후 사용자가 **실물 환경 검증**.

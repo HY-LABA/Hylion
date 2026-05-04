@@ -85,7 +85,7 @@ def load_node_config(node_config_path: str) -> dict | None:
     """configs/node.yaml 로드.
 
     Returns:
-        {"node": "orin"|"dgx"|"datacollector", "venv": "~/..."} 또는 None.
+        {"node": "orin"|"dgx", "venv": "~/..."} 또는 None.
     """
     p = Path(node_config_path)
     if p.is_dir():
@@ -134,9 +134,8 @@ def flow0_confirm_environment(node: str) -> bool:
 def flow1_select_node(current_node: str) -> str | None:
     """flow 1: 장치 선택 메뉴.
 
-    spec line 51: "본 노드인 datacollector 만 활성, 다른 노드는 안내만"
-    — 이 규칙이 모든 노드에 공통 적용: 어느 노드에서 실행하든
-      자신의 노드만 active, 나머지는 선택 불가 + 안내.
+    원칙: 본 노드만 active, 다른 노드는 안내만.
+    — 어느 노드에서 실행하든 자신의 노드만 active, 나머지는 선택 불가 + 안내.
 
     Returns:
         선택된 노드 이름 (현재 노드와 동일) 또는 None (종료 선택)
@@ -209,7 +208,7 @@ def _run_node_flows(node: str, script_dir: Path) -> int:
       flow 2: env_check.py — check_hardware.sh --mode resume
       flow 3~5: inference.py — ckpt 선택 + hil_inference 실행 + 결과 보고
 
-    dgx / datacollector: 후행 todo 에서 구현.
+    dgx: 후행 todo 에서 구현.
     """
     if node == "orin":
         from flows.env_check import run_env_check
@@ -259,7 +258,7 @@ def main() -> int:
         print(f"        유효 값: {VALID_NODES}")
         return 1
 
-    # flow 0: 환경 확인 (datacollector 전용)
+    # flow 0: 환경 확인
     if not flow0_confirm_environment(node):
         return 0  # 사용자 거부 — 정상 종료 (오류 X)
 

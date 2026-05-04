@@ -31,7 +31,7 @@
 #
 # 전제 조건:
 #   - dgx venv: ~/smolvla/dgx/.arm_finetune
-#   - lerobot [hardware,feetech] extra 설치 (X4·X5 완료 후 — V1 검증 대상)
+#   - lerobot [hardware,feetech] extra 설치 (dgx/scripts/setup_train_env.sh §3-c 완료 후)
 #   - USB: SO-ARM 2대 (follower + leader) 직결
 #   - USB: 카메라 2대 (top + wrist) 직결
 #
@@ -246,7 +246,7 @@ step_v4l2() {
 # ---------------------------------------------------------------------------
 # 7. Step 5: 카메라 인덱스 발견 (lerobot OpenCVCamera.find_cameras)
 #    orin/tests/check_hardware.sh step_cameras 패턴 미러 (비대화형 단순화)
-#    NOTE: lerobot [hardware] extra 설치 필요 (X4·X5 완료 후 동작)
+#    NOTE: lerobot [hardware] extra 설치 필요 (setup_train_env.sh §3-c 완료 후 동작)
 # ---------------------------------------------------------------------------
 step_cameras() {
     [[ "$QUIET" == "false" ]] && echo ""
@@ -279,7 +279,7 @@ PYEOF
 ) || cam_exit=$?
 
     if [[ $cam_exit -eq 3 ]]; then
-        # lerobot [hardware] extra 미설치 시 — X4·X5 완료 전 단계에서 발생 가능
+        # lerobot [hardware] extra 미설치 시 — setup_train_env.sh §3-c 실행 전 단계에서 발생 가능
         record_step "cameras" "FAIL" "lerobot import 실패 (hardware extra 미설치 가능성): ${cam_out}"
         return 1
     elif [[ $cam_exit -ne 0 ]]; then
@@ -342,7 +342,7 @@ except Exception:
         echo "   dialout FAIL → sudo usermod -aG dialout \$(id -un)  (재로그인 필요)"
         echo "   soarm_port FAIL → SO-ARM USB 케이블 연결 확인"
         echo "   v4l2 FAIL → 카메라 USB 케이블 연결 확인"
-        echo "   cameras FAIL (import) → X4·X5 완료 후 재실행 (lerobot hardware extra 필요)"
+        echo "   cameras FAIL (import) → setup_train_env.sh §3-c 실행 후 재시도 (lerobot hardware extra 필요)"
     fi
 
     return $total_exit

@@ -43,12 +43,18 @@ def _run_teleop_script(script_dir: Path) -> int:
     이식 변경: script_dir.parent.parent → script_dir.parent
       (dgx/interactive_cli/flows/ → dgx/scripts/ 경로)
 
+    lerobot-teleoperate 는 Ctrl+C 가 표준 종료 방법 (lerobot upstream 표준):
+      upstream lerobot_teleoperate.py L239: except KeyboardInterrupt: pass
+    Ctrl+C 발생 시 subprocess (lerobot-teleoperate) 도 SIGINT 를 받아 자체 정리 후 종료.
+    부모 프로세스 (Python) 에도 KeyboardInterrupt 가 raise → 여기서 catch → return 0.
+    → flow4_confirm_teleop 정상 분기 (returncode=0) 진입 보장.
+
     Args:
         script_dir: dgx/interactive_cli/flows/ 경로.
                     scripts/ 은 script_dir.parent / "scripts" 에 위치.
 
     Returns:
-        subprocess returncode (0=성공, 비0=실패)
+        subprocess returncode (0=성공·Ctrl+C 정상 종료, 비0=실패)
     """
     teleop_script = script_dir.parent / "scripts" / "run_teleoperate.sh"
 
@@ -61,11 +67,20 @@ def _run_teleop_script(script_dir: Path) -> int:
     print(f"[flow 3] 실행: bash {teleop_script} all")
     print()
 
-    result = subprocess.run(
-        ["bash", str(teleop_script), "all"],
-        check=False,
-    )
-    return result.returncode
+    try:
+        result = subprocess.run(
+            ["bash", str(teleop_script), "all"],
+            check=False,
+        )
+        return result.returncode
+    except KeyboardInterrupt:
+        # 사용자가 Ctrl+C 로 정상 종료 — lerobot-teleoperate 의 표준 종료 방법.
+        # subprocess (lerobot-teleoperate) 도 SIGINT 받아 자체 정리 후 종료됨
+        # (upstream lerobot_teleoperate.py: except KeyboardInterrupt: pass → finally 정리).
+        print()
+        print("[teleop] Ctrl+C 감지 — teleop 정상 종료 처리.")
+        print("         (lerobot-teleoperate 가 Ctrl+C 로 정상 종료됨)")
+        return 0  # 0 으로 반환 → flow4_confirm_teleop 정상 완료 분기 진입
 
 
 def flow3_teleoperate(script_dir: Path) -> int:
@@ -85,8 +100,14 @@ def flow3_teleoperate(script_dir: Path) -> int:
     print("텔레오퍼레이션을 진행하겠습니다.")
     print("이 작업이 끝나면 학습 준비가 완료됩니다.")
     print()
-    print("Enter 를 누르면 run_teleoperate.sh 가 실행됩니다.")
-    print("(종료하려면 Ctrl+C)")
+    print("흐름:")
+    print("  1. Enter 를 누르면 run_teleoperate.sh 실행 — leader 팔로 follower 팔 조종 가능")
+    print("  2. 충분히 시연한 후 Ctrl+C 한 번 누르면 *정상 종료* (lerobot 표준 종료 키)")
+    print("     (다른 종료 키 X — Ctrl+C 가 lerobot-teleoperate 의 유일한 종료 방법)")
+    print("  3. 종료 후 다음 단계: flow4 prompt → data_kind → record (epi 수집) → transfer → 학습 분기")
+    print()
+    print("  ※ teleop 도중에는 'Teleop loop time: ...' 출력만 보이고 종료 안내 X (lerobot 표준 출력).")
+    print("    충분한 시연 후 Ctrl+C 한 번 누르면 됩니다.")
     print()
 
     try:
@@ -133,7 +154,14 @@ def flow4_confirm_teleop(script_dir: Path, prev_returncode: int) -> bool:
         print()
 
         try:
-            raw = input("입력 ['r'=재시도 / Enter=진행 / Ctrl+C=종료]: ").strip().lower()
+            if prev_returncode == 0:
+                raw = input(
+                    "입력 ['r'=teleop 재시도 / Enter=다음 단계 (record + 학습) / Ctrl+C=완전 종료]: "
+                ).strip().lower()
+            else:
+                raw = input(
+                    "입력 ['r'=teleop 재시도 / Enter=강제 진행 (비권장) / Ctrl+C=완전 종료]: "
+                ).strip().lower()
         except (EOFError, KeyboardInterrupt):
             print()
             print("[flow 4] 종료됩니다.")

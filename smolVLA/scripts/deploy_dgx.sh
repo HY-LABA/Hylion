@@ -24,6 +24,7 @@ rsync -avz --delete \
     --exclude '__pycache__' \
     --exclude '*.pyc' \
     --exclude '*.egg-info' \
+    --exclude 'interactive_cli/configs/*.json' \
     "${SMOLVLA_ROOT}/dgx/" "${DGX_HOST}:${DGX_DEST}/dgx/"
 
 echo "[deploy-dgx] docs/reference/lerobot/ → ${DGX_HOST}:${DGX_DEST}/docs/reference/lerobot/"

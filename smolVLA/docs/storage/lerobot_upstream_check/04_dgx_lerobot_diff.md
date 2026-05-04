@@ -125,3 +125,123 @@ TODO-09b DGX prod 검증에서 `smoke_test.sh` 단독 실행을 완료 조건으
 - `dgx/config/dataset_repos.json` valid JSON 확인
 - `dgx/README.md` 주의사항 섹션 추가 확인
 - `dgx/scripts/` 미변경 확인 (02 산출물 회귀 없음)
+
+---
+
+### [2026-05-03] `dgx/scripts/setup_train_env.sh` — lerobot extras hardware,feetech 추가 (07 TODO-D5)
+
+**대상 파일:** `dgx/scripts/setup_train_env.sh`
+
+**변경 내용:**
+
+| 항목 | 변경 전 | 변경 후 |
+|---|---|---|
+| §3 editable install extras | `[smolvla,training]` | `[smolvla,training,hardware,feetech]` |
+| §3-c 주석 | "record + hardware + feetech extras 설치" | "torchcodec 별도 인덱스 설치 + dataset 보완 / §3 extras 통합 완료 명시" |
+
+**변경 이유:**
+
+06_dgx_absorbs_datacollector 결정에서 DGX 가 데이터 수집 책임 흡수 시 `setup_train_env.sh` 의 lerobot extras 갱신이 누락되었다. 06 사이클에서는 `§3-c` 를 별도 추가하여 개별 패키지 pip install 방식으로 처리했으나, editable install extras 에 `hardware,feetech` 가 포함되지 않아 07 TODO-D4 preflight check lerobot-find-port 실행 시 pyserial ImportError 가 발생했다 (07 D4 진단).
+
+lerobot upstream `pyproject.toml` extras 정의 (직접 인용):
+```
+# docs/reference/lerobot/pyproject.toml line 110-114
+hardware = [
+    "lerobot[pynput-dep]",
+    "lerobot[pyserial-dep]",
+    "lerobot[deepdiff-dep]",
+]
+# line 145
+feetech = ["feetech-servo-sdk>=1.0.0,<2.0.0", "lerobot[pyserial-dep]", "lerobot[deepdiff-dep]"]
+```
+
+Option B 원칙 유지: `dgx/pyproject.toml` 신규 생성 X. `dgx/lerobot/` 변경 X. `setup_train_env.sh` 에서만 extras 관리.
+
+**영향 범위:**
+
+| 기능 | 영향 |
+|---|---|
+| upstream lerobot 코드 | 변경 없음 (dgx/lerobot/ 미존재 유지) |
+| setup_train_env.sh 재실행 시 | lerobot[hardware,feetech] (pynput, pyserial, deepdiff, feetech-servo-sdk) 자동 설치 |
+| 07 D4 precheck — lerobot-find-port | pyserial ImportError 해소 (영구 fix) |
+| §3-c 의 개별 pip install | 중복 설치 — pip no-op 으로 처리됨. 제거는 차기 cleanup 사이클 후보 |
+
+**검증:**
+
+- `bash -n dgx/scripts/setup_train_env.sh` PASS
+- extras 키 `hardware`, `feetech` — lerobot upstream `pyproject.toml` 직접 확인 (line 110, 145)
+
+---
+
+### [2026-05-04] `dgx/interactive_cli/flows/precheck.py` — v4l2 메타 device 필터링 + viewer 안내 강화 (07 TODO-D8)
+
+**대상 파일:** `dgx/interactive_cli/flows/precheck.py`
+
+**변경 내용 (Part II — setup_train_env.sh deepdiff 현황 확인):**
+
+lerobot upstream `pyproject.toml` extras 직접 확인:
+```
+# docs/reference/lerobot/pyproject.toml line 110-114 (D5 인용 동일)
+hardware = [
+    "lerobot[pynput-dep]",
+    "lerobot[pyserial-dep]",
+    "lerobot[deepdiff-dep]",        ← deepdiff 포함
+]
+# line 140
+deepdiff-dep = ["deepdiff>=7.0.1,<9.0.0"]
+# line 145
+feetech = ["feetech-servo-sdk>=1.0.0,<2.0.0", "lerobot[pyserial-dep]", "lerobot[deepdiff-dep]"]
+```
+
+`setup_train_env.sh` §3 현재 extras: `[smolvla,training,hardware,feetech]` → hardware + feetech 모두 `lerobot[deepdiff-dep]` 포함.
+§3-c 에도 `deepdiff>=7.0.1,<9.0.0` 명시 개별 설치 중 (D5 cycle 2 에서 추가된 중복 설치).
+
+**D8 Part II 결론**: `setup_train_env.sh` 변경 불필요.
+- `[hardware,feetech]` extras 가 deepdiff-dep 을 transitive 포함 (D5 fix 이미 완료).
+- §3-c 의 deepdiff 별도 설치 라인은 중복 (07 BACKLOG #3 — 차기 정리 후보).
+- deepdiff 누락이 reported 된 이유: D5 fix 이전 환경에서 venv 미재설치 시 미적용. 재설치 시 해소.
+
+**변경 내용 (Part III — v4l2 메타 device 필터링):**
+
+| 항목 | 변경 전 | 변경 후 |
+|---|---|---|
+| `_get_streamable_video_devices` | 미존재 | 신규 추가 — cv2.VideoCapture read 성공 device 만 반환 |
+| `_run_find_cameras_split` baseline | `_get_video_devices()` (전체 glob) | `_get_streamable_video_devices()` (스트림 가능 device 만) |
+| `_run_find_cameras_split` baseline_restored | `_get_video_devices()` | `_get_streamable_video_devices()` |
+| 분리 후 after 상태 | `_get_video_devices()` | `_get_video_devices()` 유지 (비교 기준 유지) |
+
+레퍼런스:
+```
+# lerobot/src/lerobot/cameras/opencv/camera_opencv.py line 308, 343-348
+camera = cv2.VideoCapture(target)
+if camera.isOpened():
+    ret, frame = camera.read()  # metadata device 는 ret=False 반환
+```
+
+**변경 내용 (Part IV — ssh-file viewer 안내 강화):**
+
+| 항목 | 변경 전 | 변경 후 |
+|---|---|---|
+| ssh-file 모드 안내 | path 출력 + xdg-open 시도 (결과 미보고) | VSCode remote-ssh Explorer 클릭 안내 + code -r 명령 안내 추가 |
+| xdg-open 결과 | 실패 시 silent 무시 | poll() 로 성공/실패 명시 보고 |
+| X11 fallback 안내 | "ssh -Y 재접속" 1 줄 | libgtk2.0-dev 미설치 원인 후보 추가 |
+
+**변경 이유:**
+
+D8 walkthrough 3 차단 사항 해소:
+- (III) wrist 분리 시 video0+video1 둘 다 사라짐 — v4l2 metadata device 가 baseline 에 포함되어 복수 device 사라짐 경고 발생. streamable 필터로 main stream device 만 baseline 에 포함.
+- (IV) ssh-file 모드에서 사용자가 영상을 어디서 볼지 불명확. VSCode remote-ssh 사용법 명시.
+
+**영향 범위:**
+
+| 기능 | 영향 |
+|---|---|
+| upstream lerobot 코드 | 변경 없음 (dgx/lerobot/ 미존재 유지) |
+| `_get_video_devices()` | 변경 없음 (backward-compat 보존) |
+| `_run_find_cameras_split` | baseline 이 streamable device 만으로 필터링 → metadata device 误検出 해소 |
+| `_show_frame` ssh-file | 안내 강화 — 기능 동작 변경 없음 |
+
+**검증:**
+
+- `python3 -m py_compile dgx/interactive_cli/flows/precheck.py` PASS
+- `ruff check dgx/interactive_cli/flows/precheck.py` PASS (TODO-D8 완료 후 확인)

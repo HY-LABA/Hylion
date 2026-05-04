@@ -13,7 +13,7 @@
 # 노드별 차이:
 #   orin:          VENV_ACTIVATE, cusparseLt 블록 유지
 #   dgx:           VENV_ACTIVATE 만 변경, cusparseLt 블록 없음
-#   datacollector: VENV_ACTIVATE 만 변경, cusparseLt 블록 없음
+#   (datacollector 노드는 06_dgx_absorbs_datacollector 결정으로 운영 종료)
 #
 # 레퍼런스: check_hardware.sh step_venv() line 152~173
 #   - venv source 패턴 (line 156~162)
@@ -57,6 +57,20 @@ if [[ -d "${CUSPARSELT_PATH}" ]]; then
 fi
 
 # ---------------------------------------------------------------------------
+# 1.5 프로젝트 루트 .env 자동 source (있을 때만)
+#    HF_TOKEN 등 비밀 환경변수를 매번 수동 export 안 해도 되게 자동화.
+#    .env 는 .gitignore 처리되며 권한 600 권장.
+# ---------------------------------------------------------------------------
+PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
+ENV_FILE="${PROJECT_ROOT}/.env"
+if [[ -f "${ENV_FILE}" ]]; then
+    set -a
+    # shellcheck source=/dev/null
+    source "${ENV_FILE}"
+    set +a
+fi
+
+# ---------------------------------------------------------------------------
 # 2. node.yaml 존재 확인
 # ---------------------------------------------------------------------------
 if [[ ! -f "${NODE_CONFIG}" ]]; then
@@ -68,4 +82,4 @@ fi
 # ---------------------------------------------------------------------------
 # 3. flows/entry.py 호출
 # ---------------------------------------------------------------------------
-exec python3 "${SCRIPT_DIR}/flows/entry.py" --node-config "${NODE_CONFIG}"
+cd "${SCRIPT_DIR}" && exec python3 -m flows.entry --node-config "${NODE_CONFIG}"

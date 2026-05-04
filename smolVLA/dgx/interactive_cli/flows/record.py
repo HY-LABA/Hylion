@@ -50,7 +50,14 @@
     1. repo_id 형식: <user>/<name> (push_dataset_hub.sh line 90~94)
     2. num_episodes 양수 정수
     3. data_kind_choice 유효 범위 (1~5)
-    4. 카메라 인덱스가 flow 2 env_check 결과와 일치
+    4. 카메라 인덱스/경로가 cameras.json 검출 결과 또는 hardcoded fallback 과 일치
+
+[6] OpenCVCameraConfig (configuration_opencv.py line 61):
+    index_or_path: int | Path
+    — 정수 인덱스 (예: 0) 와 str/Path 경로 (예: /dev/video0) 둘 다 지원.
+    draccus YAML 인자: index_or_path 필드에 /dev/video0 같은 str 직접 전달 가능.
+    근거: camera_opencv.py L158: cv2.VideoCapture(self.index_or_path, self.backend)
+    — VideoCapture 는 int/str 모두 수용.
 
 이식 원본:
   docs/storage/legacy/02_datacollector_separate_node/datacollector/interactive_cli/flows/record.py
@@ -60,12 +67,22 @@
                  → ~/smolvla/dgx/data/{dataset_name}
     (원본 line 194 + line 367: `~/smolvla/datacollector/data/` → `~/smolvla/dgx/data/`)
   - 기타 모든 상수·함수·로직 그대로 재사용.
+
+D12 변경 사항:
+  - _load_configs_for_record(configs_dir) helper 신설 — cameras.json + ports.json 로드.
+    precheck.py _run_calibrate() L979~1001 D9 패턴 동일 (JSONDecodeError fallback).
+  - build_record_args() 에 cam_wrist_left_index/cam_overview_index 타입을 int|str 로 확장.
+  - flow6_record() 에 configs_dir 인자 추가 — cameras.json·ports.json 로드 후 인자 갱신.
+  - _validate_camera_indices() 를 int|str 수용으로 확장 (str 은 /dev/videoN 형식 허용).
+  - 실행 직전 config 출처 명시 출력 (cameras/ports source 안내).
 """
 
+import json
 import os
 import re
 import subprocess
 import sys
+from pathlib import Path
 
 
 # ---------------------------------------------------------------------------
@@ -100,6 +117,47 @@ SINGLE_TASK_MAP: dict[int, str] = {
     4: "Open the drawer.",
     5: "Pick up the object and hand it over.",
 }
+
+
+# ---------------------------------------------------------------------------
+# Config 로드 (D12: cameras.json + ports.json — D9 패턴 동일)
+# ---------------------------------------------------------------------------
+
+def _load_configs_for_record(configs_dir: Path) -> "tuple[dict, dict]":
+    """cameras.json + ports.json 로드. 미설정 시 빈 dict.
+
+    D9 패턴 (precheck.py _run_calibrate L979~1001) 동일 — JSONDecodeError 시 fallback.
+
+    cameras.json 형식 (D6/D7 저장):
+      {"wrist_left": {"index": "/dev/video0"}, "overview": {"index": "/dev/video2"}}
+
+    ports.json 형식 (D7 저장):
+      {"follower_port": "/dev/ttyACM1", "leader_port": "/dev/ttyACM0"}
+
+    Args:
+        configs_dir: dgx/interactive_cli/configs/ 경로
+
+    Returns:
+        (cameras_data, ports_data) — 각 dict, 미존재 또는 파싱 실패 시 빈 dict
+    """
+    cameras_data: dict = {}
+    ports_data: dict = {}
+    cameras_path = configs_dir / "cameras.json"
+    ports_path = configs_dir / "ports.json"
+
+    for path, target, label in [
+        (cameras_path, cameras_data, "cameras"),
+        (ports_path, ports_data, "ports"),
+    ]:
+        if path.exists():
+            try:
+                with path.open() as f:
+                    data = json.load(f)
+                target.update(data)
+            except (json.JSONDecodeError, OSError) as e:
+                print(f"[record] 경고: {label}.json 로드 실패 ({e}) — hardcoded fallback")
+
+    return cameras_data, ports_data
 
 
 # ---------------------------------------------------------------------------
@@ -138,23 +196,37 @@ def _validate_data_kind_choice(choice: int) -> tuple[bool, str]:
 
 
 def _validate_camera_indices(
-    cam_wrist_left_index: int,
-    cam_overview_index: int,
-) -> tuple[bool, str]:
-    """카메라 인덱스 유효성 확인 (flow 2 env_check 결과 기반).
+    cam_wrist_left_index: "int | str",
+    cam_overview_index: "int | str",
+) -> "tuple[bool, str]":
+    """카메라 인덱스/경로 유효성 확인.
 
-    flow 2 env_check 가 probe 한 인덱스를 그대로 수신하므로
-    음수 인덱스 여부 (OpenCV 오류 시 반환될 수 있는 값) 를 방어적으로 확인.
     D1 §4 validation 4항목: "카메라 인덱스가 flow 2 env_check 결과와 일치"
-    — env_check 결과 자체를 전달받으므로, 유효 범위(0 이상) 를 최종 검증.
+
+    D12 확장: cameras.json 에서 로드한 str 경로 (/dev/videoN) 도 수용.
+    OpenCVCameraConfig.index_or_path: int | Path (configuration_opencv.py L61) 에 맞춰
+    — str 경로는 /dev/ 로 시작해야 유효. int 는 0 이상이어야 유효.
     """
-    if cam_wrist_left_index < 0 or cam_overview_index < 0:
-        return False, (
-            f"카메라 인덱스 유효 범위 초과 — "
-            f"wrist_left={cam_wrist_left_index}, overview={cam_overview_index} (0 이상이어야 함)"
-        )
+    def _check_one(val: "int | str", label: str) -> "tuple[bool, str]":
+        if isinstance(val, int):
+            if val < 0:
+                return False, f"{label}={val} (int 인덱스는 0 이상이어야 함)"
+        elif isinstance(val, str):
+            if not val.startswith("/dev/"):
+                return False, f"{label}='{val}' (str 경로는 /dev/ 로 시작해야 함)"
+        else:
+            return False, f"{label} 타입 오류 (int 또는 str 경로 필요)"
+        return True, ""
+
+    ok_w, msg_w = _check_one(cam_wrist_left_index, "wrist_left")
+    if not ok_w:
+        return False, f"카메라 인덱스/경로 유효 범위 초과 — {msg_w}"
+    ok_o, msg_o = _check_one(cam_overview_index, "overview")
+    if not ok_o:
+        return False, f"카메라 인덱스/경로 유효 범위 초과 — {msg_o}"
+
     return True, (
-        f"카메라 인덱스 OK (flow 2 env_check): wrist_left={cam_wrist_left_index}, overview={cam_overview_index}"
+        f"카메라 인덱스/경로 OK: wrist_left={cam_wrist_left_index}, overview={cam_overview_index}"
     )
 
 
@@ -166,9 +238,12 @@ def build_record_args(
     data_kind_choice: int,
     repo_id: str,
     num_episodes: int,
-    cam_wrist_left_index: int = 0,
-    cam_overview_index: int = 1,
-) -> list[str]:
+    cam_wrist_left_index: "int | str" = 0,
+    cam_overview_index: "int | str" = 1,
+    single_task: "str | None" = None,
+    follower_port: str = FOLLOWER_PORT,
+    leader_port: str = LEADER_PORT,
+) -> "list[str]":
     """lerobot-record 인자 동적 생성.
 
     D1 §4 build_record_args 패턴 그대로 적용.
@@ -178,12 +253,22 @@ def build_record_args(
       원본: ~/smolvla/datacollector/data/{dataset_name}
       dgx:  ~/smolvla/dgx/data/{dataset_name}
 
+    D12 변경:
+      - cam_wrist_left_index / cam_overview_index 타입을 int|str 로 확장.
+        str 경로 (/dev/videoN) 는 draccus CLI 에서 index_or_path 필드에 직접 전달 가능.
+        근거: OpenCVCameraConfig.index_or_path: int | Path (configuration_opencv.py L61).
+      - follower_port / leader_port 를 외부에서 주입 가능하도록 인자화.
+        기본값은 기존 hardcoded 상수 (ports.json 미설정 시 호환).
+
     Args:
         data_kind_choice: flow 5 에서 선택한 번호 (1~5)
         repo_id: HF Hub ID (예: "myuser/leftarm_pickplace_v1")
         num_episodes: 수집할 에피소드 수
-        cam_wrist_left_index: flow 2 env_check 결과 wrist_left 인덱스
-        cam_overview_index: flow 2 env_check 결과 overview 인덱스
+        cam_wrist_left_index: wrist_left 카메라 인덱스(int) 또는 경로(str, 예: /dev/video0)
+        cam_overview_index: overview 카메라 인덱스(int) 또는 경로(str, 예: /dev/video2)
+        single_task: G2-a 사용자 확인/커스텀 결과 (None 시 SINGLE_TASK_MAP 기본값 사용)
+        follower_port: follower SO-ARM 포트 (ports.json 로드 결과 또는 hardcoded fallback)
+        leader_port: leader SO-ARM 포트 (ports.json 로드 결과 또는 hardcoded fallback)
 
     Returns:
         lerobot-record 에 전달할 인자 리스트
@@ -205,16 +290,19 @@ def build_record_args(
     dataset_name = repo_id.split("/")[-1]
     data_root = os.path.expanduser(f"~/smolvla/dgx/data/{dataset_name}")
 
-    single_task = SINGLE_TASK_MAP[data_kind_choice]
+    # G2-b: single_task 파라미터 우선 — None 이면 SINGLE_TASK_MAP 기본값 사용
+    # (G2-a 에서 사용자 커스텀 결정 시 해당 값 전달됨)
+    if single_task is None:
+        single_task = SINGLE_TASK_MAP[data_kind_choice]
 
     return [
         "lerobot-record",
         f"--robot.type={ROBOT_TYPE}",
-        f"--robot.port={FOLLOWER_PORT}",
+        f"--robot.port={follower_port}",
         f"--robot.id={FOLLOWER_ID}",
         f"--robot.cameras={cameras_str}",
         f"--teleop.type={TELEOP_TYPE}",
-        f"--teleop.port={LEADER_PORT}",
+        f"--teleop.port={leader_port}",
         f"--teleop.id={LEADER_ID}",
         f"--dataset.repo_id={repo_id}",
         f"--dataset.root={data_root}",
@@ -304,9 +392,10 @@ def flow6_record(
     data_kind_choice: int,
     single_task: str,
     default_num_episodes: int,
-    cam_wrist_left_index: int,
-    cam_overview_index: int,
-) -> tuple[bool, str, str]:
+    cam_wrist_left_index: "int | str" = 0,
+    cam_overview_index: "int | str" = 1,
+    configs_dir: "Path | None" = None,
+) -> "tuple[bool, str, str]":
     """flow 6: lerobot-record subprocess 호출.
 
     원본 datacollector record.py flow6_record 함수 그대로.
@@ -315,12 +404,19 @@ def flow6_record(
     이식 변경: data_root 경로 (build_record_args 내부 처리 + local_dataset_path)
       ~/smolvla/datacollector/data/ → ~/smolvla/dgx/data/
 
+    D12 변경:
+      - configs_dir 인자 추가 — cameras.json·ports.json 로드.
+        None 이면 hardcoded fallback (기존 동작과 동일).
+      - 로드 성공 시 cam_wrist_left_index / cam_overview_index / follower_port / leader_port 갱신.
+      - 실행 직전 config 출처 명시 출력.
+
     Args:
         data_kind_choice: flow 5 에서 선택한 번호 (1~5)
         single_task: flow 5 에서 결정된 task instruction
         default_num_episodes: flow 5 기반 권장 에피소드 수
-        cam_wrist_left_index: flow 2 env_check 확인 wrist_left 인덱스
-        cam_overview_index: flow 2 env_check 확인 overview 인덱스
+        cam_wrist_left_index: wrist_left 카메라 인덱스(int) 또는 경로(str). configs_dir 전달 시 덮어씀.
+        cam_overview_index: overview 카메라 인덱스(int) 또는 경로(str). configs_dir 전달 시 덮어씀.
+        configs_dir: dgx/interactive_cli/configs/ 경로. None 이면 hardcoded fallback.
 
     Returns:
         (success: bool, local_dataset_path: str, repo_id: str)
@@ -331,6 +427,104 @@ def flow6_record(
     print("=" * 60)
     print(" flow 6 — 데이터 수집 (lerobot-record)")
     print("=" * 60)
+    print()
+
+    # D12: cameras.json + ports.json 로드 (D9 패턴 — precheck.py _run_calibrate 동일)
+    follower_port: str = FOLLOWER_PORT
+    leader_port: str = LEADER_PORT
+    cameras_source = "hardcoded fallback"
+    ports_source = "hardcoded fallback"
+
+    if configs_dir is not None:
+        cameras_data, ports_data = _load_configs_for_record(configs_dir)
+
+        # cameras.json 에서 wrist_left / overview index 추출
+        wrist_idx = cameras_data.get("wrist_left", {}).get("index")
+        overview_idx = cameras_data.get("overview", {}).get("index")
+        if wrist_idx is not None:
+            cam_wrist_left_index = wrist_idx
+            cameras_source = "cameras.json 검출 결과"
+        if overview_idx is not None:
+            cam_overview_index = overview_idx
+            cameras_source = "cameras.json 검출 결과"
+
+        # ports.json 에서 follower_port / leader_port 추출
+        fp = ports_data.get("follower_port")
+        lp = ports_data.get("leader_port")
+        if fp:
+            follower_port = fp
+            ports_source = "ports.json 검출 결과"
+        if lp:
+            leader_port = lp
+            ports_source = "ports.json 검출 결과"
+
+    # config 출처 안내 (D12 §Step 4)
+    print("[record] config 출처:")
+    if cameras_source == "cameras.json 검출 결과":
+        print(
+            f"  cameras: wrist_left={cam_wrist_left_index},"
+            f" overview={cam_overview_index} ({cameras_source})"
+        )
+    else:
+        print(
+            "  cameras: hardcoded (wrist_left:0, overview:1) — cameras.json 미설정"
+        )
+    if ports_source == "ports.json 검출 결과":
+        print(
+            f"  ports: follower={follower_port},"
+            f" leader={leader_port} ({ports_source})"
+        )
+    else:
+        print(
+            "  ports: hardcoded (ttyACM1, ttyACM0) — ports.json 미설정"
+        )
+    if cameras_source != "cameras.json 검출 결과" or ports_source != "ports.json 검출 결과":
+        print(
+            "  ⚠ 미설정 항목 — v4l2 메타 device 차단 가능."
+            " precheck 옵션 1 (새 학습) 권장."
+        )
+    print()
+
+    # G2-a: 사용자 task 텍스트 확인 / 커스텀 입력 분기
+    # lerobot_record.py DatasetRecordConfig.single_task (line 161~) 직접 인용:
+    #   single_task: str — 필수 (모든 frame 에 붙는 자연어 task 설명, VLA instruction 으로 사용)
+    print("=" * 60)
+    print(" 학습 task 텍스트")
+    print("=" * 60)
+    print()
+    print("  데이터셋의 모든 frame 에 붙는 자연어 task 설명입니다.")
+    print("  VLA 모델 학습 시 instruction 으로 사용됩니다.")
+    print()
+    print(f"  기본 task (data_kind 매핑): \"{single_task}\"")
+    print()
+    print("  (1) 기본값 사용 (Enter)")
+    print("  (2) 커스텀 task 입력")
+    print()
+
+    try:
+        raw_choice = input("번호 선택 [1~2, Enter=1 기본값]: ").strip()
+    except (EOFError, KeyboardInterrupt):
+        print()
+        print("[flow 6] 취소됨.")
+        return False, "", ""
+
+    if raw_choice == "2":
+        try:
+            custom_task = input(
+                "  커스텀 task 입력 (예: 'Pick the red block and place it in the green box'): "
+            ).strip()
+        except (EOFError, KeyboardInterrupt):
+            print()
+            print("[flow 6] 취소됨.")
+            return False, "", ""
+        if custom_task:
+            single_task = custom_task
+            print(f"  [info] 커스텀 task 적용: \"{single_task}\"")
+        else:
+            print(f"  [info] 빈 입력 — 기본값 사용: \"{single_task}\"")
+    else:
+        print(f"  [info] 기본값 적용: \"{single_task}\"")
+
     print()
     print(f"  task: \"{single_task}\"")
     print()
@@ -370,13 +564,17 @@ def flow6_record(
             print(f"[flow 6] validation 실패: {msg}", file=sys.stderr)
             return False, "", ""
 
-    # 인자 동적 생성
+    # 인자 동적 생성 (G2-b: 결정된 single_task 전달 — 커스텀 또는 기본값)
+    # D12: follower_port / leader_port 는 ports.json 로드 결과 또는 hardcoded fallback
     cmd_args = build_record_args(
         data_kind_choice=data_kind_choice,
         repo_id=repo_id,
         num_episodes=num_episodes,
         cam_wrist_left_index=cam_wrist_left_index,
         cam_overview_index=cam_overview_index,
+        single_task=single_task,
+        follower_port=follower_port,
+        leader_port=leader_port,
     )
 
     # 로컬 저장 경로 (flow 7 에 전달) — dgx 경로로 변경

@@ -147,9 +147,11 @@ orin/checkpoints/
     └── ...
 ```
 
-`sync_ckpt_dgx_to_datacollector.sh` 는 `DGX_OUTPUTS/<run>/checkpoints/<step>/pretrained_model`
-경로 구조를 그대로 DataCollector 로 전송. Orin 에 동일 구조로 복사되므로
+`sync_ckpt_dgx_to_orin.sh` 는 `DGX_OUTPUTS/<run>/checkpoints/<step>/pretrained_model`
+경로 구조를 그대로 Orin 으로 전송. Orin 에 동일 구조로 복사되므로
 interactive_cli 는 `orin/checkpoints/` 아래를 순회하여 가장 최근 ckpt 를 자동 탐색할 수 있다.
+<!-- 정정 (2026-05-03): sync_ckpt_dgx_to_datacollector.sh → legacy 이관 완료.
+     현재 유효 스크립트: scripts/sync_ckpt_dgx_to_orin.sh (06_dgx_absorbs_datacollector 결정). -->
 
 ```python
 # ckpt 자동 탐색 패턴 (후행 O2 에서 구현)

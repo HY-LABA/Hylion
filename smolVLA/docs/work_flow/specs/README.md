@@ -104,9 +104,10 @@ reflection → workflow_reflections/<날짜>_<NN_name>.md
 
 ---
 
-## 활성 spec 번호 현황 (2026-05-02 기준)
+## 활성 spec 번호 현황 (2026-05-03 기준)
 
 <!-- 06_dgx_absorbs_datacollector 삽입으로 기존 06~09 → 07~10 시프트 (M1 갱신) -->
+<!-- 07_e2e_pilot_and_cleanup 삽입으로 기존 07~10 → 08~11 시프트 (P4 갱신, 2026-05-03) -->
 
 | 번호 | spec 명 | 상태 |
 |---|---|---|
@@ -115,13 +116,14 @@ reflection → workflow_reflections/<날짜>_<NN_name>.md
 | 03 | smolvla_test_on_orin | history |
 | 04 | infra_setup | history |
 | 05 | interactive_cli | history |
-| **06** | **dgx_absorbs_datacollector** | **활성 (현 사이클)** |
-| 07 | leftarmVLA | 대기 (구 06) |
-| 08 | biarm_teleop_on_dgx | 대기 (구 07) |
-| 09 | biarm_VLA | 대기 (구 08) |
-| 10 | biarm_deploy | 대기 (구 09) |
+| 06 | dgx_absorbs_datacollector | history |
+| **07** | **e2e_pilot_and_cleanup** | **활성 (현 사이클)** |
+| 08 | leftarmVLA | 대기 (구 07) |
+| 09 | biarm_teleop_on_dgx | 대기 (구 08) |
+| 10 | biarm_VLA | 대기 (구 09) |
+| 11 | biarm_deploy | 대기 (구 10) |
 
-> 번호 시프트 배경: 06_dgx_absorbs_datacollector 삽입으로 기존 `06_leftarmVLA` → `07_leftarmVLA`, `07~09` → `08~10`. 상세: `06_dgx_absorbs_datacollector.md` §본 마일스톤의 위치.
+> 번호 시프트 배경: 07_e2e_pilot_and_cleanup 삽입으로 기존 `07_leftarmVLA` → `08_leftarmVLA`, `08~10` → `09~11`. 상세: `07_e2e_pilot_and_cleanup.md` §본 마일스톤의 위치.
 
 ## Reference
 

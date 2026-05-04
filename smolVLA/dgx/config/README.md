@@ -1,6 +1,6 @@
 # dgx/config/ — DGX 학습 설정 캐시
 
-> 책임: DataCollector 로부터 수신하는 HF 데이터셋 repo_id 목록 등 학습 관련 설정 캐시 관리. 학습 스크립트가 매번 수동 입력하지 않도록 영속화.
+> 책임: HF 데이터셋 repo_id 목록 등 학습 관련 설정 캐시 관리. 학습 스크립트가 매번 수동 입력하지 않도록 영속화. (06_dgx_absorbs_datacollector 결정으로 DataCollector 노드 운영 종료 — DGX 가 데이터 수집 책임 흡수)
 > 신설: 04_infra_setup TODO-X2 (2026-05-01)
 > 형제: `orin/config/` (Orin 측 cached config — SO-ARM 포트 / 카메라 인덱스)
 
@@ -16,7 +16,7 @@
 
 ## `dataset_repos.json` 스키마
 
-DataCollector ↔ DGX 데이터 전송 방식은 **HF Hub + rsync 둘 다** (TODO-T1 사용자 결정). 두 방식을 모두 지원하는 스키마:
+데이터 전송 방식은 **HF Hub + rsync 둘 다** (TODO-T1 사용자 결정). 두 방식을 모두 지원하는 스키마:
 
 ```json
 {
@@ -28,7 +28,7 @@ DataCollector ↔ DGX 데이터 전송 방식은 **HF Hub + rsync 둘 다** (TOD
         "private": false
       },
       "rsync": {
-        "source": "<datacollector_host>:<dataset_local_path>",
+        "source": "<src_host>:<dataset_local_path>",
         "dest": "/home/laba/smolvla/.hf_cache/lerobot/<HF_USER>/<dataset_name>"
       },
       "active_method": "hf_hub"

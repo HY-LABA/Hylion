@@ -62,27 +62,39 @@ pip install \
 
 # ── 3. lerobot editable 설치 (submodule SHA 기준) ─────────────────────────────
 # docs/reference/lerobot/ 의 fixed SHA 를 그대로 사용 → 본 프로젝트가 분석한 코드와 학습 환경 일치.
-echo "[setup] lerobot[smolvla,training] editable 설치 중..."
-pip install -e "${LEROBOT_SRC}[smolvla,training]" --quiet
+#
+# extras 구성:
+#   smolvla   : SmolVLA policy (transformers, num2words, accelerate)
+#   training  : 학습 파이프라인 (dataset extras 포함 — datasets, pandas, pyarrow, av, jsonlines)
+#   hardware  : SO-ARM 모터 제어 + 키보드 입력 (pynput, pyserial, deepdiff)
+#   feetech   : Feetech 서보 직접 구동 (feetech-servo-sdk, pyserial, deepdiff)
+#
+# 06_dgx_absorbs_datacollector 결정 후행 (영구 fix) + 07 TODO-D5:
+#   06 사이클에서 DGX 가 데이터 수집 책임 흡수 — hardware·feetech extras 필수.
+#   07 D4 precheck 시 lerobot-find-port → pyserial ImportError 차단 원인.
+#   Option B 원칙 (dgx/pyproject.toml 신규 생성 X) 유지 — setup_train_env.sh 에서만 관리.
+echo "[setup] lerobot[smolvla,training,hardware,feetech] editable 설치 중..."
+pip install -e "${LEROBOT_SRC}[smolvla,training,hardware,feetech]" --quiet
 
-# ── 3-c. record + hardware + feetech extras 설치 ───────────────────────────────
-# 06_dgx_absorbs_datacollector: DGX 가 데이터 수집 책임 흡수 — record·hardware·feetech extras 추가.
-# Option B (pyproject.toml 미변경): DGX 가 lerobot upstream editable 설치 + 9 entrypoint 등록됨.
-#   본 step 은 record/hardware/feetech extras 패키지 추가 설치만 (Option B — pyproject 신규 X).
+# ── 3-c. torchcodec 별도 인덱스 설치 + dataset 보완 ──────────────────────────
+# 06_dgx_absorbs_datacollector: DGX 가 데이터 수집 책임 흡수 — 06 사이클에서 개별 pip install 방식으로 추가.
+# 07 TODO-D5 이후: hardware·feetech extras 는 §3 의 editable install extras 로 통합 완료.
+#   (pynput, pyserial, deepdiff, feetech-servo-sdk 는 §3 에서 lerobot[hardware,feetech] 로 설치됨)
 #
 # torchcodec: PyPI 기본 인덱스에서는 cu130 wheel 미제공 → cu130 인덱스 별도 지정 필요.
-#   먼저 설치하면 이후 일반 pip install 명령에서 torchcodec 조건 중복 없이 skip.
+#   lerobot[dataset] extras 의 torchcodec 조건: sys_platform/aarch64 제외 조건으로 linux/aarch64 에서 skip.
+#   DGX (x86_64) 에서는 cu130 인덱스로 직접 설치 필요 — lerobot extras 로 처리 불가.
 echo "[setup] torchcodec (>=0.3.0,<0.11.0, cu130 wheel) 설치 중..."
 pip install \
     'torchcodec>=0.3.0,<0.11.0' \
     --index-url https://download.pytorch.org/whl/cu130 \
     --quiet
 
-# record extras: LeRobotDataset 포맷 저장 + HF Hub + 비디오 인코딩
-# hardware extras: SO-ARM 모터 제어 + 키보드 입력
-# feetech extras: Feetech 서보 직접 구동
-# 버전 범위: datacollector/pyproject.toml record/hardware/feetech extras 직접 인용 (line 40-61)
-echo "[setup] record + hardware + feetech extras 설치 중..."
+# dataset 보완: lerobot[training] extras 가 lerobot[dataset] 를 체인하나,
+#   av 는 torchcodec 설치 후 중복 없이 skip. datasets/pandas/pyarrow/jsonlines 는 이미 §3 에서 설치됨.
+#   아래 pip install 은 이미 설치된 패키지를 명시적으로 재확인하는 보수적 처리 — pip 가 no-op 으로 처리.
+#   버전 범위: lerobot/pyproject.toml [project.optional-dependencies] 직접 인용 (dataset extra, line 97-104)
+echo "[setup] record + hardware + feetech extras 패키지 확인 (§3 extras 중복 포함, pip no-op)..."
 pip install \
     'datasets>=4.0.0,<5.0.0' \
     'pandas>=2.0.0,<3.0.0' \

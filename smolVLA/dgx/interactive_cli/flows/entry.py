@@ -18,9 +18,23 @@ flow 1: 장치 선택 메뉴
     datacollector 노드 운영 종료 (06_dgx_absorbs_datacollector 결정 C·F).
   - dgx 분기: flow 3 mode 분기 (mode.py) 호출로 변경
     (env_check 는 mode 인자 없이 smoke 로 사전 점검 — 수집/학습 분기는 mode.py 책임)
+
+갱신 (2026-05-03, TODO-D6):
+  - detect_display_mode() 신규 — SSH/직접 실행 자동 검출 + 사용자 확인.
+  - dgx 분기에서 display_mode 를 flow3_mode_entry() 로 전달.
+    이로써 precheck.py 카메라 영상 표시 방법 (OpenCV imshow vs 파일 저장)
+    을 flow 초반에 결정.
+
+갱신 (2026-05-03, TODO-D7):
+  - detect_display_mode(): "ssh" → "ssh-file" + "ssh-x11" 2종 분리.
+    "direct" | "ssh-x11" | "ssh-file" 3종 반환.
+    SMOLVLA_DISPLAY_MODE 환경변수: "direct" | "ssh-x11" | "ssh-file" | "ssh" (구형 compat)
+  - SSH X11 forwarding 검출: DISPLAY=localhost:N 패턴.
+  - 진입 시 display mode 안내 강화 (SSH X11 forwarding 사용법 포함).
 """
 
 import argparse
+import os
 import sys
 from pathlib import Path
 
@@ -74,7 +88,7 @@ def load_node_config(node_config_path: str) -> dict | None:
     """configs/node.yaml 로드.
 
     Returns:
-        {"node": "orin"|"dgx"|"datacollector", "venv": "~/..."} 또는 None.
+        {"node": "orin"|"dgx", "venv": "~/..."} 또는 None.
     """
     p = Path(node_config_path)
     if p.is_dir():
@@ -94,6 +108,116 @@ def load_node_config(node_config_path: str) -> dict | None:
     except Exception as e:
         print(f"[ERROR] node.yaml 파싱 실패 ({p}): {e}", file=sys.stderr)
         return None
+
+
+# ---------------------------------------------------------------------------
+# display mode 검출 (TODO-D6)
+# ---------------------------------------------------------------------------
+
+def _prompt_entry(message: str) -> str:
+    """input() 래퍼 — EOFError·KeyboardInterrupt 보호 (entry.py 내부용)."""
+    try:
+        return input(message).strip()
+    except (EOFError, KeyboardInterrupt):
+        print()
+        raise KeyboardInterrupt
+
+
+def detect_display_mode() -> str:
+    """SSH 접속 vs 직접 실행 자동 검출 + 사용자 확인.
+
+    카메라 영상을 어떻게 표시할지 결정:
+      "direct"   — DGX 모니터에 OpenCV imshow (DISPLAY=:0 등 로컬 DISPLAY)
+      "ssh-x11"  — SSH X11 forwarding 활성 (DISPLAY=localhost:N). cv2.imshow 시도.
+                   X11 실패 시 precheck._show_frame() 이 ssh-file 로 자동 fallback.
+                   전제: ssh -Y dgx 또는 ssh -X dgx 로 접속 필요.
+      "ssh-file" — 이미지 파일 저장 + path 출력 (xdg-open 시도). SSH 파일 모드.
+
+    자동 검출 기준:
+      is_ssh: SSH_CLIENT 또는 SSH_TTY 환경변수 존재 여부 (표준 SSH 연결 시 셸이 설정)
+      display: DISPLAY 환경변수
+        - is_ssh + display.startswith("localhost:") → ssh-x11 (X11 forwarding 활성)
+        - is_ssh + 그 외 → ssh-file
+        - not is_ssh + display → direct
+        - not is_ssh + not display → direct (DISPLAY=:0 시도 가능)
+
+    SMOLVLA_DISPLAY_MODE 환경변수로 강제 override 가능:
+      "direct" | "ssh-x11" | "ssh-file" | "ssh" (구형 compat → ssh-file 로 처리)
+
+    DISPLAY fallback:
+      direct 선택 시 DISPLAY 환경변수 미설정 → ssh-file 모드 자동 전환 + 안내.
+
+    Returns:
+        "direct", "ssh-x11", 또는 "ssh-file"
+    """
+    # 환경변수 강제 override (비대화형 테스트·스크립트 호출 시)
+    env_override = os.environ.get("SMOLVLA_DISPLAY_MODE", "").lower()
+    if env_override in ("direct", "ssh-x11", "ssh-file"):
+        return env_override
+    if env_override == "ssh":  # 구형 호환 — ssh-file 로 처리
+        return "ssh-file"
+
+    # 자동 검출
+    is_ssh = bool(os.environ.get("SSH_CLIENT") or os.environ.get("SSH_TTY"))
+    display = os.environ.get("DISPLAY", "")
+
+    # SSH X11 forwarding: DISPLAY=localhost:N 패턴
+    if is_ssh and display.startswith("localhost:"):
+        auto_detected = "ssh-x11"
+    elif is_ssh:
+        auto_detected = "ssh-file"
+    else:
+        auto_detected = "direct"
+
+    # 사용자 확인 prompt (+ SSH X11 안내)
+    print()
+    print("=" * 60)
+    print(" 환경 모드 선택 (카메라 영상 표시 방법)")
+    print("=" * 60)
+    print()
+    print(f"  현재 DISPLAY={display!r}  SSH={is_ssh}")
+    print()
+    print("  (1) direct    — DGX 모니터에 OpenCV 창 표시 (DISPLAY=:0 필요)")
+    print("  (2) ssh-x11   — SSH X11 forwarding 으로 cv2.imshow")
+    print("                  (ssh -Y dgx 또는 ssh -X dgx 로 접속 시 사용)")
+    print("  (3) ssh-file  — 이미지 파일 저장 + path 출력 (xdg-open 시도)")
+    print()
+    print(f"  자동 검출: {auto_detected}")
+    print()
+    if is_ssh and auto_detected == "ssh-file":
+        print("  * SSH X11 forwarding 을 사용하려면 ssh -Y dgx 로 재접속하세요.")
+        print("    X11 forwarding 활성 시 DISPLAY=localhost:N 으로 자동 검출됩니다.")
+        print()
+
+    try:
+        raw = _prompt_entry(f"번호 선택 [1~3, Enter={auto_detected}]: ")
+    except KeyboardInterrupt:
+        print("[entry] 인터럽트 — 자동 검출 값 사용: {}".format(auto_detected))
+        raw = ""
+
+    if raw == "1":
+        selected = "direct"
+    elif raw == "2":
+        selected = "ssh-x11"
+    elif raw == "3":
+        selected = "ssh-file"
+    else:
+        selected = auto_detected
+
+    # DISPLAY fallback: direct 선택 + DISPLAY 미설정 → ssh-file 전환
+    if selected == "direct" and not display:
+        print()
+        print(
+            "[entry] 경고: DISPLAY 환경변수 미설정 — OpenCV imshow 동작 불가."
+        )
+        print("        ssh-file 모드(이미지 파일 저장)로 자동 전환합니다.")
+        print("        DGX 모니터에서 직접 실행 시: export DISPLAY=:0")
+        print("        SSH X11 forwarding 사용 시: ssh -Y dgx 로 재접속")
+        selected = "ssh-file"
+
+    print()
+    print(f"[entry] 환경 모드 결정: {selected}")
+    return selected
 
 
 # ---------------------------------------------------------------------------
@@ -124,9 +248,8 @@ def flow0_confirm_environment(node: str) -> bool:
 def flow1_select_node(current_node: str) -> str | None:
     """flow 1: 장치 선택 메뉴.
 
-    spec line 51: "본 노드인 datacollector 만 활성, 다른 노드는 안내만"
-    — 이 규칙이 모든 노드에 공통 적용: 어느 노드에서 실행하든
-      자신의 노드만 active, 나머지는 선택 불가 + 안내.
+    원칙: 본 노드만 active, 다른 노드는 안내만.
+    — 어느 노드에서 실행하든 자신의 노드만 active, 나머지는 선택 불가 + 안내.
 
     Returns:
         선택된 노드 이름 (현재 노드와 동일) 또는 None (종료 선택)
@@ -216,7 +339,7 @@ def main() -> int:
         print(f"        유효 값: {VALID_NODES}")
         return 1
 
-    # flow 0: 환경 확인 (datacollector 전용)
+    # flow 0: 환경 확인
     if not flow0_confirm_environment(node):
         return 0  # 사용자 거부 — 정상 종료 (오류 X)
 
@@ -232,6 +355,10 @@ def main() -> int:
 
         script_dir = Path(args.node_config).parent.parent  # configs/ 상위 = interactive_cli/
 
+        # display mode 결정 (TODO-D6) — flow 초반에 SSH/직접 분기 결정
+        # flow3_mode_entry → precheck.py 카메라 영상 표시 방법 전달
+        display_mode = detect_display_mode()
+
         # flow 2: 환경 체크 (기본 smoke 시나리오로 preflight — mode 선택 전 사전 점검)
         # mode 인자 없이 train 체크만 수행. 수집 환경 체크 (USB·카메라) 는
         # mode.py 에서 수집 mode 선택 시 env_check.py 재호출 (mode="collect") 로 처리.
@@ -240,7 +367,7 @@ def main() -> int:
             return 1  # preflight FAIL — 종료
 
         # flow 3: mode 분기 (G-4 결정 — 수집/학습/종료)
-        return flow3_mode_entry(script_dir)
+        return flow3_mode_entry(script_dir, display_mode=display_mode)
 
     else:
         # orin: 후행 todo 에서 구현

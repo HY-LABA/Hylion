@@ -28,6 +28,21 @@ state 를 받아 forward → action chunk 출력 → (모드별로) follower 송
     --gate-json <dir>          → <dir>/ports.json + <dir>/cameras.json
     --gate-json <ports.json>   → 같은 디렉터리의 cameras.json 도 함께 로드
     --gate-json <cameras.json> → 같은 디렉터리의 ports.json 도 함께 로드
+
+카메라 인덱스 사전 발견 (03 BACKLOG #15):
+  Linux 에서 카메라 인덱스가 재부팅·USB 재연결마다 달라질 수 있다.
+  실행 전 반드시 아래 명령으로 인덱스를 확인하고 --cameras 에 명시할 것:
+
+    lerobot-find-cameras opencv
+
+  --cameras 를 생략하거나 --gate-json 을 미지정하면 자동 발견을 시도하며
+  (OpenCVCamera.find_cameras()), 발견된 카메라가 정확히 2 대일 때만 자동 적용
+  (top: 첫 번째, wrist: 두 번째). 발견 수가 0 이거나 3 대 이상이면 수동 지정 필수.
+
+wrist 카메라 플립 (03 BACKLOG #16):
+  wrist 카메라를 거꾸로 장착한 경우 --flip-cameras wrist 를 추가한다.
+  사전학습 분포(svla_so100_pickplace)의 wrist 카메라 방향과 일치 여부는
+  08_leftarmVLA 진입 시 확인 예정 (03 BACKLOG #11).
 """
 
 import argparse
@@ -119,6 +134,62 @@ def load_gate_config(gate_json_path: str) -> tuple[dict | None, dict | None]:
     return ports_data, cameras_data
 
 
+def _auto_discover_cameras() -> dict[str, int] | None:
+    """OpenCVCamera.find_cameras() 로 시스템에 연결된 카메라를 자동 발견한다.
+
+    발견된 카메라가 정확히 2 대인 경우에만 자동 적용.
+    반환: {camera_name: device_index} 또는 자동 적용 불가 시 None.
+
+    패턴 출처: docs/reference/lerobot/src/lerobot/cameras/opencv/camera_opencv.py
+    OpenCVCamera.find_cameras() — Linux: /dev/video* glob, others: 0..MAX_OPENCV_INDEX
+    """
+    try:
+        from lerobot.cameras.opencv import OpenCVCamera
+
+        found = OpenCVCamera.find_cameras()
+    except Exception as e:
+        print(f"[camera] 자동 발견 중 오류: {e}", file=sys.stderr)
+        return None
+
+    if len(found) == 0:
+        print("[camera] 연결된 카메라를 찾지 못했습니다. lerobot-find-cameras opencv 로 확인하세요.", file=sys.stderr)
+        return None
+
+    if len(found) != 2:
+        print(
+            f"[camera] 카메라 {len(found)} 대 발견 — 자동 적용 불가 (정확히 2 대 필요).\n"
+            f"[camera] lerobot-find-cameras opencv 결과를 확인하고 --cameras top:<idx>,wrist:<idx> 로 명시하십시오.",
+            file=sys.stderr,
+        )
+        return None
+
+    # 발견 수 == 2: 첫 번째 → top, 두 번째 → wrist
+    # find_cameras() 의 각 항목은 {'id': str|int, ...} 형식
+    # id 는 Linux 에서 str('/dev/video0'), 다른 OS 에서 int
+    def _to_idx(v) -> int:
+        try:
+            return int(v)
+        except (ValueError, TypeError):
+            # '/dev/video2' → 2 (끝 숫자만 추출)
+            import re
+            m = re.search(r"(\d+)$", str(v))
+            if m:
+                return int(m.group(1))
+            raise ValueError(f"카메라 id 를 정수 인덱스로 변환할 수 없음: {v!r}")
+
+    try:
+        top_idx = _to_idx(found[0]["id"])
+        wrist_idx = _to_idx(found[1]["id"])
+    except Exception as e:
+        print(f"[camera] 자동 발견 인덱스 변환 실패: {e}", file=sys.stderr)
+        return None
+
+    result = {"top": top_idx, "wrist": wrist_idx}
+    print(f"[camera] 자동 발견 성공 — top:{top_idx}, wrist:{wrist_idx} (2대 발견)")
+    print("[camera] 인덱스가 올바르지 않으면 lerobot-find-cameras opencv 로 확인 후 --cameras 로 명시하십시오.")
+    return result
+
+
 def apply_gate_config(
     args: argparse.Namespace,
     ports_data: dict | None,
@@ -132,11 +203,9 @@ def apply_gate_config(
 
     채움 규칙:
       ports_data.follower_port  → --follower-port  (기본값 required 이므로 미설정 시 채움)
-      cameras_data.top.index + cameras_data.wrist.index → --cameras  (기본값 top:0,wrist:1 이면 덮어씀)
+      cameras_data.top.index + cameras_data.wrist.index → --cameras  (None 또는 기본값일 때 덮어씀)
       cameras_data.*.flip==true  → --flip-cameras  (빈 set 이면 gate 값 추가)
     """
-    default_cameras = parse_camera_arg("top:0,wrist:1")
-
     # --follower-port: required 이므로 None 일 때만 gate 값 적용
     if args.follower_port is None and ports_data is not None:
         fp = ports_data.get("follower_port")
@@ -146,10 +215,10 @@ def apply_gate_config(
         else:
             print("[gate] ports.json.follower_port = null — --follower-port 는 여전히 필수", file=sys.stderr)
 
-    # --cameras: 기본값(top:0,wrist:1)과 동일한 경우만 gate 값으로 덮어씀
+    # --cameras: None (미지정) 인 경우 gate 값으로 채움.
     # cameras.json 의 index 는 문자열("/dev/video0") 또는 정수일 수 있으므로
     # parse_camera_arg 를 우회하고 직접 dict 구성 (index_or_path 는 int|Path — str 불허)
-    if cameras_data is not None and args.cameras == default_cameras:
+    if cameras_data is not None and args.cameras is None:
         top_idx = cameras_data.get("top", {}).get("index")
         wrist_idx = cameras_data.get("wrist", {}).get("index")
         if top_idx is not None and wrist_idx is not None:
@@ -205,14 +274,24 @@ def main():
     parser.add_argument(
         "--cameras",
         type=parse_camera_arg,
-        default=parse_camera_arg("top:0,wrist:1"),
-        help="Camera mapping `name:device_idx,...` (default: top:0,wrist:1).",
+        default=None,
+        help=(
+            "Camera mapping `name:device_idx,...` (예: top:2,wrist:0). "
+            "미지정 시 OpenCVCamera.find_cameras() 로 자동 발견 시도 "
+            "(발견 수 == 2 일 때만 자동 적용 — top: 첫 번째, wrist: 두 번째). "
+            "사전 발견 명령: lerobot-find-cameras opencv. "
+            "--gate-json 지정 시 cameras.json 에서 인덱스를 읽어 채움 (이쪽이 우선)."
+        ),
     )
     parser.add_argument(
         "--flip-cameras",
         type=parse_camera_names,
         default=set(),
-        help="Comma-separated camera names to vertically flip before inference (e.g., wrist).",
+        help=(
+            "Comma-separated camera names to vertically flip before inference (e.g., wrist). "
+            "wrist 카메라를 거꾸로 장착한 경우 `--flip-cameras wrist` 를 추가한다. "
+            "--gate-json 의 cameras.json.wrist.flip=true 로도 자동 적용 가능."
+        ),
     )
     parser.add_argument(
         "--n-action-steps",
@@ -285,6 +364,21 @@ def main():
     if args.gate_json is not None:
         ports_data, cameras_data = load_gate_config(args.gate_json)
         args = apply_gate_config(args, ports_data, cameras_data, parser)
+
+    # ── 카메라 인덱스 자동 발견 fallback (03 BACKLOG #15) ──────────
+    # 우선순위: --cameras CLI 직접 지정 > --gate-json cameras.json > 자동 발견 > 기본값
+    if args.cameras is None:
+        args.cameras = _auto_discover_cameras()
+
+    # ── 자동 발견 실패 시 기본값 적용 + 사전 발견 안내 ───────────────
+    if args.cameras is None:
+        print(
+            "[camera] 자동 발견 실패 — 기본값(top:0,wrist:1) 을 사용합니다.\n"
+            "[camera] 카메라 인덱스 확인 명령: lerobot-find-cameras opencv\n"
+            "[camera] 확인 후 --cameras top:<idx>,wrist:<idx> 로 명시하십시오.",
+            file=sys.stderr,
+        )
+        args.cameras = parse_camera_arg("top:0,wrist:1")
 
     # --follower-port 최종 필수 검증 (gate-json 로딩 후)
     if args.follower_port is None:

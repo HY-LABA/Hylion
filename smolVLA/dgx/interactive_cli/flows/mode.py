@@ -9,6 +9,18 @@
   (2) 학습 선택 시 → 학습 flow 3~ (run_training_flow)
   (3) 종료 선택 시 → 즉시 종료
 
+갱신 (2026-05-04, TODO-D4):
+  수집 mode (1) 에 teleop 진입 직전 사전 점검 단계 추가 (ANOMALIES 07-#3 후속).
+  흐름: env_check(mode="collect") PASS → teleop_precheck() → _run_collect_flow()
+  teleop_precheck(): 저장된 모터 포트·카메라 인덱스·캘리브 위치 표시 + 3-way 분기.
+  "cancel" 시 return 0 (수집 mode 정상 종료).
+
+갱신 (2026-05-03, TODO-D6):
+  flow3_mode_entry() 에 display_mode 인자 추가.
+  수집 mode (1) → teleop_precheck(script_dir, display_mode) 로 전달.
+  precheck.py 가 카메라 식별 시 display_mode ("direct"/"ssh") 에 따라
+  OpenCV imshow 또는 이미지 파일 저장으로 영상 표시.
+
 구조: 단발 종료 (G-1 기반) + 수집 끝 학습 전환 prompt 하이브리드.
       메뉴 진입 후 mode 완료 시 종료 (루프 X).
 
@@ -16,6 +28,7 @@
   - 14_dgx_cli_flow.md §2 G-1~G-4 후보 분석 + G-4 확정
   - datacollector/interactive_cli/flows/{teleop,data_kind,record,transfer}.py 이식 패턴
   - dgx/interactive_cli/flows/training.py run_training_flow() 시그니처
+  - dgx/interactive_cli/flows/precheck.py teleop_precheck() — TODO-D4 신규
 """
 
 from pathlib import Path
@@ -85,15 +98,15 @@ def _run_collect_flow(script_dir: Path) -> tuple[int, str | None]:
         return 1, None
 
     # flow 6: lerobot-record 실행
-    # env_check 에서 수집 mode 시 카메라 인덱스 체크를 수행했어야 하나,
-    # 현재 구현에서는 기본값 (wrist_left=0, overview=1) 사용.
-    # V2 prod 검증에서 실제 인덱스 확인 후 수정 예정.
+    # D12: configs_dir 전달 — cameras.json·ports.json 로드 후 인자 갱신.
+    # cameras.json 미설정 시 hardcoded fallback (wrist_left=0, overview=1) 사용.
+    # precheck.py _get_configs_dir 패턴과 동일하게 configs_dir 계산.
+    configs_dir = script_dir / "configs"
     success, local_dataset_path, repo_id = flow6_record(
         data_kind_choice=data_kind_result.choice,
         single_task=data_kind_result.single_task,
         default_num_episodes=data_kind_result.default_num_episodes,
-        cam_wrist_left_index=0,
-        cam_overview_index=1,
+        configs_dir=configs_dir,
     )
 
     # dataset_name 추출 (G-4 학습 전환 인계용)
@@ -168,7 +181,7 @@ def _prompt_transition_to_train(
 # flow 3 메인 — mode 선택 진입점
 # ---------------------------------------------------------------------------
 
-def flow3_mode_entry(script_dir: Path) -> int:
+def flow3_mode_entry(script_dir: Path, display_mode: str = "ssh") -> int:
     """flow 3: mode 선택 메뉴 + 해당 flow 실행.
 
     G-4 명세 적용:
@@ -178,6 +191,12 @@ def flow3_mode_entry(script_dir: Path) -> int:
       (3) 즉시 종료
 
     단발 종료 구조 (루프 X).
+
+    Args:
+        script_dir: dgx/interactive_cli/ 경로
+        display_mode: "direct" (DGX 모니터 OpenCV imshow) | "ssh" (이미지 파일 저장)
+                      entry.py detect_display_mode() 결과 전달 (TODO-D6).
+                      기본값 "ssh" — 안전한 fallback.
 
     Returns:
         0: 정상 완료 / 1: 오류
@@ -207,6 +226,29 @@ def flow3_mode_entry(script_dir: Path) -> int:
             print()
             print("[mode] 데이터 수집 mode 진입합니다.")
             print()
+
+            # env_check.py 수집 환경 체크 (항목 6~9: USB·dialout·v4l2·SO-ARM 포트 응답)
+            # entry.py 에서는 scenario="smoke" 로 preflight 만 실행 (학습 mode 공통 사전 점검).
+            # 수집 mode 에서는 SO-ARM·카메라 하드웨어 체크 추가 (env_check.py mode="collect").
+            # 결정 (TODO-X2 §7, env_check.py docstring): selective check — 수집 mode 에서만 항목 6~9 실행.
+            # FAIL 시 사용자 안내 후 종료 (실 SO-ARM 없는 환경 보호).
+            from flows.env_check import flow2_env_check as _flow2_env_check_collect
+            if not _flow2_env_check_collect(script_dir, scenario="smoke", mode="collect"):
+                print()
+                print("[mode] 수집 환경 체크 FAIL — SO-ARM·카메라 연결 후 재시작하세요.")
+                return 1
+
+            # teleop 진입 직전 사전 점검 (TODO-D4 신규 단계, TODO-D6 display_mode 추가)
+            # 저장된 모터 포트·카메라 인덱스·캘리브 위치 표시 + 분기:
+            #   "proceed" → teleop 진행
+            #   "cancel"  → 수집 mode 종료
+            # display_mode: 카메라 영상 표시 방법 ("direct"/"ssh") — entry.py 에서 전달.
+            from flows.precheck import teleop_precheck as _teleop_precheck
+            precheck_result = _teleop_precheck(script_dir, display_mode=display_mode)
+            if precheck_result == "cancel":
+                print()
+                print("[mode] 사전 점검에서 취소를 선택했습니다. 수집 mode 를 종료합니다.")
+                return 0
 
             rc, dataset_name = _run_collect_flow(script_dir)
 

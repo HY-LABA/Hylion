@@ -69,6 +69,25 @@ model: sonnet
   - smoke test (예: `ssh orin "bash ~/smolvla/orin/tests/smoke_test.sh"`)
 - 결과 캡처 + 분석
 
+#### 4-a. interactive CLI entry runtime smoke (07 reflection #1 도출)
+
+해당 todo 가 `main.sh` 류 interactive CLI entry 를 포함하면 정적 검증 (py_compile·ruff·bash -n) 만으론 불충분. **runtime smoke 의무 실행**:
+
+- 패턴: `echo "<menu_input>" | timeout 10 bash <main.sh 경로> 2>&1 | head -20`
+- planner 가 `context/plan.md` Phase 3 검증 큐 후보에 명시한 menu walkthrough 시나리오를 따라 입력 시퀀스 결정 (없으면 종료 메뉴 단순 진입 시뮬)
+- 기대: ModuleNotFoundError / ImportError 미발생, 메뉴 출력 정상
+- 목적: import-time 에러를 사용자 walkthrough 이전에 자동 탐지 (07 ANOMALIES #2 SMOKE_TEST_GAP 패턴 차단)
+- ※ 응답 없으면 timeout SIGTERM 정상. 검증 결과는 `03_prod-test.md` 에 명시
+
+#### 4-b. lerobot CLI 진입점 import 체크 (07 reflection #4 도출)
+
+해당 todo 에서 사용 예정인 lerobot CLI (예: `lerobot-find-port`, `lerobot-find-cameras`, `lerobot-record`, `lerobot-train`) 가 있으면 DGX/Orin 배포 후 import smoke 의무:
+
+- 패턴: `ssh dgx "source ~/smolvla/dgx/.arm_finetune/bin/activate && lerobot-find-port --help" > /dev/null`
+- exit code 비정상 (예: ImportError 의 1) → BACKLOG 후보 등록 + 검증 결과 명시
+- 목적: extras transitive 의존성 누락 (07 BACKLOG #6 — pyserial·deepdiff 3회 반복 패턴) 사전 탐지
+- 적용 범위: 해당 todo 에서 *사용 예정* CLI 만. 모든 lerobot CLI 의무화 X (비용 ↑)
+
 ### 5. 사용자 실물 검증 필요 항목 식별
 
 다음 패턴은 사용자 실물 검증 필요:

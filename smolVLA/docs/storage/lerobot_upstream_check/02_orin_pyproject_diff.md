@@ -209,4 +209,52 @@ upstream `pyproject.toml`이 업데이트될 때 아래 항목이 orin에 영향
 - [ ] `torch` / `torchvision` 버전 범위 변경 → jp6/cu126 제공 버전과 호환성 재확인
 - [ ] `smolvla` extra 내 `transformers` 버전 변경 → orin `transformers==5.3.0`과 불일치 여부
 - [ ] 신규 패키지 추가 → aarch64 / cp310 빌드 존재 여부 확인
-- [ ] `[project.scripts]` 변경 → upstream에 새 스크립트 추가 시 orin에도 반영 필요
+- [ ] `[project.scripts]` 변경 → upstream에 새 스크립트 추가 시 orin에도 반영 필요 (아래 절차 참조)
+
+---
+
+## upstream 동기화 시 entrypoint 정리 절차 (07 W3 추가, 2026-05-03)
+
+> **04 BACKLOG #1 명문화** — lerobot upstream submodule 갱신 후 `orin/pyproject.toml [project.scripts]` 의 entrypoint 정리가 덮어씌워질 수 있음. 다음 절차 필수.
+
+### 배경
+
+04_infra_setup 사이클 (TODO-O2, 2026-04-30) 에서 Orin 책임이 **추론 + 데이터 수집 전용** 으로 축소됨에 따라 `lerobot-eval` / `lerobot-train` 두 entrypoint 를 `orin/pyproject.toml [project.scripts]` 에서 제거. upstream 동기화 시 이 결정이 무의식적으로 복원될 위험이 있어 본 절차를 명문화.
+
+### 동기화 후 entrypoint 정리 절차
+
+submodule 갱신 (`git submodule update --remote docs/reference/lerobot`) 또는 upstream `pyproject.toml` 수동 갱신 후:
+
+1. `orin/pyproject.toml` 의 `[project.scripts]` 섹션을 직접 Read 하여 entrypoint 목록 확인.
+
+2. **유지 대상** (Orin 추론·수집·환경 점검 책임) — 아래 9개:
+
+   | entrypoint | 역할 |
+   |---|---|
+   | `lerobot-calibrate` | 모터 캘리브레이션 |
+   | `lerobot-find-cameras` | 카메라 인덱스 발견 |
+   | `lerobot-find-port` | 시리얼 포트 발견 |
+   | `lerobot-find-joint-limits` | 관절 한계 발견 |
+   | `lerobot-record` | 데이터 수집 |
+   | `lerobot-replay` | 데이터 재생 |
+   | `lerobot-setup-motors` | 모터 초기 설정 |
+   | `lerobot-teleoperate` | 원격 조작 |
+   | `lerobot-info` | 환경 정보 출력 |
+
+3. **제거 대상** (04 TODO-O2 결정 — 추론-only 환경이므로 학습·평가 entrypoint 불요):
+
+   | entrypoint | 제거 이유 |
+   |---|---|
+   | `lerobot-eval` | Orin 평가 안 함. `hil_inference.py` 또는 DGX 가 대체 |
+   | `lerobot-train` | Orin 학습 안 함. DGX 책임 |
+
+4. upstream 동기화 후 위 두 항목이 `[project.scripts]` 에 **재추가됐으면 즉시 삭제** 또는 주석 처리. 파일 자체 (`orin/lerobot/scripts/lerobot_eval.py`, `lerobot_train.py`) 는 upstream 보존 원칙대로 **그대로 유지** (옵션 B).
+
+5. upstream 에 **신규 entrypoint 가 추가됐으면**, 해당 스크립트가 Orin 책임 범위 (추론·수집·환경 점검) 에 해당하는지 판단:
+   - 해당: `[project.scripts]` 에 추가 유지
+   - 미해당 (학습·평가·시각화·노트북 등): 제거 후 본 문서 변경 이력 섹션에 기록
+
+6. 변경 후:
+   - 본 문서 (`02_orin_pyproject_diff.md`) 의 *변경 이력* 섹션에 날짜·이유 기록
+   - `orin/scripts/setup_env.sh` 의 entrypoint 의존성 변경이 있으면 함께 갱신 (Coupled File Rule 1)
+   - Orin venv 에서 `pip install -e orin/[smolvla,hardware,feetech]` 재실행으로 entrypoint 적용

@@ -16,6 +16,31 @@ description: orin·dgx 배포 절차 + 비대화형 검증 명령 시퀀스. pro
 
 ⚠️ deploy_*.sh 자체는 Hard Constraints Category B 영역. 스크립트 내용 변경 시 사용자 동의 필수.
 
+## rsync 배포 시 사용자 환경 파일 보호 원칙 (07 reflection #6 도출)
+
+배포 스크립트 (`deploy_orin.sh`, `deploy_dgx.sh`) 의 rsync 실행 시 다음 파일·디렉터리는 **반드시 exclude** — 사용자 환경 의존 파일 (시연장 셋업·동기화된 ckpt 등) 을 devPC repo 가 덮어쓰지 않도록 보호:
+
+| 경로 | 이유 |
+|---|---|
+| `orin/checkpoints/` | sync_ckpt_dgx_to_orin.sh 가 동기화한 ckpt. devPC 미존재 → rsync `--delete` 로 Orin 측 삭제됨 (07 BACKLOG #8 사고) |
+| `orin/config/*.json` | 시연장 포트·카메라 설정. 사용자 환경마다 다름 (07 W4 정책 문서 — `docs/storage/15_orin_config_policy.md`) |
+| `dgx/interactive_cli/configs/*.json` | DGX 포트·카메라 설정. deploy 마다 placeholder 로 덮어쓰면 precheck 결과 손실 (07 BACKLOG #15 → D13 Part B 로 fix, 본 원칙으로 일반화) |
+
+exclude 추가 패턴:
+
+```bash
+rsync ... \
+  --exclude 'checkpoints/' \
+  --exclude 'config/*.json' \
+  --exclude 'interactive_cli/configs/*.json' \
+  ...
+```
+
+**적용 의무**:
+- 신규 deploy 스크립트 작성 시 task-executor 가 위 exclude 목록 확인 의무
+- code-tester 가 deploy 스크립트 수정 본 검토 시 위 exclude 미포함 발견 → Recommended 항목으로 지적
+- 신규 사용자 환경 의존 파일 추가 시 본 표 + 해당 deploy 스크립트 동시 갱신 (Coupled File 패턴)
+
 ## SSH 설정
 
 - `~/.ssh/config` 에 `orin`, `dgx` alias 등록 가정

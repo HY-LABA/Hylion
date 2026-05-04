@@ -2,7 +2,8 @@
 
 > SmolVLA 학습 전용. orin/ (추론) 과 형제 디렉터리.
 > 결정 근거: `docs/work_flow/specs/02_dgx_setting.md` TODO-08 / `docs/lerobot_study/06_smolvla_finetune_feasibility.md`
-> 갱신: 04_infra_setup TODO-X2 (2026-05-01) — tests/, config/ 신규 디렉터리 추가 + DataCollector 인터페이스 안내 추가
+> 갱신: 04_infra_setup TODO-X2 (2026-05-01) — tests/, config/ 신규 디렉터리 추가 + 데이터 수집 인터페이스 안내 추가
+> 갱신: 07_cleanup_datacollector_refs TODO-P5 (2026-05-03) — 06_dgx_absorbs_datacollector 결정 반영: DataCollector 노드 운영 종료, DGX 단일 노드 데이터 수집·학습 통합 구조로 갱신
 
 ---
 
@@ -13,7 +14,7 @@
 `dgx/pyproject.toml` 은 **존재하지 않는다**. DGX 는 `docs/reference/lerobot/` upstream submodule 을 editable install 로 그대로 사용하기 때문에 별도 pyproject 가 불필요하다.
 
 - 학습 entrypoint (`lerobot-train`) 는 `docs/reference/lerobot/pyproject.toml` 의 `[project.scripts]` 에서 제공됨
-- DGX 에서 직접 사용하는 entrypoint: `lerobot-train` 만 (나머지는 DataCollector / Orin 의 책임)
+- DGX 에서 직접 사용하는 entrypoint: `lerobot-train` 만 (데이터 수집·텔레오퍼레이션은 DGX 가 직접 담당, 추론은 Orin 의 책임)
 - 사용하지 않는 entrypoint (`lerobot-record`, `lerobot-calibrate`, `lerobot-teleoperate` 등) — DGX 에서 실행 X. SO-ARM 직접 연결 없음
 
 ### lerobot 설치 방법
@@ -41,7 +42,7 @@ dgx/
 │   └── README.md            # tests/ 의 책임 + 자산 목록
 ├── config/                  # ★ 신규 (04 TODO-X2) — dgx 측 학습 설정 캐시
 │   ├── README.md            # config/ 의 책임 + dataset_repos.json 스키마
-│   └── dataset_repos.json   # DataCollector 로부터 수신할 HF 데이터셋 repo_id 목록 (placeholder)
+│   └── dataset_repos.json   # DGX 학습에 사용할 HF 데이터셋 repo_id 목록 (placeholder)
 ├── runs/                    # 마일스톤별 학습 실행 자료 (05 진입 시 채움)
 │   └── README.md            # 구조 안내
 └── outputs/                 # 학습 출력 (체크포인트, 로그) — 자동 생성. rsync 배포 제외
@@ -181,20 +182,28 @@ lerobot-train \
 
 ---
 
-## DataCollector ↔ DGX 인터페이스
+## DGX 단일 노드 데이터 수집·학습 인터페이스
 
-DataCollector 로부터 학습 데이터를 수신하는 방식은 **HF Hub + rsync 둘 다** (TODO-T1 결정). 설정은 `dgx/config/dataset_repos.json` 에서 관리.
+<!-- 06_dgx_absorbs_datacollector 결정 (2026-05-03): DataCollector 노드 운영 종료.
+     DGX 가 데이터 수집(lerobot-record·lerobot-teleoperate) + 학습(lerobot-train) 책임을 단일 노드에서 담당.
+     이전 DataCollector ↔ DGX 2-노드 구조는 legacy 로 이관 (docs/storage/legacy/ 참조). -->
+
+DGX 에서 직접 데이터 수집 후 학습을 진행한다. 설정은 `dgx/config/dataset_repos.json` 에서 관리.
 
 ```
-DataCollector:
+DGX (데이터 수집):
+  lerobot-teleoperate → 텔레오퍼레이션
   lerobot-record → 데이터셋 (LeRobotDataset 포맷)
       ↓
-  HF Hub push (lerobot-record --push-to-hub) 또는 rsync (TODO-T1 결정)
+  HF Hub push (lerobot-record --push-to-hub) 또는 로컬 저장
       ↓
-DGX:
+DGX (학습):
   lerobot-train --dataset.repo_id=<HF_USER>/... 또는 --dataset.local_path=...
       ↓
   outputs/train/<run_name>/checkpoints/<step>/pretrained_model/
+      ↓
+Orin (추론):
+  sync_ckpt_dgx_to_orin.sh → Orin 체크포인트 배포
 ```
 
 - `dataset.repo_id` 포맷: `{hf_username}/{dataset_name}` (lerobot upstream 표준)
