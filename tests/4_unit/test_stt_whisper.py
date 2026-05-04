@@ -10,38 +10,28 @@ if str(PROJECT_ROOT) not in sys.path:
 from jetson.expression import stt_whisper
 
 
-class _FakeSegment:
-    def __init__(self, text: str):
-        self.text = text
-
-
-class _FakeInfo:
-    def __init__(self, language: str):
-        self.language = language
-
-
 class _FakeWhisperModel:
-    def __init__(self, model_size: str, compute_type: str = "int8"):
+    def __init__(self, model_size: str, device: str = "cpu"):
         self.model_size = model_size
-        self.compute_type = compute_type
+        self.device = device
 
-    def transcribe(self, wav_path: str, language=None, vad_filter=True):
+    def transcribe(self, wav_path: str, language=None, fp16=False):
         assert wav_path.endswith(".wav")
-        assert vad_filter is True
-        segments = [_FakeSegment("안녕"), _FakeSegment("하이리온")]
-        info = _FakeInfo(language or "ko")
-        return segments, info
+        return {"text": "안녕 하이리온", "language": language or "ko"}
 
 
 def test_transcribe_wav_with_mocked_model(monkeypatch, tmp_path):
-    fake_module = types.ModuleType("faster_whisper")
-    fake_module.WhisperModel = _FakeWhisperModel
-    monkeypatch.setitem(sys.modules, "faster_whisper", fake_module)
+    fake_module = types.ModuleType("whisper")
+    fake_module.load_model = lambda model_size, device="cpu": _FakeWhisperModel(model_size, device)
+    monkeypatch.setitem(sys.modules, "whisper", fake_module)
+    stt_whisper._MODEL_CACHE.clear()
 
     wav_file = tmp_path / "sample.wav"
     wav_file.write_bytes(b"RIFF....WAVE")
 
-    result = stt_whisper.transcribe_wav(str(wav_file), model_size="small", language="ko")
+    result = stt_whisper.transcribe_wav(
+        str(wav_file), model_size="small", language="ko", device="cpu"
+    )
 
     assert result.text == "안녕 하이리온"
     assert result.language == "ko"

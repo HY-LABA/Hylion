@@ -9,9 +9,11 @@ from uuid import uuid4
 
 _MODEL_CACHE: Dict[str, Any] = {}
 
-# parameters: defaults tuned for Jetson with CUDA available.
-# On startup we try GPU float16 first, then fall back to CPU int8 if CUDA / cuDNN
-# isn't available so the pipeline still works on developer laptops.
+# Defaults tuned for Jetson with CUDA available. On startup we try GPU first,
+# then fall back to CPU if CUDA isn't available so the pipeline still works on
+# developer laptops. compute_type is kept as a parameter for API compatibility:
+# "float16" → fp16 path on GPU (default openai-whisper behavior on cuda),
+# "int8" / others → fp32 path (openai-whisper does not support int8 quantization).
 DEFAULT_MODEL_SIZE = "base"
 DEFAULT_DEVICE = "cuda"
 DEFAULT_COMPUTE_TYPE = "float16"
@@ -29,29 +31,29 @@ def _get_model(
     compute_type: str = DEFAULT_COMPUTE_TYPE,
     device: str = DEFAULT_DEVICE,
 ) -> Any:
-    cache_key = f"{model_size}:{compute_type}:{device}"
+    cache_key = f"{model_size}:{device}"
     if cache_key in _MODEL_CACHE:
         return _MODEL_CACHE[cache_key]
 
     try:
-        from faster_whisper import WhisperModel
+        import whisper
     except Exception as exc:
         raise RuntimeError(
-            "faster-whisper is not installed. Install it on TARGET Ubuntu environment first."
+            "openai-whisper is not installed. Install it on TARGET Ubuntu environment first."
         ) from exc
 
     try:
-        model = WhisperModel(model_size, device=device, compute_type=compute_type)
-        print(f"[STT] loaded faster-whisper '{model_size}' on {device} ({compute_type})")
+        model = whisper.load_model(model_size, device=device)
+        print(f"[STT] loaded openai-whisper '{model_size}' on {device} ({compute_type})")
     except Exception as exc:
-        if device == "cpu" and compute_type == CPU_FALLBACK_COMPUTE_TYPE:
+        if device == "cpu":
             raise
-        print(f"[STT] {device}/{compute_type} unavailable ({exc}); falling back to cpu/{CPU_FALLBACK_COMPUTE_TYPE}")
-        cache_key = f"{model_size}:{CPU_FALLBACK_COMPUTE_TYPE}:cpu"
+        print(f"[STT] {device} unavailable ({exc}); falling back to cpu")
+        cache_key = f"{model_size}:cpu"
         if cache_key in _MODEL_CACHE:
             return _MODEL_CACHE[cache_key]
-        model = WhisperModel(model_size, device="cpu", compute_type=CPU_FALLBACK_COMPUTE_TYPE)
-        print(f"[STT] loaded faster-whisper '{model_size}' on cpu ({CPU_FALLBACK_COMPUTE_TYPE})")
+        model = whisper.load_model(model_size, device="cpu")
+        print(f"[STT] loaded openai-whisper '{model_size}' on cpu ({CPU_FALLBACK_COMPUTE_TYPE})")
 
     _MODEL_CACHE[cache_key] = model
     return model
@@ -70,20 +72,15 @@ def transcribe_wav(
 
     model = _get_model(model_size=model_size, compute_type=compute_type, device=device)
 
-    segments, info = model.transcribe(
+    use_fp16 = compute_type == "float16" and getattr(model, "device", None) is not None and "cuda" in str(model.device)
+    result = model.transcribe(
         str(path),
         language=language,
-        vad_filter=True,
+        fp16=use_fp16,
     )
 
-    text_parts = []
-    for segment in segments:
-        chunk = str(getattr(segment, "text", "")).strip()
-        if chunk:
-            text_parts.append(chunk)
-
-    merged_text = " ".join(text_parts).strip()
-    detected_lang = str(getattr(info, "language", language or "unknown"))
+    merged_text = str(result.get("text", "")).strip()
+    detected_lang = str(result.get("language", language or "unknown"))
 
     return STTResult(text=merged_text, language=detected_lang)
 

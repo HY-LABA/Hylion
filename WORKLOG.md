@@ -577,3 +577,47 @@
 - 남은 할 일:
   - Jetson에서 Clova 실키 기반 발화 검증 결과를 07/WORKLOG에 추가
   - Piper TTS 및 LocalLLM 실구현 시 해당 체크리스트 항목 업데이트
+
+### 2026-05-04 (STT GPU 가속 — faster-whisper → openai-whisper 백엔드 교체)
+
+- 한 줄 요약:
+  - Jetson Orin Nano Super 8GB에서 STT를 GPU(cuDNN 9 + CUDA 12.6)로 돌리기 위해 백엔드를 `faster-whisper`(CTranslate2 의존, aarch64 CUDA wheel 부재)에서 `openai-whisper`(PyTorch 기반, smolvla 문서가 검증한 NVIDIA JP 6.0 wheel 재사용)로 교체. `jetson/expression/.venv` 신규 venv 구축.
+- 수정한 파일:
+  - `jetson/expression/stt_whisper.py`
+  - `tests/4_unit/test_stt_whisper.py`
+  - `WORKLOG.md`
+  - (시스템) `~/.bashrc` — ROS2 source 두 줄 삭제 (앞으로도 ROS2 미사용)
+- 결과:
+  - venv 위치 `jetson/expression/.venv` (virtualenv 21.2.4 사용 — `python3-venv` apt 미설치 회피)
+  - 설치 패키지:
+    - `torch 2.5.0a0+872d972e41.nv24.08` (NVIDIA JP 6.0 wheel — `developer.download.nvidia.com/compute/redist/jp/v61/pytorch/`)
+    - `nvidia-cusparselt-cu12 0.8.1` (시스템 미등록 → venv `activate`에 LD_LIBRARY_PATH fallback 추가)
+    - `numpy 1.26.4` (`<2` 고정 — torch 2.5.0a0 ABI)
+    - `openai-whisper 20250625`, `tiktoken`, `numba`, `pytest`
+  - 시스템 의존성(libopenblas/openmpi/omp)은 이미 설치돼있어 sudo apt 단계 스킵
+  - smolvla `setup_env.sh` 절차를 그대로 따라가 환경 일관성 유지 (lerobot 부분만 제외)
+- 코드 변경 요지:
+  - `stt_whisper.py`
+    - `from faster_whisper import WhisperModel` → `import whisper`
+    - 외부 API (`STTResult`, `transcribe_wav`, `build_input_event`) 시그니처 그대로 유지 → `coordinator.py` 변경 불필요
+    - `compute_type="float16"` → openai-whisper의 `fp16=True` 매핑, cpu fallback도 동일 흐름
+    - `vad_filter` 인자 제거 (openai-whisper 내장 no-speech 검출 사용)
+    - 캐시 키에서 compute_type 분리, device만 캐시 키로 사용
+  - `test_stt_whisper.py`
+    - mock 대상을 `faster_whisper.WhisperModel` → `whisper.load_model`로 교체
+    - segments+info dict → `{"text": ..., "language": ...}` dict 형태로 fake 응답 변경
+    - 단위 테스트 2/2 PASSED (PYTHONPATH ROS2 오염 제거 후)
+- 검증:
+  - `import torch; torch.cuda.is_available()` → True, cuDNN 90300, CUDA 텐서 연산 OK
+  - `whisper.load_model('base', device='cuda')` 로딩 OK
+  - 실제 샘플 `data/episodes/live_20260422_203303.wav` → "안녕 넌 누구야?" (ko), 4.79초 (모델 로딩 포함, GPU 메모리 439MB)
+  - 단위 테스트 `tests/4_unit/test_stt_whisper.py` 2 passed
+- 결정 기록:
+  - 다른 후보(D1 ctranslate2 소스 빌드 / D3 whisper.cpp / D4 CPU 유지)를 두고, **smolvla 문서와 동일 환경 컨벤션 유지**가 가장 중요하다는 사용자 판단으로 D2(openai-whisper) 선택
+  - 트레이드오프: 추론 속도/메모리 약간 손해, 환경 재현성·다른 모델(smolVLA 등)과의 venv 통합 가능성 확보
+  - smolVLA 동시 적재 시 메모리 전략은 smolVLA 모델 확정 후 측정해서 다시 판단 (현재는 둘 다 상주가 가장 빠른 옵션)
+- 남은 할 일:
+  - smolVLA 모델 확정 후 메모리 budget 재측정, 필요 시 패턴 A/C로 전환 (서비스 추상화는 그때 도입)
+  - `data/reply/` root 소유 디렉터리 정리 (사용자 권한으로 이전)
+  - 미사용 패키지(`faster-whisper`, `ctranslate2`, `av`, `onnxruntime`) 정리 검토 (~300MB)
+  - `scripts/deploy_jetson.sh`가 venv activate 가정하도록 정비 검토
