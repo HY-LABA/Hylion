@@ -60,9 +60,29 @@ bash scripts/deploy_dgx.sh
 
 각 deploy 스크립트가 devPC → 해당 노드로 rsync 수행합니다.
 
+## UX — 뒤로가기 (b/back)
+
+갱신 (2026-05-04, TODO-N1):
+
+모든 prompt 분기점에서 `b` 또는 `back` 입력 시 직전 분기점으로 복귀합니다.
+
+| 분기점 | b/back 동작 |
+|---|---|
+| flow 1 장치 선택 (entry.py) | 종료 (최상위 — 되돌아갈 상위 없음) |
+| flow 3 ckpt 선택 (inference.py) | 종료 (최상위) |
+| HF Hub repo_id 입력 (inference.py) | ckpt 선택 메뉴로 복귀 |
+| 로컬 ckpt 경로 입력 (inference.py) | ckpt 선택 메뉴로 복귀 |
+| flow 4 모드 선택 dry-run/live (inference.py) | ckpt 선택으로 복귀 |
+
+**subprocess 실행 중에는 뒤로가기 불가** — Ctrl+C 로만 종료 가능:
+- hil_inference.py (flow 4 실행 중)
+
+helper: `flows/_back.py` — `is_back(raw)` 단일 함수 (Category C 회피: flows/ 기존 디렉터리 내 배치)
+
 ## 후행 todo
 
 - F3 이후: `flows/env_check.py` — check_hardware.sh 패턴 wrapping
 - O1 study: orin flow 3+ 책임 정의
 - O2 task: `flows/inference.py` 구현
 - O3 prod: 실 Orin 환경 통합 검증
+- N1 task: orin interactive_cli 뒤로가기 b/back 패턴 적용 — **완료 (2026-05-04)**.

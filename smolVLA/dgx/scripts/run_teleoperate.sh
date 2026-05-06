@@ -26,8 +26,11 @@ set -euo pipefail
 # 시연장 이동 시 lerobot-find-port 로 재확인 필요 (USB 순서 변동 가능)
 FOLLOWER_PORT="/dev/ttyACM1"
 LEADER_PORT="/dev/ttyACM0"
-FOLLOWER_ID="my_awesome_follower_arm"
-LEADER_ID="my_awesome_leader_arm"
+# C0d: 환경변수 우선, hardcoded fallback (calibration.json 미존재 시)
+# teleop.py flow3_teleoperate 가 calibration.json 로드 후 FOLLOWER_ID / LEADER_ID 주입.
+# lerobot calibration 파일명 = robot.id → ID 정합이 calibration 정합.
+FOLLOWER_ID="${FOLLOWER_ID:-my_awesome_follower_arm}"
+LEADER_ID="${LEADER_ID:-my_awesome_leader_arm}"
 
 calibrate_follower() {
   echo "[1/3] Calibrating follower on ${FOLLOWER_PORT}"

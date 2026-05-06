@@ -14,7 +14,7 @@ state 를 받아 forward → action chunk 출력 → (모드별로) follower 송
 - top → camera1, wrist → camera2 (임의 고정 — 03 단계는 정성 검증)
 
 안전 장치:
-- (i) SO100Follower 의 기본 토크 한계 의존 (별도 코드 X)
+- (i) SO101Follower 의 기본 토크 한계 의존 (별도 코드 X)
 - (iii) n_action_steps=5 (chunk_size=50 의 1/10) — 폭주 시 영향 시간 축소
 - 추가: --max-steps 로 전체 실행 step 상한, try/finally 로 follower 깔끔 종료,
   SIGINT 핸들러로 Ctrl+C 시 시리얼 통신 충돌 회피
@@ -57,12 +57,12 @@ from lerobot.cameras.opencv import OpenCVCameraConfig
 from lerobot.policies import make_pre_post_processors
 from lerobot.policies.smolvla import SmolVLAPolicy
 from lerobot.policies.utils import build_inference_frame, make_robot_action
-from lerobot.robots.so_follower import SO100Follower, SO100FollowerConfig
+from lerobot.robots.so_follower import SO101Follower, SO101FollowerConfig
 from lerobot.utils.feature_utils import hw_to_dataset_features
 
 MODEL_ID = "lerobot/smolvla_base"
 TASK = "Pick up the cube and place it in the box."
-ROBOT_TYPE = "so100_follower"
+ROBOT_TYPE = "so101_follower"
 
 # top, wrist 순서로 camera1, camera2 슬롯에 매핑 (smolvla_base 의 camera3 은 더미)
 SLOT_MAP = ["camera1", "camera2"]
@@ -430,12 +430,12 @@ def main():
         flip_note = ", flip=vertical" if slot in flip_slots else ""
         print(f"[camera] {slot} ← {name} (device {idx}{flip_note})")
 
-    robot_cfg = SO100FollowerConfig(
+    robot_cfg = SO101FollowerConfig(
         port=args.follower_port,
         id=args.follower_id,
         cameras=camera_config,
     )
-    robot = SO100Follower(robot_cfg)
+    robot = SO101Follower(robot_cfg)
 
     # ── 3. SIGINT 핸들러 — graceful Ctrl+C ─────────────────────
     interrupted = False

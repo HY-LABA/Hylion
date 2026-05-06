@@ -171,7 +171,7 @@ try:
         dummy_obs,
         device=DEVICE,
         task="smoke test task",
-        robot_type="so100_follower",
+        robot_type="so101_follower",
     )
     obs_tensor = preprocess(obs_tensor)
 

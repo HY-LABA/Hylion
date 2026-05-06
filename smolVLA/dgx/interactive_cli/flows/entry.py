@@ -13,30 +13,14 @@ flow 1: 장치 선택 메뉴
   - 환경변수 경유 값 처리: check_hardware.sh record_step() line 128~144 패턴 응용
     (특수문자 안전 처리를 위해 환경변수 경유)
 
-갱신 (2026-05-02, TODO-X2):
-  - VALID_NODES: ("orin", "dgx", "datacollector") → ("orin", "dgx")
-    datacollector 노드 운영 종료 (06_dgx_absorbs_datacollector 결정 C·F).
-  - dgx 분기: flow 3 mode 분기 (mode.py) 호출로 변경
-    (env_check 는 mode 인자 없이 smoke 로 사전 점검 — 수집/학습 분기는 mode.py 책임)
-
-갱신 (2026-05-03, TODO-D6):
-  - detect_display_mode() 신규 — SSH/직접 실행 자동 검출 + 사용자 확인.
-  - dgx 분기에서 display_mode 를 flow3_mode_entry() 로 전달.
-    이로써 precheck.py 카메라 영상 표시 방법 (OpenCV imshow vs 파일 저장)
-    을 flow 초반에 결정.
-
-갱신 (2026-05-03, TODO-D7):
-  - detect_display_mode(): "ssh" → "ssh-file" + "ssh-x11" 2종 분리.
-    "direct" | "ssh-x11" | "ssh-file" 3종 반환.
-    SMOLVLA_DISPLAY_MODE 환경변수: "direct" | "ssh-x11" | "ssh-file" | "ssh" (구형 compat)
-  - SSH X11 forwarding 검출: DISPLAY=localhost:N 패턴.
-  - 진입 시 display mode 안내 강화 (SSH X11 forwarding 사용법 포함).
 """
 
 import argparse
 import os
 import sys
 from pathlib import Path
+
+from flows._back import is_back
 
 try:
     import yaml
@@ -48,7 +32,6 @@ except ImportError:
 # ---------------------------------------------------------------------------
 # 노드 종류 상수
 # ---------------------------------------------------------------------------
-# 갱신 (2026-05-02, TODO-X2): datacollector 제거 (06 결정 C·F — 노드 운영 종료)
 VALID_NODES = ("orin", "dgx")
 
 NODE_DESCRIPTIONS = {
@@ -190,9 +173,14 @@ def detect_display_mode() -> str:
         print()
 
     try:
-        raw = _prompt_entry(f"번호 선택 [1~3, Enter={auto_detected}]: ")
+        raw = _prompt_entry(f"번호 선택 [1~3, Enter={auto_detected}, b: 뒤로]: ")
     except KeyboardInterrupt:
         print("[entry] 인터럽트 — 자동 검출 값 사용: {}".format(auto_detected))
+        raw = ""
+
+    # 환경 모드 선택 최상위 — b/back 시 자동 검출값으로 진행 (되돌아갈 상위 없음)
+    if is_back(raw):
+        print("[entry] 환경 모드 선택 최상위 — 자동 검출값으로 진행합니다.")
         raw = ""
 
     if raw == "1":
@@ -229,10 +217,6 @@ def flow0_confirm_environment(node: str) -> bool:
 
     orin / dgx: VSCode remote-ssh 로 이미 올바른 노드에서 실행 →
                 확인 단계 없음 → True 즉시 반환.
-
-    갱신 (2026-05-02, TODO-X2):
-      datacollector 분기 제거 (노드 운영 종료).
-      node 가 VALID_NODES 내이면 항상 True 반환.
 
     Returns:
         True: 계속 진행 / False: 잘못된 노드 (이론상 도달 X)
@@ -281,9 +265,14 @@ def flow1_select_node(current_node: str) -> str | None:
 
     while True:
         try:
-            raw = input("번호 선택 [1~{}]: ".format(len(VALID_NODES) + 1)).strip()
+            raw = input("번호 선택 [1~{}, b: 뒤로(종료)]: ".format(len(VALID_NODES) + 1)).strip()
         except (EOFError, KeyboardInterrupt):
             print()
+            return None
+
+        # 진입 최상위(flow 1) — b/back 시 종료 (되돌아갈 상위 없음)
+        if is_back(raw):
+            print("종료합니다.")
             return None
 
         if not raw.isdigit():

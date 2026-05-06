@@ -4,7 +4,7 @@ from lerobot.cameras.opencv import OpenCVCameraConfig
 from lerobot.policies import make_pre_post_processors
 from lerobot.policies.smolvla import SmolVLAPolicy
 from lerobot.policies.utils import build_inference_frame, make_robot_action
-from lerobot.robots.so_follower import SO100Follower, SO100FollowerConfig
+from lerobot.robots.so_follower import SO101Follower, SO101FollowerConfig
 from lerobot.utils.feature_utils import hw_to_dataset_features
 
 MAX_EPISODES = 5
@@ -28,7 +28,7 @@ def main():
     follower_port = ...  # something like "/dev/tty.usbmodem58760431631"
 
     # the robot ids are used the load the right calibration files
-    follower_id = ...  # something like "follower_so100"
+    follower_id = ...  # something like "follower_so101"
 
     # Robot and environment configuration
     # Camera keys must match the name and resolutions of the ones used for training!
@@ -38,12 +38,12 @@ def main():
         "camera2": OpenCVCameraConfig(index_or_path=1, width=640, height=480, fps=30),
     }
 
-    robot_cfg = SO100FollowerConfig(port=follower_port, id=follower_id, cameras=camera_config)
-    robot = SO100Follower(robot_cfg)
+    robot_cfg = SO101FollowerConfig(port=follower_port, id=follower_id, cameras=camera_config)
+    robot = SO101Follower(robot_cfg)
     robot.connect()
 
     task = ""  # something like "pick the red block"
-    robot_type = ""  # something like "so100_follower" for multi-embodiment datasets
+    robot_type = ""  # something like "so101_follower" for multi-embodiment datasets
 
     # This is used to match the raw observation keys to the keys expected by the policy
     action_features = hw_to_dataset_features(robot.action_features, "action")

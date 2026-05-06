@@ -38,6 +38,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+from flows._back import is_back
+
 
 # ---------------------------------------------------------------------------
 # HF Token 확인 (push_dataset_hub.sh line 104~117 패턴 미러)
@@ -172,10 +174,17 @@ def flow7_select_transfer(
 
     while True:
         try:
-            raw = input("번호 선택 [1~2]: ").strip()
+            raw = input("번호 선택 [1~2, b: 건너뜀]: ").strip()
         except (EOFError, KeyboardInterrupt):
             print()
             print("[flow 7] 종료됩니다. 로컬 저장 유지.")
+            _keep_local_dgx(local_dataset_path, repo_id)
+            return
+
+        # b/back: 로컬 저장 유지 후 다음 단계 진행 (record 완료 후라 실질적 건너뜀)
+        if is_back(raw):
+            print()
+            print("[flow 7] 건너뜀 — 로컬 저장 유지.")
             _keep_local_dgx(local_dataset_path, repo_id)
             return
 
@@ -223,4 +232,4 @@ def flow7_select_transfer(
             return
 
         else:
-            print("  1, 2 중 하나를 입력하세요.")
+            print("  1, 2 또는 b(건너뜀) 를 입력하세요.")

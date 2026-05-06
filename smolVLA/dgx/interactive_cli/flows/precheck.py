@@ -27,29 +27,6 @@ TODO-D4 (07_e2e_pilot_and_cleanup, 2026-05-04):
     → 기본값: ~/.cache/huggingface/lerobot/calibration/
     환경변수 HF_LEROBOT_CALIBRATION 으로 override 가능.
 
-갱신 (2026-05-03, TODO-D6):
-  _run_find_cameras_split(configs_dir, display_mode) 신규 — USB 분리/재연결 기반 카메라 식별.
-  기존 _run_find_cameras() 를 teleop_precheck() 호출 위치에서 대체.
-  display_mode 인자: "direct" (OpenCV imshow) | "ssh-x11" | "ssh-file" (이미지 파일 저장).
-
-갱신 (2026-05-03, TODO-D7):
-  (a) _run_find_cameras_split: 방향 반전 — 모두 연결 상태에서 분리해서 검출
-      (lerobot-find-port 패턴 정확히 미러: 분리해서 사라진 것 검출)
-  (b) _run_find_port_self: lerobot-find-port subprocess 회피 자체 로직 신규
-      (lerobot_find_port.py find_port() L47-L64 핵심 패턴 미러)
-  (c) detect_display_mode: ssh-x11 (X11 forwarding) 신규 모드 추가
-      display_mode: "direct" | "ssh-x11" | "ssh-file" 3종
-  (d) _show_frame: ssh-x11 분기 추가 + cv2.imshow 실패 시 ssh-file 자동 fallback
-
-갱신 (2026-05-04, TODO-D8):
-  (e) _get_streamable_video_devices: 신규 — cv2.VideoCapture read 성공 device 만 반환.
-      Linux v4l2 가 카메라 1 개당 main stream + metadata 등 multiple device 노출 문제 해결.
-      _get_video_devices() 는 backward-compat 보존. _run_find_cameras_split 가 후자 사용.
-  (f) _show_frame ssh-file 안내 강화:
-      - VSCode remote-ssh 미리보기 안내 명시 (Explorer 클릭 또는 code -r)
-      - xdg-open subprocess 결과 보고 (성공/실패 명시)
-      - ssh -Y X11 forwarding + libgtk 미설치 안내 추가
-
 레퍼런스:
   - lerobot/src/lerobot/utils/constants.py (HF_LEROBOT_CALIBRATION, line 74-75) — 캘리브 위치
   - lerobot/src/lerobot/scripts/lerobot_find_port.py (find_port(), L30-L64):
@@ -77,6 +54,8 @@ import sys
 import time
 from pathlib import Path
 
+from flows._back import is_back
+
 
 # ---------------------------------------------------------------------------
 # 저장 파일 경로 상수
@@ -84,6 +63,7 @@ from pathlib import Path
 
 _PORTS_FILENAME = "ports.json"
 _CAMERAS_FILENAME = "cameras.json"
+_CALIBRATION_FILENAME = "calibration.json"
 
 # 포트 JSON 초기 구조 (orin/config/ports.json 패턴 미러)
 _PORTS_DEFAULT: dict = {"follower_port": None, "leader_port": None}
@@ -92,6 +72,16 @@ _PORTS_DEFAULT: dict = {"follower_port": None, "leader_port": None}
 _CAMERAS_DEFAULT: dict = {
     "wrist_left": {"index": None},
     "overview": {"index": None},
+}
+
+# 캘리브레이션 JSON 초기 구조 — 첫 calibrate 성공 시 자동 생성
+# follower_id / leader_id 는 다음 실행 기본값으로 사용 (so_follower.py 패턴: ID 로 파일 로드)
+_CALIBRATION_DEFAULT: dict = {
+    "follower_id": None,
+    "leader_id": None,
+    "follower_type": "so101_follower",
+    "leader_type": "so101_leader",
+    "calibrated_at": None,
 }
 
 
@@ -670,7 +660,6 @@ def _show_frame(
             _show_frame(device_path, label, "ssh-file", output_dir)
 
     else:  # ssh-file (또는 구 "ssh")
-        # TODO-D8 (f): ssh-file 안내 강화 — VSCode remote-ssh 미리보기 안내 + xdg-open 결과 보고
         saved = _capture_frame_to_file(device_path, label, output_dir)
         if saved:
             print(f"[precheck] 영상 저장됨 ({label}): {saved}")
@@ -754,10 +743,8 @@ def _run_find_cameras_split(configs_dir: Path, display_mode: str) -> bool:
     print("  (lerobot-find-port 와 같은 방식)")
     print()
 
-    # baseline: wrist + overview 모두 연결 상태
-    # TODO-D8 (e): _get_video_devices() 대신 _get_streamable_video_devices() 사용.
-    # v4l2 metadata device 는 cv2 read 실패 → 카메라 후보에서 제외.
-    # 주의: cv2 시도로 device 수 × ~1 초 소요 (통상 4 device 미만 → 4 초 이하).
+    # baseline: wrist + overview 모두 연결 상태 (cv2 read 가능 device 만 사용)
+    # v4l2 metadata device 는 cv2 read 실패 → 카메라 후보에서 제외
     print("  [사전 스캔] 영상 스트림 가능 device 확인 중 (cv2 시도, 잠시 대기)...")
     baseline = set(_get_streamable_video_devices())
     print(f"  현재 연결된 /dev/video* 기기 (스트림 가능): {sorted(baseline) or '(없음)'}")
@@ -855,8 +842,7 @@ def _run_find_cameras_split(configs_dir: Path, display_mode: str) -> bool:
         else:
             print("  wrist 카메라 미지정 — cameras.json 에 null 저장.")
 
-        # baseline 재취득 (wrist 재연결 후 상태 — overview 분리 기준선)
-        # TODO-D8 (e): streamable device 기준으로 재취득 (metadata device 제외).
+        # baseline 재취득 (wrist 재연결 후 상태 — overview 분리 기준선, streamable device 기준)
         time.sleep(0.3)
         baseline_restored = set(_get_streamable_video_devices())
         print(f"\n  재연결 후 기기 목록 (스트림 가능): {sorted(baseline_restored) or '(없음)'}")
@@ -957,7 +943,125 @@ def _run_find_cameras_split(configs_dir: Path, display_mode: str) -> bool:
     return True
 
 
-def _run_calibrate(configs_dir: Path) -> bool:
+def _verify_camera_mapping_live(
+    cameras: dict,
+    configs_dir: Path,
+    display_mode: str,
+) -> str:
+    """저장된 cameras.json 의 wrist_left/overview 매핑이 실제로 맞는지 라이브 영상 + 사용자 확인.
+
+    display_mode 분기:
+      "direct"   — DGX 본체 모니터 (DISPLAY=:1) → ffplay 직접
+      "ssh-x11"  — ssh -Y forwarding → ffplay (devPC X11 서버에 표시)
+      "ssh-file" — X11 X → cv2 캡처 1장 저장 + xdg-open 안내
+
+    각 슬롯 (wrist_left → overview 순서) 에 대해:
+      1. 라이브 표시 (또는 캡처)
+      2. 사용자 prompt: "화면의 카메라가 '{slot}' 가 맞습니까? [Y/n/swap]"
+         Y / Enter → 다음 슬롯
+         n         → "cancel" 반환
+         swap      → wrist_left ↔ overview index 교환 + cameras.json 저장 + "swap" 반환
+
+    ffplay 미설치 시 자동 ssh-file fallback.
+
+    Args:
+        cameras:     _load_json_or_default(cameras_path, _CAMERAS_DEFAULT) 결과
+        configs_dir: cameras.json 저장 디렉터리
+        display_mode: "direct" | "ssh-x11" | "ssh-file"
+
+    Returns:
+        "ok"     — 전 슬롯 확인 완료
+        "swap"   — 사용자 swap 요청 (호출자가 재시도)
+        "cancel" — 사용자 취소 또는 device 없음
+    """
+    cameras_path = configs_dir / _CAMERAS_FILENAME
+    output_dir = configs_dir.parent / "outputs" / "captured_images"
+
+    for slot in ("wrist_left", "overview"):
+        device = cameras.get(slot, {}).get("index")
+        if device is None or not isinstance(device, str):
+            print(f"[precheck] {slot} index 없음 — 옵션 (1) 으로 재발견 권장.")
+            return "cancel"
+
+        print()
+        print(f"[precheck] {slot} 카메라 라이브 표시 ({device})")
+        print(f"  display_mode={display_mode}")
+
+        proc = None
+        _mode = display_mode  # local copy — fallback 시 변경
+
+        if _mode in ("direct", "ssh-x11"):
+            # ffplay 라이브 — direct 는 본체 DISPLAY, ssh-x11 은 X11 forwarding 자동
+            cmd = [
+                "ffplay", "-f", "v4l2", "-i", device,
+                "-window_title", f"{slot} ({device}) — Y=확인 / n=취소 / swap=교환",
+                "-loglevel", "error",
+                "-fflags", "nobuffer",
+            ]
+            try:
+                proc = subprocess.Popen(cmd, stdin=subprocess.DEVNULL)
+                time.sleep(1.0)  # 라이브 시작 대기
+            except FileNotFoundError:
+                print("[precheck] ffplay 미설치 — ssh-file 모드 fallback")
+                _mode = "ssh-file"
+                proc = None
+
+        if _mode == "ssh-file" or proc is None:
+            # cv2 캡처 1장 저장 + xdg-open
+            try:
+                saved = _capture_frame_to_file(device, slot, output_dir)
+                if saved:
+                    print(f"  캡처 저장: {saved}")
+                    print("  VSCode remote-ssh Explorer 클릭 또는 xdg-open 으로 확인하세요.")
+                    try:
+                        subprocess.Popen(
+                            ["xdg-open", saved],
+                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                        )
+                    except FileNotFoundError:
+                        pass
+                else:
+                    print(f"[precheck] {device} 캡처 실패 — 매핑 확인 불가.")
+                    return "cancel"
+            except Exception as e:  # noqa: BLE001
+                print(f"[precheck] cv2 캡처 예외: {e}")
+                return "cancel"
+
+        # 사용자 확인 prompt
+        try:
+            ans = _prompt(f"  화면의 카메라가 '{slot}' 가 맞습니까? [Y/n/swap]: ").lower()
+        except KeyboardInterrupt:
+            ans = "n"
+        finally:
+            if proc is not None:
+                proc.terminate()
+                try:
+                    proc.wait(timeout=2)
+                except subprocess.TimeoutExpired:
+                    proc.kill()
+                proc = None
+
+        if ans in ("n", "no"):
+            print(f"[precheck] {slot} 정합 실패 — 취소합니다.")
+            return "cancel"
+
+        if ans == "swap":
+            # wrist_left ↔ overview index 교환 + 저장
+            cameras["wrist_left"]["index"], cameras["overview"]["index"] = (
+                cameras["overview"]["index"],
+                cameras["wrist_left"]["index"],
+            )
+            _save_json(cameras_path, cameras)
+            print("[precheck] cameras.json 매핑 교환 저장 완료 — 재검증합니다.")
+            return "swap"
+
+        # Y / Enter → 다음
+        print(f"[precheck] {slot} 정합 확인.")
+
+    return "ok"
+
+
+def _run_calibrate(configs_dir: Path, force_new_id: bool = False) -> bool:
     """lerobot-calibrate 를 subprocess 로 실행 (대화형).
 
     run_teleoperate.sh 의 calibrate_follower / calibrate_leader 패턴 참조:
@@ -966,17 +1070,34 @@ def _run_calibrate(configs_dir: Path) -> bool:
 
     포트값은 configs/ports.json 에서 로드. 미설정 시 사용자에게 입력 요청.
 
+    ⚠️ lerobot-calibrate 동작 주의 (so_follower.py:111-115):
+      기존 calibration JSON 있으면 prompt:
+        "Press ENTER to use provided calibration file ..., or type 'c' and press ENTER to run calibration:"
+      → Enter = 기존 사용 / 'c' + Enter = 재calibration
+
+    force_new_id=True:
+      timestamp 기반 신규 ID 자동 생성 — lerobot self.calibration=None 원리 활용.
+      lerobot SOFollower.calibrate() 는 ID 와 매핑된 calibration JSON 이 없으면
+      self.calibration=None → "Press ENTER ..." prompt 자체 뜨지 않음.
+      사용자 'c'+Enter 불필요.
+
+    force_new_id=False:
+      calibration.json 의 이전 ID 를 default 로 사용.
+      기존 ID 재사용 시 lerobot 이 기존 calibration 로드 → 'c'+Enter 안내 배너 표시.
+
+    완료 후 configs/calibration.json 에 ID·timestamp 저장 → 다음 실행 default.
+
     Args:
-        configs_dir: configs/ 디렉터리 (ports.json 로드 대상 — D9 fix).
+        configs_dir:  configs/ 디렉터리 (ports.json 로드 + calibration.json 저장 대상).
+        force_new_id: True 시 timestamp 신규 ID 자동, lerobot prompt 회피.
+                      False 시 기존 안내 배너 + ID 입력 (C0b 동작 유지).
 
     Returns:
         True: 캘리브 완료 / False: 중단 또는 오류
     """
-    print()
-    print("[precheck] 캘리브레이션 재실행 — follower → leader 순서로 진행합니다.")
-    print()
+    import datetime
 
-    # D9 fix: ports.json 로드 (precheck 검출 결과를 default 로)
+    # ports.json 로드 (precheck 검출 결과를 default 로)
     ports_path = configs_dir / _PORTS_FILENAME
     ports_default_follower = "/dev/ttyACM1"  # hardcoded fallback
     ports_default_leader = "/dev/ttyACM0"
@@ -993,18 +1114,109 @@ def _run_calibrate(configs_dir: Path) -> bool:
         except (json.JSONDecodeError, OSError) as e:
             print(f"[precheck] 경고: ports.json 로드 실패 ({e}) — hardcoded fallback 사용")
 
+    calib_path = configs_dir / _CALIBRATION_FILENAME
+    calib_data = _load_json_or_default(calib_path, _CALIBRATION_DEFAULT)
+    timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+
+    if force_new_id:
+        # timestamp 새 ID 강제 — lerobot 'c'+Enter prompt 회피
+        # 원리: lerobot SOFollower.calibrate() — self.calibration=None 이면 기존 ID prompt 뜨지 않음
+        follower_id = f"my_so101_follower_{timestamp}"
+        leader_id = f"my_so101_leader_{timestamp}"
+        print()
+        print("[precheck] timestamp 새 ID 자동 생성:")
+        print(f"  follower_id = {follower_id}")
+        print(f"  leader_id   = {leader_id}")
+        print()
+        print("  (lerobot 'c'+Enter prompt 없이 바로 진행됩니다)")
+        print()
+        print("=" * 60)
+        print(" lerobot-calibrate 진행 안내")
+        print("=" * 60)
+        print()
+        print("  ★ 절차 (각 SO-101 마다 1~2분):")
+        print("    1. zero pose 안내 — 팔을 zero pose 자세로 두고 Enter")
+        print("    2. 각 모터 max range 회전 안내 — 안내 따라 모터 회전 후 Enter")
+        print("       - shoulder_pan, shoulder_lift, elbow_flex, wrist_flex, gripper 5개")
+        print("       - wrist_roll 자동 처리 (사용자 회전 X — full_turn_motor)")
+        print("         (so_follower.py:131-132 — wrist_roll 은 full_turn_motor 로 자동 매핑)")
+        print("    3. 완료 시 자동으로 JSON 저장")
+        print()
+        print("  주의:")
+        print("    - 중간 Ctrl+C / ESC 누르면 calibration 중단 → JSON 미생성 → 처음부터 다시")
+        print("    - 각 prompt 안내를 차분히 읽고 Enter")
+        print()
+        print("=" * 60)
+        print()
+        try:
+            go = _prompt("  이해했으면 Enter 로 진행 (b: 취소): ")
+        except KeyboardInterrupt:
+            return False
+        if is_back(go):
+            print("[precheck] 캘리브레이션 취소.")
+            return False
+    else:
+        print()
+        print("=" * 60)
+        print(" lerobot-calibrate 동작 주의")
+        print("=" * 60)
+        print()
+        print("  lerobot-calibrate 가 다음 prompt 를 띄울 수 있습니다")
+        print("  (기존 calibration 파일이 있을 때):")
+        print()
+        print('    "Press ENTER to use provided calibration file ...,')
+        print("     or type 'c' and press ENTER to run calibration:")
+        print()
+        print("  ★ 재calibration 의도이면 반드시 'c' + Enter 입력")
+        print("    그냥 Enter 누르면 기존 calibration 그대로 사용됩니다.")
+        print()
+        print("  ★ 절차 (각 SO-101 마다 1~2분):")
+        print("    1. zero pose 안내 — 팔을 zero pose 자세로 두고 Enter")
+        print("    2. 각 모터 max range 회전 안내 — 안내 따라 모터 회전 후 Enter")
+        print("       - shoulder_pan, shoulder_lift, elbow_flex, wrist_flex, gripper 5개")
+        print("       - wrist_roll 자동 처리 (사용자 회전 X — full_turn_motor)")
+        print("    3. 완료 시 자동으로 JSON 저장")
+        print()
+        print("  주의:")
+        print("    - 중간 Ctrl+C / ESC 누르면 calibration 중단 → JSON 미생성 → 처음부터 다시")
+        print("=" * 60)
+        print()
+        try:
+            go = _prompt("  이해했으면 Enter 로 진행 (b: 취소): ")
+        except KeyboardInterrupt:
+            return False
+        if is_back(go):
+            print("[precheck] 캘리브레이션 취소.")
+            return False
+
+        follower_id_default = calib_data.get("follower_id") or f"my_so101_follower_{timestamp}"
+        leader_id_default = calib_data.get("leader_id") or f"my_so101_leader_{timestamp}"
+
+        follower_id = _prompt(
+            f"  follower ID  (Enter={follower_id_default}): "
+        ) or follower_id_default
+        leader_id = _prompt(
+            f"  leader ID   (Enter={leader_id_default}): "
+        ) or leader_id_default
+
     follower_port = _prompt(
         f"  follower 포트 (Enter={ports_default_follower}, source: {ports_source}): "
     ) or ports_default_follower
     leader_port = _prompt(
         f"  leader 포트  (Enter={ports_default_leader}, source: {ports_source}): "
     ) or ports_default_leader
-    follower_id = _prompt(
-        "  follower ID  (Enter=my_awesome_follower_arm): "
-    ) or "my_awesome_follower_arm"
-    leader_id = _prompt(
-        "  leader ID   (Enter=my_awesome_leader_arm): "
-    ) or "my_awesome_leader_arm"
+
+    # JSON 실존 검증용 expected_paths 사전 계산
+    # lerobot upstream constants.py L74-75: robots/<robot.name>/<id>.json
+    #   so_follower → "so_follower" (robot.name), so_leader → "so_leader" (teleop.name)
+    calib_dir = _get_calib_dir()
+    expected_paths = {
+        "follower": calib_dir / "robots" / "so_follower" / f"{follower_id}.json",
+        "leader": calib_dir / "teleoperators" / "so_leader" / f"{leader_id}.json",
+    }
+
+    # 각 subprocess 결과 추적 (returncode + JSON 실존)
+    calibration_results: dict[str, bool] = {}
 
     for label, cmd in (
         (
@@ -1044,12 +1256,69 @@ def _run_calibrate(configs_dir: Path) -> bool:
             )
             return False
 
-        if result.returncode != 0:
-            print(f"[precheck] 경고: {label} 캘리브 비정상 종료 (rc={result.returncode})")
+        # subprocess 종료 후 실 JSON 파일 실존 확인
+        expected_path = expected_paths[label]
+        json_exists = expected_path.is_file()
+        rc_ok = result.returncode == 0
+
+        print()
+        print(f"[precheck] {label} 결과:")
+        print(f"  subprocess returncode: {result.returncode}")
+        print(f"  expected JSON: {expected_path}")
+        print(f"  JSON 실존: {'예' if json_exists else '아니오'}")
+
+        if rc_ok and json_exists:
+            calibration_results[label] = True
+            print(f"  → {label} 캘리브 정합 OK")
+        else:
+            calibration_results[label] = False
+            if not json_exists:
+                print(f"  {label} JSON 파일 미생성 — calibration 미완료")
+                print(
+                    "     원인 추정: lerobot-calibrate 가 중간에 종료됐거나"
+                    " 모든 모터 절차 미완수"
+                )
             print()
             cont = _prompt("  계속 진행하겠습니까? [y/N]: ")
             if cont.lower() != "y":
+                print(f"[precheck] {label} 캘리브 실패 — 중단합니다.")
                 return False
+
+    # 두 calibration 모두 정합인지 최종 검증
+    # 하나라도 False 면 calibration.json 갱신 X (옛 default 보존)
+    all_ok = all(calibration_results.values())
+
+    if not all_ok:
+        print()
+        print("=" * 60)
+        print("  Calibration 정합 검증 실패")
+        print("=" * 60)
+        print()
+        for lbl, ok in calibration_results.items():
+            status = "OK" if ok else "JSON 미생성 또는 비정상 종료"
+            print(f"  {lbl}: {status}")
+        print()
+        print("  → calibration.json 갱신 안 함 (옛 default 보존)")
+        print("  → 다시 calibrate 진행하세요. (precheck → calibrate → a)")
+        print()
+        return False
+
+    # 두 JSON 모두 실존 확인 후에만 calibration.json 갱신
+    calib_data.update({
+        "follower_id": follower_id,
+        "leader_id": leader_id,
+        "follower_type": "so101_follower",
+        "leader_type": "so101_leader",
+        "calibrated_at": datetime.datetime.now().isoformat(),
+    })
+    if _save_json(calib_path, calib_data):
+        print()
+        print("[precheck] calibration.json 저장 완료 — 다음 실행 default 로 사용됩니다.")
+        print(f"  follower_id={follower_id}")
+        print(f"  leader_id={leader_id}")
+        print("  실 JSON 경로:")
+        print(f"    {expected_paths['follower']}")
+        print(f"    {expected_paths['leader']}")
 
     print()
     print("[precheck] 캘리브레이션 완료.")
@@ -1057,172 +1326,264 @@ def _run_calibrate(configs_dir: Path) -> bool:
 
 
 # ---------------------------------------------------------------------------
-# 메인 함수
+# 단계별 [a/b] 분기 헬퍼
 # ---------------------------------------------------------------------------
 
-def teleop_precheck(script_dir: Path, display_mode: str = "ssh") -> str:
-    """teleop 진입 직전 사용자 사전 점검 단계.
-
-    저장된 포트·카메라·캘리브 위치 표시 + 분기.
-
-    호출 위치: mode.py flow3_mode_entry() 수집 분기
-      env_check(mode="collect") PASS 후, _run_collect_flow() 직전.
-
-    Args:
-        script_dir: dgx/interactive_cli/ 경로 (mode.py 의 script_dir 과 동일).
-        display_mode: "direct" (DGX 모니터 OpenCV imshow) | "ssh" (이미지 파일 저장)
-                      entry.py detect_display_mode() 결과 전달 (TODO-D6).
-                      기본값 "ssh" — 안전한 fallback.
+def _step_motor_port(configs_dir: Path, ports: dict) -> str:
+    """단계 1: 모터 포트 — (a) 새로 발견 / (b) ports.json 그대로 [Enter default].
 
     Returns:
-        "proceed" — 기존 설정 진행 (teleop 시작)
-        "cancel"  — 취소 (수집 mode 종료)
+        "ok"     — 단계 완료, 다음 단계로
+        "cancel" — 사용자 취소 또는 back
     """
-    configs_dir = _get_configs_dir(script_dir)
-
-    # 1. 저장된 값 읽기
-    ports_path = configs_dir / _PORTS_FILENAME
-    cameras_path = configs_dir / _CAMERAS_FILENAME
-    ports = _load_json_or_default(ports_path, _PORTS_DEFAULT)
-    cameras = _load_json_or_default(cameras_path, _CAMERAS_DEFAULT)
-    calib_dir = _get_calib_dir()
-
-    # 2. 캘리브 디렉터리 존재 여부 (표시용)
-    calib_exists = calib_dir.exists()
-    calib_label = str(calib_dir) + (" (존재)" if calib_exists else " (미생성)")
-
-    # 3. 표시
     print()
-    print("=" * 60)
-    print(" teleop 사전 점검")
-    print("=" * 60)
+    print("─" * 60)
+    print(" 1. 모터 포트")
+    print("─" * 60)
+    print(f"  현재: {_format_ports(ports)}")
     print()
-    print(f"  모터 포트     : {_format_ports(ports)}")
-    print(f"  카메라 인덱스 : {_format_cameras(cameras)}")
-    print(f"  캘리브 위치   : {calib_label}")
-    print()
-    print("  ※ 캘리브레이션 값은 웬만하면 변하지 않음.")
-    print("    같은 SO-ARM 으로 이어서 작업 시 재사용 가능.")
-    print()
-    print("어떻게 진행할까요?")
-    print()
-    print("  (1) 새 학습 데이터 수집 시작 — 포트·카메라 다시 발견 추천")
-    print("       USB 분리/재연결 방식으로 포트·카메라 자동 검출")
-    print("       (lerobot-find-port 와 같은 패턴 — subprocess 없이 직접 glob)")
-    print("       캘리브레이션 재실행 여부는 별도 확인")
-    print("  (2) 기존 설정 그대로 진행 (캘리브 재사용)")
-    print("  (3) 취소")
+    print("  (a) 새로 발견 — USB 분리/재연결로 자동 매핑")
+    print("  (b) 그대로 사용  [Enter default]")
     print()
 
     while True:
         try:
-            raw = _prompt("번호 선택 [1~3]: ")
+            raw = _prompt("  선택 [a/b/Enter=b/back]: ").lower()
         except KeyboardInterrupt:
-            print()
-            print("[precheck] 취소됨.")
             return "cancel"
 
-        if raw == "1":
-            # 옵션 (1): find-port + find-cameras 재실행 + 캘리브 별도 묻기
-            print()
-            print("[precheck] 포트·카메라 재발견 시작합니다.")
-            print()
+        if is_back(raw):
+            return "cancel"
 
-            # 자체 포트 검출 (lerobot-find-port subprocess 회피 — TODO-D7 b)
-            if not _run_find_port_self(configs_dir):
-                print()
-                print("[precheck] 포트 발견이 중단되었습니다. 취소합니다.")
-                return "cancel"
+        if raw in ("", "b"):
+            print("  [선택] b — ports.json 그대로 사용")
+            return "ok"
 
-            # 카메라 식별 (USB 분리/재연결 + 영상 확인 — TODO-D6)
-            # _run_find_cameras() 대체: _run_find_cameras_split(display_mode)
-            # 차이: lerobot-find-cameras subprocess X, 직접 /dev/video* glob + cv2 capture
-            if not _run_find_cameras_split(configs_dir, display_mode):
-                print()
-                print("[precheck] 카메라 발견이 중단되었습니다. 취소합니다.")
-                return "cancel"
-
-            # 캘리브 재실행 별도 묻기
+        if raw == "a":
+            print("  [선택] a — USB 분리/재연결로 새로 발견")
             print()
-            print("  캘리브레이션도 재실행할까요?")
-            print("  (보통 변하지 않으니 N 권장 — 같은 SO-ARM 이어서 작업 시)")
-            print()
-            try:
-                recalib = _prompt("  캘리브 재실행 [y/N]: ")
-            except KeyboardInterrupt:
-                recalib = ""
-
-            if recalib.lower() == "y":
-                if not _run_calibrate(configs_dir):
-                    print()
-                    print("[precheck] 캘리브레이션이 중단되었습니다. 취소합니다.")
-                    return "cancel"
+            if _run_find_port_self(configs_dir):
+                return "ok"
             else:
-                print()
-                print("[precheck] 캘리브레이션 재실행 건너뜀.")
+                print("[precheck] 포트 발견 중단 — 취소합니다.")
+                return "cancel"
 
-            print()
-            print("[precheck] 포트·카메라 재발견 완료.")
-            print()
-            print("  다음 흐름:")
-            print("    1. teleop (run_teleoperate.sh) — leader 팔로 follower 조종")
-            print("    2. data_kind 선택 → record (에피소드 수집)")
-            print("    3. transfer (HF Hub / 로컬)")
-            print("    4. 학습 분기 prompt — 바로 fine-tune 진입 가능")
-            print()
-            return "proceed"
+        print("  a 또는 b 또는 Enter 또는 back 입력")
 
-        elif raw == "2":
-            print()
-            print("[precheck] 기존 설정으로 진행합니다.")
+
+def _step_camera_port(configs_dir: Path, cameras: dict, display_mode: str) -> str:
+    """단계 2: 카메라 — (a) 새로 발견 / (b) cameras.json 그대로 + 라이브 검증 [Enter default].
+
+    b 선택 시 cameras.json null 체크 → streamable fallback + 라이브 검증.
+
+    Returns:
+        "ok"     — 단계 완료
+        "cancel" — 사용자 취소, back, 또는 검증 실패
+    """
+    print()
+    print("─" * 60)
+    print(" 2. 카메라")
+    print("─" * 60)
+    print(f"  현재: {_format_cameras(cameras)}")
+    print()
+    print("  (a) 새로 발견 — USB 분리/재연결로 자동 매핑")
+    print("  (b) 그대로 사용 + 라이브 영상 검증  [Enter default]")
+    print()
+
+    while True:
+        try:
+            raw = _prompt("  선택 [a/b/Enter=b/back]: ").lower()
+        except KeyboardInterrupt:
+            return "cancel"
+
+        if is_back(raw):
+            return "cancel"
+
+        if raw in ("", "b"):
+            print("  [선택] b — cameras.json 그대로 + 라이브 검증")
             print()
 
-            # D13 Part A: cameras.json null 검출 → streamable device 자동 fallback
-            cameras_data_opt2 = _load_json_or_default(cameras_path, _CAMERAS_DEFAULT)
-            wrist_idx_opt2 = cameras_data_opt2.get("wrist_left", {}).get("index")
-            overview_idx_opt2 = cameras_data_opt2.get("overview", {}).get("index")
+            cameras_path = configs_dir / _CAMERAS_FILENAME
 
-            if wrist_idx_opt2 is None or overview_idx_opt2 is None:
-                print("[precheck] cameras.json 미설정 검출 — streamable device 자동 fallback 시도")
+            # cameras null 시 streamable fallback (기존 D13 로직 보존)
+            wrist_idx = cameras.get("wrist_left", {}).get("index")
+            overview_idx = cameras.get("overview", {}).get("index")
+            if wrist_idx is None or overview_idx is None:
+                print("[precheck] cameras.json 미설정 — streamable device 자동 fallback")
                 streamable = _get_streamable_video_devices()
                 if len(streamable) >= 2:
-                    new_cameras = {
-                        "wrist_left": {"index": streamable[0]},
-                        "overview": {"index": streamable[1]},
-                    }
-                    if _save_json(cameras_path, new_cameras):
-                        print("[precheck] cameras.json 자동 갱신:")
-                        print(f"  wrist_left = {streamable[0]} (자동 fallback — 첫 번째 streamable)")
-                        print(f"  overview   = {streamable[1]} (자동 fallback — 두 번째 streamable)")
-                        print("  ※ 카메라 정합 (wrist vs overview) 확인 필요 — 다르면 옵션 1 으로 다시 식별")
-                    else:
-                        print("[precheck] cameras.json 자동 갱신 실패 — record 가 hardcoded fallback 사용")
+                    cameras["wrist_left"] = {"index": streamable[0]}
+                    cameras["overview"] = {"index": streamable[1]}
+                    _save_json(cameras_path, cameras)
+                    print(f"  자동 매핑: wrist_left={streamable[0]}, overview={streamable[1]}")
+                    print()
                 else:
                     print(
                         f"[precheck] streamable device 부족 ({len(streamable)} 개)"
-                        f" — record 가 hardcoded fallback 사용 (메타 device 차단 가능)"
+                        " — (a) 새로 발견 권장"
                     )
-                print()
+                    return "cancel"
 
-            # ports.json 미설정 안내 (자동 fallback 없음 — follower/leader 구분 불가)
-            ports_data_opt2 = _load_json_or_default(ports_path, _PORTS_DEFAULT)
-            if ports_data_opt2.get("follower_port") is None or ports_data_opt2.get("leader_port") is None:
-                print("[precheck] ports.json 미설정 — record 가 hardcoded (ttyACM1, ttyACM0) 사용.")
-                print("  포트 정합이 필요하면 옵션 1 으로 재식별 권장.")
-                print()
+            # 라이브 검증 루프 max 3회 (swap 재시도 포함)
+            for attempt in range(3):
+                verify_cameras = _load_json_or_default(cameras_path, _CAMERAS_DEFAULT)
+                result = _verify_camera_mapping_live(verify_cameras, configs_dir, display_mode)
 
-            print("  다음 흐름:")
-            print("    1. teleop (run_teleoperate.sh) — leader 팔로 follower 조종")
-            print("    2. data_kind 선택 → record (에피소드 수집)")
-            print("    3. transfer (HF Hub / 로컬)")
-            print("    4. 학습 분기 prompt — 바로 fine-tune 진입 가능")
-            print()
-            return "proceed"
+                if result == "ok":
+                    print("[precheck] 카메라 매핑 정합 OK.")
+                    return "ok"
+                if result == "cancel":
+                    print("[precheck] 카메라 매핑 검증 취소.")
+                    return "cancel"
+                if result == "swap":
+                    if attempt < 2:
+                        print(f"[precheck] swap 후 재검증 ({attempt + 2}/3 회)")
+                        continue
+                    else:
+                        print("[precheck] swap 반복 한도 도달 — (a) 새로 발견 권장")
+                        return "cancel"
 
-        elif raw == "3":
-            print()
-            print("[precheck] 취소됩니다.")
             return "cancel"
 
-        else:
-            print("  1, 2, 3 중 하나를 입력하세요.")
+        if raw == "a":
+            print("  [선택] a — USB 분리/재연결로 새로 발견")
+            print()
+            if _run_find_cameras_split(configs_dir, display_mode):
+                return "ok"
+            else:
+                print("[precheck] 카메라 발견 중단 — 취소합니다.")
+                return "cancel"
+
+        print("  a 또는 b 또는 Enter 또는 back 입력")
+
+
+def _step_calibrate(configs_dir: Path, calib: dict) -> str:
+    """단계 3: calibrate — (a) timestamp 새 ID 자동 / (b) calibration.json 그대로 [Enter default].
+
+    (a) 선택 시 force_new_id=True → timestamp ID 강제 → lerobot 'c'+Enter prompt 회피.
+    (b) calib 미설정 시 (a) 강제 안내.
+
+    Returns:
+        "ok"     — 단계 완료
+        "cancel" — 사용자 취소, back
+    """
+    print()
+    print("─" * 60)
+    print(" 3. calibrate")
+    print("─" * 60)
+    fid = calib.get("follower_id") or "(미설정)"
+    lid = calib.get("leader_id") or "(미설정)"
+    cat = calib.get("calibrated_at") or "(없음)"
+    print(f"  현재: follower_id={fid}, leader_id={lid}")
+    print(f"        calibrated_at={cat}")
+    print()
+    print("  (a) 새로 진행 — timestamp 새 ID 자동 (lerobot prompt 회피)")
+    print("  (b) 그대로 사용  [Enter default]")
+    print()
+
+    while True:
+        try:
+            raw = _prompt("  선택 [a/b/Enter=b/back]: ").lower()
+        except KeyboardInterrupt:
+            return "cancel"
+
+        if is_back(raw):
+            return "cancel"
+
+        if raw in ("", "b"):
+            if calib.get("follower_id") is None or calib.get("leader_id") is None:
+                print("  [경고] calibration.json 미설정 — (a) 새로 진행 필요")
+                print()
+                continue
+            print("  [선택] b — calibration.json 그대로 사용")
+            return "ok"
+
+        if raw == "a":
+            print("  [선택] a — timestamp 새 ID 자동 calibration")
+            print()
+            if _run_calibrate(configs_dir, force_new_id=True):
+                return "ok"
+            else:
+                print("[precheck] calibration 중단 — 취소합니다.")
+                return "cancel"
+
+        print("  a 또는 b 또는 Enter 또는 back 입력")
+
+
+# ---------------------------------------------------------------------------
+# 메인 함수
+# ---------------------------------------------------------------------------
+
+def teleop_precheck(script_dir: Path, display_mode: str = "ssh") -> str:
+    """teleop 진입 직전 사용자 사전 점검 — 3단계 sequential [a/b] 분기.
+
+    1. 모터 포트: (a) 새로 발견 (USB 분리/재연결) / (b) ports.json 그대로 [Enter]
+    2. 카메라:   (a) 새로 발견 (USB 분리/재연결) / (b) cameras.json + 라이브 검증 [Enter]
+    3. calibrate: (a) 새로 진행 (timestamp 새 ID 강제) / (b) calibration.json 그대로 [Enter]
+
+    각 단계 b 가 default (Enter). a 선택 시 해당 단계만 새로 진행.
+
+    'c'+Enter 자동 회피: (a) 새 calibrate 시 timestamp 새 ID 강제 → JSON 신규 →
+    lerobot-calibrate 의 self.calibration=None → prompt 자체 안 뜸.
+
+    호출 위치: mode.py flow3_mode_entry() 수집 분기
+      env_check(mode="collect") PASS 후, _run_collect_flow() 직전.
+    시그니처 동일 (mode.py 호출 측 변경 불필요).
+
+    Args:
+        script_dir:   dgx/interactive_cli/ 경로 (mode.py 의 script_dir 과 동일).
+        display_mode: "direct" | "ssh-x11" | "ssh-file" (구 "ssh" 도 수용).
+                      entry.py detect_display_mode() 결과 전달 (TODO-D6).
+                      기본값 "ssh" — 안전한 fallback.
+
+    Returns:
+        "proceed" — 모든 단계 OK, teleop 시작
+        "cancel"  — 어느 단계 취소 또는 back
+    """
+    configs_dir = _get_configs_dir(script_dir)
+
+    # 현재 저장값 로드 (표시용)
+    ports_path = configs_dir / _PORTS_FILENAME
+    cameras_path = configs_dir / _CAMERAS_FILENAME
+    calib_path = configs_dir / _CALIBRATION_FILENAME
+
+    ports = _load_json_or_default(ports_path, _PORTS_DEFAULT)
+    cameras = _load_json_or_default(cameras_path, _CAMERAS_DEFAULT)
+    calib = _load_json_or_default(calib_path, _CALIBRATION_DEFAULT)
+
+    print()
+    print("=" * 60)
+    print(" teleop 사전 점검 — 단계별 진행")
+    print("=" * 60)
+    print()
+    print("  현재 저장값:")
+    print(f"    ports.json       : {_format_ports(ports)}")
+    print(f"    cameras.json     : {_format_cameras(cameras)}")
+    print(
+        f"    calibration.json : follower_id={calib.get('follower_id') or '(미설정)'}"
+        f", leader_id={calib.get('leader_id') or '(미설정)'}"
+    )
+    print()
+    print("  각 단계에서 b 또는 Enter = 저장값 그대로 사용 (default).")
+    print("  a = 해당 단계만 새로 진행.")
+    print()
+
+    # ----- 단계 1: 모터 포트 -----
+    if _step_motor_port(configs_dir, ports) == "cancel":
+        return "cancel"
+
+    # ----- 단계 2: 카메라 -----
+    # 단계 1 완료 후 ports.json 최신값 반영 (step 1 에서 저장됐을 수 있음)
+    cameras = _load_json_or_default(cameras_path, _CAMERAS_DEFAULT)
+    if _step_camera_port(configs_dir, cameras, display_mode) == "cancel":
+        return "cancel"
+
+    # ----- 단계 3: calibrate -----
+    calib = _load_json_or_default(calib_path, _CALIBRATION_DEFAULT)
+    if _step_calibrate(configs_dir, calib) == "cancel":
+        return "cancel"
+
+    print()
+    print("[precheck] 모든 단계 완료 — teleop 시작합니다.")
+    print()
+    return "proceed"

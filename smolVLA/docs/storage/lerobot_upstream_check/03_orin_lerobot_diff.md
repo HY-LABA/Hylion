@@ -301,6 +301,48 @@ self.processor = _TokenizerOnlyProcessor(model_id)
 
 ---
 
+### [2026-05-04] `orin/lerobot/scripts/lerobot_*.py` — docstring 예제 SO100 → SO101 교체 (TODO-R2)
+
+**대상 파일:**
+- `orin/lerobot/scripts/lerobot_record.py` (docstring line 24, 37)
+- `orin/lerobot/scripts/lerobot_replay.py` (docstring line 24)
+- `orin/lerobot/scripts/lerobot_calibrate.py` (docstring line 24)
+- `orin/lerobot/scripts/lerobot_setup_motors.py` (docstring line 22)
+- `orin/lerobot/scripts/lerobot_find_joint_limits.py` (docstring line 24, 27)
+
+**변경 내용:**
+
+docstring 의 CLI 예시 인자에서 `so100_follower` / `so100_leader` → `so101_follower` / `so101_leader` 교체.
+
+```
+# before
+--robot.type=so100_follower
+--teleop.type=so100_leader
+
+# after
+--robot.type=so101_follower
+--teleop.type=so101_leader
+```
+
+`lerobot_setup_motors.py` 의 `COMPATIBLE_DEVICES` 리스트 (`so100_follower`, `so100_leader`) 는 **하위 호환 유지** 목적으로 보존. `so101_follower`, `so101_leader` 는 이미 동일 리스트에 포함되어 있음.
+
+**변경 이유:**
+
+08_final_e2e TODO-R2 — 본 프로젝트 SO-101 Arm Kit Pro 하드웨어에 맞춰 활성 코드 전반을 SO101 클래스/robot_type 으로 일괄 마이그레이션. Category B 영역 최소 변경 원칙에 따라 docstring 교체만 수행 (하위 호환 분기 보존).
+
+**영향 범위:**
+
+| 기능 | 영향 |
+|---|---|
+| 추론 경로 (hil_inference, smolvla forward) | 없음 — 본 파일은 scripts/ entrypoint |
+| CLI 명령 예시 | docstring 수정으로 SO101 기준 예시 제공 |
+| 하위 호환 (SO100 기기 사용자) | 없음 — COMPATIBLE_DEVICES 리스트 보존 |
+| upstream 동기화 | 최소 변경 유지 — docstring 수준만 변경 |
+
+**inference-only 트리밍 여부:** no (docstring 교체만)
+
+---
+
 ## upstream 동기화 시 재확인 항목
 
 `orin/lerobot/`을 upstream에서 재동기화할 때 아래 파일들이 변경되었는지 확인하고, 필요 시 변경 이력을 추가한다.

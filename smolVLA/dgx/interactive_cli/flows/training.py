@@ -13,30 +13,13 @@
   - dgx/scripts/smoke_test.sh — 직접 Read (line 44~45, 68~81)
   - dgx/scripts/save_dummy_checkpoint.sh — 직접 Read (line 25, 62~63)
 
-갱신 (2026-05-02, TODO-X2):
-  - sync_ckpt_dgx_to_datacollector.sh 인용 제거
-    사유: DataCollector 노드 운영 종료 (06 결정). DGX → DataCollector 케이스 무효.
-    대체: 케이스 3 안내를 "ckpt sync DGX→Orin 은 차기 사이클 신규" 메시지로 교체.
-    영향 라인: L15·L54·L70·L72·L92·L494·L497 (7건) — 모두 아래와 같이 정정.
-  - run_training_flow_with_dataset(script_dir, dataset_name) 시그니처 추가
-    G-4 학습 전환 시 방금 수집한 dataset_name 을 dataset_id 로 자동 선택.
-
-갱신 (2026-05-03, TODO-D2):
-  - _select_start_ckpt() 추가 — 시작 ckpt 케이스 4건 분기 UI
-    케이스 none:          --policy.path=lerobot/smolvla_base (사전학습 시작)
-    케이스 dummy:         save_dummy_checkpoint.sh 산출물 경로 (T1 의존 X — 1 step ckpt)
-    케이스 fine-tune-step: 실 학습 중간 체크포인트 --policy.path=<step>/pretrained_model/
-    케이스 fine-tune-last: --resume + config_path=<last>/pretrained_model/train_config.json
-    레퍼런스: docs/reference/lerobot/src/lerobot/configs/train.py
-      resume: bool = False (L49)
-      checkpoint_path: Path | None (L84)
-      elif self.resume: self.checkpoint_path = policy_dir.parent (L94~111)
-    단, 실 fine-tune 케이스 (step·last) 는 T2 산출물 의존 — D2 시점엔 코드 분기 정합 만 검증.
 """
 
 import subprocess
 import sys
 from pathlib import Path
+
+from flows._back import is_back
 
 
 # ---------------------------------------------------------------------------
@@ -70,10 +53,6 @@ SMOKE_DEFAULT_DATASET = "lerobot/svla_so100_pickplace"
 DEFAULT_POLICY_PATH = "lerobot/smolvla_base"
 
 # ckpt 케이스 안내
-# 갱신 (2026-05-02, TODO-X2):
-#   sync_ckpt_dgx_to_datacollector.sh 인용 제거 — DataCollector 노드 운영 종료 (06 결정).
-#   케이스 3 (DataCollector 우회) 무효 → "차기 사이클 신규" 안내로 교체.
-#   케이스 4 각주에서 sync_ckpt_dgx_to_datacollector.sh 라인 인용 제거.
 CKPT_CASES = {
     "1": {
         "label": "케이스 1·2 — Orin 과 동일 네트워크 / devPC 2-hop",
@@ -179,12 +158,18 @@ def flow3_select_scenario(script_dir: Path) -> str | None:
 
     while True:
         try:
-            raw = _prompt(f"번호 선택 [1~{len(scenario_keys) + 1}]: ")
+            raw = _prompt(f"번호 선택 [1~{len(scenario_keys) + 1}, b: 뒤로]: ")
         except KeyboardInterrupt:
             return None
 
+        # b/back: mode 선택으로 복귀
+        if is_back(raw):
+            print()
+            print("[flow 3] 뒤로가기 — mode 선택으로 돌아갑니다.")
+            return None
+
         if not raw.isdigit():
-            print("  숫자를 입력하세요.")
+            print("  숫자 또는 b(뒤로) 를 입력하세요.")
             continue
 
         choice = int(raw)
@@ -198,7 +183,7 @@ def flow3_select_scenario(script_dir: Path) -> str | None:
             print(f"\n[선택] {SCENARIOS[selected]['label']}")
             return selected
 
-        print(f"  유효한 번호를 입력하세요 (1~{len(scenario_keys) + 1}).")
+        print(f"  유효한 번호를 입력하세요 (1~{len(scenario_keys) + 1}) 또는 b(뒤로).")
 
 
 # ---------------------------------------------------------------------------
@@ -265,12 +250,18 @@ def flow4_select_dataset(script_dir: Path, scenario: str) -> str | None:
 
     while True:
         try:
-            raw = _prompt("번호 선택 [1~4]: ")
+            raw = _prompt("번호 선택 [1~4, b: 뒤로]: ")
         except KeyboardInterrupt:
             return None
 
+        # b/back: 시나리오 선택으로 복귀
+        if is_back(raw):
+            print()
+            print("[flow 4] 뒤로가기 — 시나리오 선택으로 돌아갑니다.")
+            return None
+
         if not raw.isdigit():
-            print("  숫자를 입력하세요.")
+            print("  숫자 또는 b(뒤로) 를 입력하세요.")
             continue
 
         choice = int(raw)
@@ -282,9 +273,13 @@ def flow4_select_dataset(script_dir: Path, scenario: str) -> str | None:
         if choice == 1:
             # HF Hub repo_id 직접 입력
             try:
-                repo_id = _prompt("HF Hub repo_id 입력 (예: lerobot/svla_so100_pickplace): ")
+                repo_id = _prompt("HF Hub repo_id 입력 (예: lerobot/svla_so100_pickplace, b: 뒤로): ")
             except KeyboardInterrupt:
                 return None
+            if is_back(repo_id):
+                print()
+                print("[flow 4] 뒤로가기.")
+                continue
             if not repo_id:
                 print("  repo_id 가 비어있습니다. 다시 입력하세요.")
                 continue
@@ -301,7 +296,7 @@ def flow4_select_dataset(script_dir: Path, scenario: str) -> str | None:
             print(f"\n[선택] 기본 데이터셋: {SMOKE_DEFAULT_DATASET}")
             return SMOKE_DEFAULT_DATASET
 
-        print("  유효한 번호를 입력하세요 (1~4).")
+        print("  유효한 번호를 입력하세요 (1~4) 또는 b(뒤로).")
 
 
 def _select_local_dataset(local_datasets: list[str]) -> str | None:
@@ -315,12 +310,18 @@ def _select_local_dataset(local_datasets: list[str]) -> str | None:
 
     while True:
         try:
-            raw = _prompt(f"번호 선택 [1~{len(local_datasets) + 1}]: ")
+            raw = _prompt(f"번호 선택 [1~{len(local_datasets) + 1}, b: 뒤로]: ")
         except KeyboardInterrupt:
             return None
 
+        # b/back: 데이터셋 선택 메뉴로 복귀
+        if is_back(raw):
+            print()
+            print("[flow 4] 뒤로가기.")
+            return None
+
         if not raw.isdigit():
-            print("  숫자를 입력하세요.")
+            print("  숫자 또는 b(뒤로) 를 입력하세요.")
             continue
 
         choice = int(raw)
@@ -335,7 +336,7 @@ def _select_local_dataset(local_datasets: list[str]) -> str | None:
             print(f"\n[선택] 로컬: {local_path}")
             return local_path
 
-        print(f"  유효한 번호를 입력하세요 (1~{len(local_datasets) + 1}).")
+        print(f"  유효한 번호를 입력하세요 (1~{len(local_datasets) + 1}) 또는 b(뒤로).")
 
 
 # ---------------------------------------------------------------------------
@@ -444,12 +445,18 @@ def _select_start_ckpt(script_dir: Path) -> tuple[str, str | None, str | None]:
 
     while True:
         try:
-            raw = _prompt("번호 선택 [1~5]: ")
+            raw = _prompt("번호 선택 [1~5, b: 뒤로]: ")
         except KeyboardInterrupt:
             return "none", DEFAULT_POLICY_PATH, None
 
+        # b/back: 데이터셋 선택으로 복귀 신호 — "back" 특수 케이스 반환
+        if is_back(raw):
+            print()
+            print("[ckpt] 뒤로가기 — 데이터셋 선택으로 돌아갑니다.")
+            return "back", None, None
+
         if not raw.isdigit():
-            print("  숫자를 입력하세요.")
+            print("  숫자 또는 b(뒤로) 를 입력하세요.")
             continue
 
         choice = int(raw)
@@ -505,7 +512,7 @@ def _run_real_training(
     script_dir: Path,
     scenario: str,
     dataset_repo_id: str,
-) -> tuple[bool, str | None]:
+) -> tuple[bool | str, str | None]:
     """실 학습: lerobot-train draccus 인자 동적 생성 후 실행.
 
     save_dummy_checkpoint.sh line 56~70 의 lerobot-train 인자 패턴 인용:
@@ -522,7 +529,7 @@ def _run_real_training(
         --job_name=${RUN_NAME}
         --policy.device=cuda
         --policy.push_to_hub=false
-        --rename_map='{"observation.images.top":"observation.images.camera1",...}'
+        --rename_map='{"observation.images.overview":"observation.images.camera1",...}'
         --wandb.enable=false
 
     ckpt 케이스 4건 (TODO-D2 갱신):
@@ -535,7 +542,9 @@ def _run_real_training(
     실 학습 시 steps 는 사용자 입력 받음.
 
     Returns:
-        (성공 여부, output_dir 경로 문자열 또는 None)
+        (result, output_dir)
+        result: True=성공, False=실패/중단, "CANCELED"=b/back 취소 (학습 미실행)
+        output_dir: 학습 출력 디렉터리 경로 또는 None
     """
     import datetime
 
@@ -549,22 +558,52 @@ def _run_real_training(
     # 시작 ckpt 선택 (4건 분기)
     ckpt_case, policy_path, config_path = _select_start_ckpt(script_dir)
 
+    # b/back 취소: 데이터셋 선택으로 복귀 — "CANCELED" sentinel 반환
+    # False 와 구분하여 호출 측(flow5)에서 _show_ckpt_management skip 처리 가능.
+    if ckpt_case == "back":
+        return "CANCELED", None
+
     # fine-tune-last 는 resume 모드 — output_dir 은 run_dir 에서 자동 결정됨
     is_resume = (ckpt_case == "fine-tune-last")
 
-    # steps 입력
+    # steps 메뉴 (C0 갱신 — 4개 선택지, default 2000)
+    print("학습 step 수 선택:")
+    print("  (1) 2000  — 빠른 검증·08 사이클 권장 ★")
+    print("  (2) 5000  — 중간")
+    print("  (3) 10000 — 본격 학습 (09 사이클 권장)")
+    print("  (4) 직접 입력")
+    print()
+
+    steps = 2000  # 선언 (루프 break 전 사용 방지)
     while True:
         try:
-            steps_raw = _prompt("학습 steps 입력 (기본: 10000): ")
+            raw = _prompt("번호 선택 [1~4, Enter=1 default, b: 뒤로]: ")
         except KeyboardInterrupt:
             return False, None
-        if steps_raw == "":
+
+        if is_back(raw):
+            return "CANCELED", None
+
+        if raw == "" or raw == "1":
+            steps = 2000
+            break
+        if raw == "2":
+            steps = 5000
+            break
+        if raw == "3":
             steps = 10000
             break
-        if steps_raw.isdigit() and int(steps_raw) > 0:
-            steps = int(steps_raw)
-            break
-        print("  양의 정수를 입력하세요.")
+        if raw == "4":
+            try:
+                steps_raw = _prompt("학습 steps 직접 입력: ")
+            except KeyboardInterrupt:
+                return False, None
+            if steps_raw.isdigit() and int(steps_raw) > 0:
+                steps = int(steps_raw)
+                break
+            print("  양의 정수를 입력하세요.")
+            continue
+        print("  1~4 또는 b(뒤로) 를 입력하세요.")
 
     # run_name 입력 (resume 시에도 출력 구분용)
     try:
@@ -576,8 +615,14 @@ def _run_real_training(
     # save_freq
     save_freq = max(1, steps // 10)
 
-    # wandb 선택
-    use_wandb = _yn_prompt("WandB 로깅을 사용하겠습니까?", default_yes=False)
+    # wandb 선택 (C0 안내 강화)
+    print()
+    print("학습 시각화 옵션:")
+    print("  - 기본: 콘솔 tqdm progress bar (자동 — 추가 설정 X)")
+    print("  - WandB: 실시간 loss/lr curve 웹 dashboard + eval video")
+    print("    (최초 1회 'wandb login' 필요 — DGX 본체 터미널에서)")
+    print()
+    use_wandb = _yn_prompt("WandB 로깅을 사용하겠습니까? (default: N)", default_yes=False)
 
     # output_dir: save_dummy_checkpoint.sh line 25 인용
     #   OUTPUT_DIR="${DGX_DIR}/outputs/train/${RUN_NAME}"
@@ -605,8 +650,8 @@ def _run_real_training(
             f"--job_name={run_name}",
             "--policy.device=cuda",
             "--policy.push_to_hub=false",
-            "--rename_map={\"observation.images.top\":\"observation.images.camera1\","
-            "\"observation.images.wrist\":\"observation.images.camera2\"}",
+            "--rename_map={\"observation.images.overview\":\"observation.images.camera1\","
+            "\"observation.images.wrist_left\":\"observation.images.camera2\"}",
             f"--wandb.enable={'true' if use_wandb else 'false'}",
         ]
     else:
@@ -625,8 +670,8 @@ def _run_real_training(
             f"--job_name={run_name}",
             "--policy.device=cuda",
             "--policy.push_to_hub=false",
-            "--rename_map={\"observation.images.top\":\"observation.images.camera1\","
-            "\"observation.images.wrist\":\"observation.images.camera2\"}",
+            "--rename_map={\"observation.images.overview\":\"observation.images.camera1\","
+            "\"observation.images.wrist_left\":\"observation.images.camera2\"}",
             f"--wandb.enable={'true' if use_wandb else 'false'}",
         ]
 
@@ -645,6 +690,7 @@ def _run_real_training(
     print(f"  save_freq:   {save_freq}")
     print()
     print("  (Ctrl+C 로 중단 가능 — 마지막 save_checkpoint 까지 저장됨)")
+    print("  ※ lerobot-train 실행 중에는 뒤로가기 불가 — Ctrl+C 로만 종료 가능.")
     print("=" * 60)
     print()
 
@@ -664,11 +710,6 @@ def _show_ckpt_management(output_dir: str | None) -> None:
       케이스 1·2 → devPC 에서 sync_ckpt_dgx_to_orin.sh 실행
       케이스 3   → 차기 사이클 신규 예정 (DataCollector 우회 무효 — 06 결정)
       나중에     → 안내만
-
-    갱신 (2026-05-02, TODO-X2):
-      케이스 설명 출처를 sync_ckpt_dgx_to_datacollector.sh 에서
-      docs/storage/others/ckpt_transfer_scenarios.md 로 변경.
-      (DataCollector 노드 운영 종료 — 스크립트 legacy 이관)
     """
     print()
     print("=" * 60)
@@ -703,14 +744,19 @@ def _show_ckpt_management(output_dir: str | None) -> None:
 
     while True:
         try:
-            raw = _prompt(f"번호 선택 [1~{quit_num}]: ")
+            raw = _prompt(f"번호 선택 [1~{quit_num}, b: 건너뜀]: ")
         except KeyboardInterrupt:
             print()
             print("[ckpt 관리] 종료합니다.")
             return
 
+        # b/back: ckpt 전송 건너뜀 (종료와 동일)
+        if is_back(raw):
+            print("[ckpt 관리] 전송 건너뜀 — 나중에 docs/storage/others/ckpt_transfer_scenarios.md 참조.")
+            return
+
         if not raw.isdigit():
-            print("  숫자를 입력하세요.")
+            print("  숫자 또는 b(건너뜀) 를 입력하세요.")
             continue
 
         choice_str = raw
@@ -727,7 +773,7 @@ def _show_ckpt_management(output_dir: str | None) -> None:
             print(c["guide"])
             return
 
-        print(f"  유효한 번호를 입력하세요 (1~{quit_num}).")
+        print(f"  유효한 번호를 입력하세요 (1~{quit_num}) 또는 b(건너뜀).")
 
 
 def flow5_train_and_manage_ckpt(
@@ -785,7 +831,15 @@ def flow5_train_and_manage_ckpt(
 
     else:
         # 실 학습
-        success, output_dir = _run_real_training(script_dir, scenario, dataset_repo_id)
+        result, output_dir = _run_real_training(script_dir, scenario, dataset_repo_id)
+
+        # b/back 취소: 학습 미실행 — ckpt 관리 UI skip (학습이 없었으므로 안내 불필요)
+        if result == "CANCELED":
+            print()
+            print("[flow 5] 뒤로가기 — 데이터셋 선택으로 돌아갑니다.")
+            return False
+
+        success = bool(result)
 
         if success:
             print()

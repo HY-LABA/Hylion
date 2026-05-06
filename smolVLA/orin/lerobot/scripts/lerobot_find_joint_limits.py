@@ -21,10 +21,10 @@ Example:
 
 ```shell
 lerobot-find-joint-limits \
-  --robot.type=so100_follower \
+  --robot.type=so101_follower \
   --robot.port=/dev/tty.usbmodem58760432981 \
   --robot.id=black \
-  --teleop.type=so100_leader \
+  --teleop.type=so101_leader \
   --teleop.port=/dev/tty.usbmodem58760434471 \
   --teleop.id=blue \
   --urdf_path=<user>/SO-ARM100-main/Simulation/SO101/so101_new_calib.urdf \

@@ -81,11 +81,39 @@ bash dgx/interactive_cli/main.sh
                  └─ (3) 종료
 ```
 
+## UX — 뒤로가기 (b/back)
+
+모든 prompt 분기점에서 `b` 또는 `back` 입력 시 직전 분기점으로 복귀합니다.
+
+| 분기점 | b/back 동작 |
+|---|---|
+| flow 1 장치 선택 (entry.py) | 종료 (최상위 — 되돌아갈 상위 없음) |
+| 환경 모드 선택 (entry.py) | 자동 검출값으로 진행 (최상위이므로 종료 대신 기본값 적용) |
+| flow 3 mode 선택 (mode.py) | 종료 (CLI 재시작 안내) |
+| teleop 사전 점검 (precheck.py) | 수집 mode 취소 |
+| flow 5 학습 종류 선택 (data_kind.py) | teleop 사전 점검으로 복귀 |
+| flow 6 task 텍스트 / repo_id / num_episodes (record.py) | 직전 입력 단계로 복귀 |
+| flow 6 lerobot-record 실행 전 (record.py) | 실행 전 취소 |
+| flow 3 시나리오 선택 (training.py) | mode 선택으로 복귀 |
+| flow 4 데이터셋 선택 (training.py) | 시나리오 선택으로 복귀 |
+| 시작 ckpt 선택 (training.py) | 데이터셋 선택으로 복귀 |
+| ckpt 관리 전송 선택 (training.py) | 건너뜀 (로컬 저장 유지) |
+| flow 7 전송 방식 선택 (transfer.py) | 건너뜀 (로컬 저장 유지) |
+
+**subprocess 실행 중에는 뒤로가기 불가** — Ctrl+C 로만 종료 가능:
+- lerobot-record (flow 6)
+- run_teleoperate.sh (flow 3 teleop)
+- lerobot-train (flow 5 실 학습)
+
+helper: `flows/_back.py` — `is_back(raw)` 단일 함수 (Category C 회피: flows/ 기존 디렉터리 내 배치)
+
 ## 후행 todo
 
 - X1 study: dgx flow 3+ 재설계 (학습 + 수집 통합) — **완료 (2026-05-02)**. `docs/storage/14_dgx_cli_flow.md` 갱신됨.
 - X2 task: flow 1 (orin/dgx 2 옵션) + mode.py 신규 + 수집 flow 이식 (teleop/data_kind/record/transfer) — **완료 (2026-05-02)**.
+- N1 task: dgx + orin interactive_cli 뒤로가기 b/back 패턴 일괄 적용 — **완료 (2026-05-04)**.
 - X3 task: dgx/scripts/ 수집 책임 스크립트 이식 (run_teleoperate.sh 등) — 진행 중
 - X4 task: dgx/pyproject.toml record + hardware + feetech extras 추가 (Category B — awaits_user)
 - X5 task: dgx/scripts/setup_env.sh record extras 설치 추가 (Coupled File Rule 1)
 - V1·V2·V3 prod: DGX 시연장 이동 후 SO-ARM·카메라·수집 flow·학습 flow 검증
+

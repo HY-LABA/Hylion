@@ -35,6 +35,8 @@ _CLI_DIR = _THIS_DIR.parent
 if str(_CLI_DIR) not in sys.path:
     sys.path.insert(0, str(_CLI_DIR))
 
+from flows._back import is_back
+
 try:
     import yaml
 except ImportError:
@@ -167,9 +169,14 @@ def flow1_select_node(current_node: str) -> str | None:
 
     while True:
         try:
-            raw = input("번호 선택 [1~{}]: ".format(len(VALID_NODES) + 1)).strip()
+            raw = input("번호 선택 [1~{}, b: 뒤로(종료)]: ".format(len(VALID_NODES) + 1)).strip()
         except (EOFError, KeyboardInterrupt):
             print()
+            return None
+
+        # 진입 최상위(flow 1) — b/back 시 종료 (되돌아갈 상위 없음)
+        if is_back(raw):
+            print("종료합니다.")
             return None
 
         if not raw.isdigit():

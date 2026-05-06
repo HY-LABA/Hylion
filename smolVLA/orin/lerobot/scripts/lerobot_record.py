@@ -21,7 +21,7 @@ Example:
 
 ```shell
 lerobot-record \
-    --robot.type=so100_follower \
+    --robot.type=so101_follower \
     --robot.port=/dev/tty.usbmodem58760431541 \
     --robot.cameras="{laptop: {type: opencv, index_or_path: 0, width: 640, height: 480, fps: 30}}" \
     --robot.id=black \
@@ -34,7 +34,7 @@ lerobot-record \
     # <- Optional: specify video codec (auto, h264, hevc, libsvtav1). Default is libsvtav1. \
     # --dataset.vcodec=h264 \
     # <- Teleop optional if you want to teleoperate to record or in between episodes with a policy \
-    # --teleop.type=so100_leader \
+    # --teleop.type=so101_leader \
     # --teleop.port=/dev/tty.usbmodem58760431551 \
     # --teleop.id=blue \
     # <- Policy optional if you want to record with a policy \

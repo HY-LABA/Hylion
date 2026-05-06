@@ -21,7 +21,7 @@ Examples:
 
 ```shell
 lerobot-replay \
-    --robot.type=so100_follower \
+    --robot.type=so101_follower \
     --robot.port=/dev/tty.usbmodem58760431541 \
     --robot.id=black \
     --dataset.repo_id=<USER>/record-test \

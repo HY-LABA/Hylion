@@ -157,3 +157,19 @@
 | 15 | deploy_dgx.sh 가 dgx/interactive_cli/configs/ports.json·cameras.json placeholder 덮어쓰는 문제 — 04 BACKLOG #3 (orin/config) + 07 BACKLOG #8 (deploy_orin --delete) 와 같은 패턴. 사용자 환경 보호 위해 rsync exclude 또는 별도 정책 필요. precheck 옵션 1 다시 진행으로 우회 가능 단 영구 fix 권장. | D12 walkthrough 발견 (2026-05-03) | 중간 | 완료 (07 D13 Part B, 2026-05-03): deploy_dgx.sh rsync 에 `--exclude 'interactive_cli/configs/*.json'` 추가. precheck 옵션 2 cameras.json null 시 streamable fallback 도 D13 Part A 로 함께 처리 |
 | 16 | flow7 transfer.py HF_TOKEN 미설정 시 즉석 입력 prompt 강화 — 현재는 "HuggingFace 인증 정보 없음 → 인증 설정 후 다시 선택" 안내만 출력하고 (1) 로컬 저장만 fallback. 즉석 토큰 입력 prompt 추가 시 walkthrough 1회 흐름 안에서 HF Hub 업로드 가능. flow7 _check_hf_token False 분기에서 "지금 토큰 입력하시겠습니까? [y/N]" prompt → input → os.environ['HF_TOKEN'] 즉석 export 후 재진행 옵션 추가 검토. 현 우회: 프로젝트 루트 `.env` 파일 + main.sh 자동 source (07 walkthrough 후속 ad-hoc 처리 완료). | 07 walkthrough 후속 (2026-05-04 HF Hub push 검증 시) | 낮음 | 미완 |
 | 17 | 본 사이클 walkthrough 가 spec 본문에 명시되지 않은 ad-hoc 변경 2건 발생 — (a) 프로젝트 루트 `.env` 파일 신규 + `.gitignore` 패턴 추가 (.env, .env.*, !.env.example) + `.env.example` 템플릿 신규, (b) `dgx/interactive_cli/main.sh` + `orin/interactive_cli/main.sh` 1.5 블록 추가 (PROJECT_ROOT/.env 자동 source). 사용자 즉석 요청 + 본 사이클 wrap 우선이라 즉시 적용. reflection 후보: spec Phase 1 합의 시 walkthrough 중 ad-hoc 변경 처리 정책 명문화 (별도 todo 등록 vs 즉시 적용 + 메모). | 07 walkthrough ad-hoc (2026-05-04) | 낮음 | 완료 (07 walkthrough, 2026-05-04 — 변경 자체는 즉시 처리, 정책 명문화는 reflection 후보) |
+
+---
+
+## [08_final_e2e](history/08_final_e2e.md)
+
+> 목표: so100/101 정합 + wrist 카메라 (U20CAM-720P) 흡수 + interactive-cli 뒤로가기 UX + 활성 spec 정합성 정리
+> 작성: 2026-05-04 | 완료: 2026-05-04
+
+| # | 항목 | 발견 출처 | 우선순위 | 상태 |
+|---|------|-----------|----------|------|
+| 1 | wrist 광각 (FOV-H 102°, U20CAM-720P) 와 smolvla_base 사전학습 분포 차이 — svla_so100_pickplace 의 wrist/camera2 슬롯이 어떤 화각 카메라로 수집됐는지 미확인. 광각 분포 차이가 후속 사이클 데이터 수집·학습·추론 정성 품질에 영향 가능. 03 BACKLOG #11 연계. 추론 결과 트리거 시 격상 (데이터 재수집 표준 화각 vs 광각 fine-tune 비교). | TODO-H2 H2 검토 (2026-05-04) | 낮음 (추론 트리거 시 중간) | 미완 |
+| 2 | wrist 카메라 장착 방향 flip 미결 — U20CAM-720P 물리 장착 방향에 따라 `cameras.json.wrist.flip=true` 또는 `--flip-cameras wrist` 필요. 시연장 셋업 시 확인 후 `orin/config/cameras.json` 갱신 필요. 03 BACKLOG #16 연계. | TODO-H2 H2 검토 (2026-05-04) | 중간 (셋업 트리거) | 미완 |
+| 3 | DGX `dgx/interactive_cli/flows/record.py` 카메라 키 컨벤션 (`wrist_left`/`overview`) vs Orin 데이터셋·hil_inference 카메라 키 (`top`/`wrist`, `observation.images.{wrist, overview}`) 불일치 — 수집 시와 추론 시 카메라 키 매핑 어긋날 가능성. 09 사이클 진입 시 통일 검토 (양팔 시 `wrist_left`/`wrist_right`/`overview` 자연 정렬). | TODO-H2 code-tester Recommended (2026-05-04) — orchestrator 직접 등록 | 중간 (09 사이클 트리거) | 미완 |
+| 4 | `orin/inference/hil_inference.py` `--follower-id` argparse default `"follower_so100"` 미갱신 — R2 마이그레이션 시 import·ROBOT_TYPE 만 변경. CLI 명시 지정 (`--follower-id follower_so101`) 으로 우회 가능. 다음 사이클 hil_inference 변경 시 흡수 권장. | TODO-R2 code-tester Recommended #1 (2026-05-04) | 낮음 | 미완 |
+| 5 | `orin/tests/smoke_test.py` ruff F841/F401 pre-existing lint 3건 — R2 마이그레이션과 무관. 다음 코드 변경 사이클 흡수 또는 별도 정리 권장. | TODO-R2 code-tester Recommended #2 (2026-05-04) | 낮음 | 미완 |
+| 6 | ~~calibration JSON 경로 robot_type 의존~~ — **기각 (2026-05-04)**: upstream `lerobot/robots/robot.py:49-50` 의 `self.calibration_dir = HF_LEROBOT_CALIBRATION / ROBOTS / self.name` 에서 `self.name` 은 클래스 attribute (`so_follower.py:44 name = "so_follower"`) 로 robot_type 문자열과 무관. SO100Follower / SO101Follower 모두 동일 `name = "so_follower"` 사용 → calibration 디렉터리는 `so_follower/` 통합. R2 마이그레이션은 calibration 경로에 영향 없음. | TODO-R2 잔여 리스크 (2026-05-04) | - | 완료 (기각, 2026-05-04) |

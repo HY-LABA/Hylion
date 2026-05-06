@@ -15,13 +15,6 @@ flow 2: 환경 체크
       script_dir.parent / "scripts" / "preflight_check.sh"
       subprocess.run([...], check=False)
 
-갱신 (2026-05-02, TODO-X2):
-  - mode 파라미터 추가: "train" | "collect" | None
-    14_dgx_cli_flow.md §1-3 수집 항목 6~9 추가 구현.
-  - 결정 (TODO-X2 §7): selective check 방식 채택
-    — mode="collect" 시에만 항목 6~9 실행 (학습 mode 선택 시 skip).
-    — 이유: 학습 mode 에서 USB·카메라 부재가 preflight FAIL 원인 되면 안 됨.
-             수집 장비 (SO-ARM, 카메라) 는 수집 mode 에서만 필수.
 """
 
 import subprocess

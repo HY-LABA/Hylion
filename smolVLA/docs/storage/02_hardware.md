@@ -174,8 +174,13 @@ leader + follower(현재 보유 1쌍) 합계:
 ## 7) 카메라 (SO-ARM용)
 
 - 모델: `OV5648 USB Camera Module`
-- 수량: 2대 (SO-ARM 관측용)
+- 수량: 1대 (overview, SO-ARM 관측용)
 - 구매 사양: 68° 버전 (제품 라인업: 68° / 120° 두 종 존재)
+- **USB descriptor 식별** (운영 시 lsusb·v4l2 에서 보이는 별개 표기, 2026-05-04 ssh dgx 실측 추가):
+  - `idVendor:idProduct = 0bda:0565` (Realtek Semiconductor Corp.)
+  - `iProduct = "YJX-C5"`, v4l2 Card type = `"YJX-C5: YJX-C5"`
+  - → OV5648 = image sensor chip (OmniVision), YJX-C5 = USB 모듈 제품명 (Realtek bridge IC). 동일 카메라의 두 차원 표기. lsusb·v4l2 결과는 USB descriptor (YJX-C5) 가 보이고, 실 sensor 사양은 아래 표 (OV5648) 따름.
+  - §5-1 (DataCollector legacy) 의 "GYY YJX-C5, vendor 0bda:0565" 와 동일 카메라 — 본 프로젝트 내내 사용.
 
 | 항목 | 값 |
 |---|---|
@@ -202,8 +207,57 @@ leader + follower(현재 보유 1쌍) 합계:
 | 보관 온도 | 0 ~ 50°C |
 | 호환 OS | Windows XP/Vista/7/8.1/10, Linux with UVC (≥2.6.26), Android 4.0+ with UVC |
 
+## 7-1) 카메라 (SO-ARM용, wrist 카메라 — 신규)
+
+- 모델: `INNO-MAKER U20CAM-720P`
+- 수량: 1대 (wrist 카메라 — 그리퍼 근거리 광각 촬영)
+- 출처: `https://github.com/INNO-MAKER/U20CAM-720P` UserManual v1.0 (2023-10-20)
+
+| 항목 | 값 |
+|---|---|
+| 센서 | 1/4 inch, 1280×720 colors |
+| 셔터 | Rolling Shutter |
+| 렌즈 | F2.2, focal 2.79mm, M12 mount |
+| M12 seat spacing | 18mm |
+| FOV-D | 120° |
+| FOV-H | 102° |
+| PCBA 크기 | 32×32mm |
+| 마운팅 홀 | 4개 (Φ2.2mm) |
+| 인터페이스 | USB 2.0 High-Speed |
+| USB 프로토콜 | UVC 1.0.0 |
+| 케이블 길이 | 1m |
+| 출력 포맷 | MJPEG / YUY2 |
+| 최대 프레임 | 30 fps |
+| 지원 해상도 | 1280×720 / 800×600 / 640×480 / 320×240 |
+| 본 프로젝트 용도 | wrist 카메라 1대 (그리퍼 근거리 광각 촬영) |
+
 ## 8) 로봇 구성 수량
 
 - Follower arm: 1대
 - Leader arm: 1대
-- Camera: 2대
+- Camera: overview OV5648 x1 + wrist U20CAM-720P x1 (혼합 구성)
+
+## 9) 카메라 키 컨벤션 + 분기 결과 (08_final_e2e H2 검토 — 2026-05-04)
+
+### 9-1) 노드별 카메라 키 컨벤션
+
+| 노드 | 키 이름 | 파일 | 비고 |
+|---|---|---|---|
+| DGX (데이터 수집) | `wrist_left`, `overview` | `dgx/interactive_cli/flows/record.py` `cameras_str` | lerobot-record `--robot.cameras` draccus 인자 |
+| Orin (추론) | `top`, `wrist` | `orin/config/cameras.json`, `orin/inference/hil_inference.py` | hil_inference.py SLOT_MAP → smolvla_base `camera1/camera2` |
+
+두 노드가 카메라를 독립적으로 사용 (수집 시 DGX 키 → 데이터셋 저장, 추론 시 Orin 키 → policy forward). 노드 간 직접 키 공유 없으므로 현재 불일치는 동작 무관.
+
+### 9-2) 코드 분기 필요성 검토 결과
+
+| 검토 영역 | 결과 |
+|---|---|
+| `dgx/record.py --robot.cameras` overview vs wrist 해상도 | 둘 다 640×480 + MJPG 적용 중 — U20CAM-720P 640×480 지원, MJPG 지원. 코드 분기 불필요 |
+| `orin/config/cameras.json` slot 별 fourcc 분기 | cameras.json 은 index + flip 만 저장. hil_inference.py 는 width=640, height=480, fps=30 하드코딩. U20CAM-720P 640×480@30fps 지원. 분기 불필요 |
+| `orin/inference/hil_inference.py` flip 기본값 | `set()` (플립 없음) 기본값 유지. wrist 물리 장착 방향은 실물 셋업 시 확인 후 `cameras.json.wrist.flip` 또는 `--flip-cameras wrist` 로 적용 |
+| §5-2 fourcc=MJPG 패턴 | 두 카메라 모두 MJPEG 지원 — DGX record.py 이미 fourcc=MJPG 강제 적용 중. 변경 불필요 |
+
+### 9-3) 잠재 리스크 (BACKLOG 추적)
+
+- **wrist 광각 (FOV-H 102°) vs smolvla_base 사전학습 분포**: smolvla_base 의 `camera2` 슬롯이 svla_so100_pickplace 기준으로 어떤 화각 카메라로 수집됐는지 미확인. wrist U20CAM-720P 의 102° 광각이 사전학습 분포와 다르면 데이터 수집 (C2) → 학습 (T1) → 추론 (I1) 에서 정성 차이 가능. 03 BACKLOG #11 + spec §TODO-H2 잔여 리스크로 추적 중.
+- **wrist 장착 방향 flip 미결**: wrist 카메라가 물리적으로 거꾸로 장착될 경우 `cameras.json.wrist.flip=true` 또는 `--flip-cameras wrist` 적용 필요. 실물 셋업 시 확인 (03 BACKLOG #16 연계).

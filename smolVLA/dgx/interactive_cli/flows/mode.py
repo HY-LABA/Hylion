@@ -9,18 +9,6 @@
   (2) 학습 선택 시 → 학습 flow 3~ (run_training_flow)
   (3) 종료 선택 시 → 즉시 종료
 
-갱신 (2026-05-04, TODO-D4):
-  수집 mode (1) 에 teleop 진입 직전 사전 점검 단계 추가 (ANOMALIES 07-#3 후속).
-  흐름: env_check(mode="collect") PASS → teleop_precheck() → _run_collect_flow()
-  teleop_precheck(): 저장된 모터 포트·카메라 인덱스·캘리브 위치 표시 + 3-way 분기.
-  "cancel" 시 return 0 (수집 mode 정상 종료).
-
-갱신 (2026-05-03, TODO-D6):
-  flow3_mode_entry() 에 display_mode 인자 추가.
-  수집 mode (1) → teleop_precheck(script_dir, display_mode) 로 전달.
-  precheck.py 가 카메라 식별 시 display_mode ("direct"/"ssh") 에 따라
-  OpenCV imshow 또는 이미지 파일 저장으로 영상 표시.
-
 구조: 단발 종료 (G-1 기반) + 수집 끝 학습 전환 prompt 하이브리드.
       메뉴 진입 후 mode 완료 시 종료 (루프 X).
 
@@ -32,6 +20,8 @@
 """
 
 from pathlib import Path
+
+from flows._back import is_back
 
 
 # ---------------------------------------------------------------------------
@@ -80,6 +70,8 @@ def _run_collect_flow(script_dir: Path) -> tuple[int, str | None]:
         (returncode, dataset_name_or_None)
         dataset_name: G-4 학습 전환 시 training flow 에 인계하는 데이터셋 이름
     """
+    import json
+
     from flows.teleop import flow3_teleoperate, flow4_confirm_teleop
     from flows.data_kind import flow5_select_data_kind
     from flows.record import flow6_record
@@ -98,15 +90,34 @@ def _run_collect_flow(script_dir: Path) -> tuple[int, str | None]:
         return 1, None
 
     # flow 6: lerobot-record 실행
-    # D12: configs_dir 전달 — cameras.json·ports.json 로드 후 인자 갱신.
+    # configs_dir 전달 — cameras.json·ports.json 로드 후 인자 갱신.
     # cameras.json 미설정 시 hardcoded fallback (wrist_left=0, overview=1) 사용.
-    # precheck.py _get_configs_dir 패턴과 동일하게 configs_dir 계산.
     configs_dir = script_dir / "configs"
+
+    # calibration.json 로드 → follower_id / leader_id 추출
+    follower_id = "my_awesome_follower_arm"  # hardcoded fallback
+    leader_id = "my_awesome_leader_arm"
+    calib_path = configs_dir / "calibration.json"
+    if calib_path.exists():
+        try:
+            with calib_path.open() as f:
+                calib_data = json.load(f)
+            if calib_data.get("follower_id"):
+                follower_id = calib_data["follower_id"]
+            if calib_data.get("leader_id"):
+                leader_id = calib_data["leader_id"]
+        except (json.JSONDecodeError, OSError):
+            pass  # hardcoded fallback 유지
+
     success, local_dataset_path, repo_id = flow6_record(
         data_kind_choice=data_kind_result.choice,
         single_task=data_kind_result.single_task,
         default_num_episodes=data_kind_result.default_num_episodes,
+        default_episode_time_s=data_kind_result.default_episode_time_s,
+        default_reset_time_s=data_kind_result.default_reset_time_s,
         configs_dir=configs_dir,
+        follower_id=follower_id,
+        leader_id=leader_id,
     )
 
     # dataset_name 추출 (G-4 학습 전환 인계용)
@@ -215,10 +226,17 @@ def flow3_mode_entry(script_dir: Path, display_mode: str = "ssh") -> int:
 
     while True:
         try:
-            raw = _prompt("번호 선택 [1~3]: ")
+            raw = _prompt("번호 선택 [1~3, b: 뒤로(종료)]: ")
         except KeyboardInterrupt:
             print()
             print("[mode] 종료합니다.")
+            return 0
+
+        # mode 선택 최상위 — b/back 시 종료 (entry 로 재진입은 main.sh 재실행 필요)
+        if is_back(raw):
+            print()
+            print("[mode] 뒤로가기 — CLI 를 종료합니다.")
+            print("  (다시 시작: bash dgx/interactive_cli/main.sh)")
             return 0
 
         if raw == "1":
@@ -275,4 +293,4 @@ def flow3_mode_entry(script_dir: Path, display_mode: str = "ssh") -> int:
             return 0
 
         else:
-            print("  1, 2, 3 중 하나를 입력하세요.")
+            print("  1, 2, 3 또는 b(뒤로) 를 입력하세요.")

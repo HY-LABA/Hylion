@@ -40,7 +40,7 @@ from lerobot.policies.utils import prepare_observation_for_inference
 
 DEFAULT_MODEL_ID = "lerobot/smolvla_base"
 TASK = "Pick up the cube and place it in the box."
-ROBOT_TYPE = "so100_follower"
+ROBOT_TYPE = "so101_follower"
 
 
 def parse_args() -> argparse.Namespace:

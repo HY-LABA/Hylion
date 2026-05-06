@@ -27,7 +27,7 @@
 
 [3] CLI 예시 (lerobot_record.py line 22~41):
     lerobot-record \\
-        --robot.type=so100_follower \\
+        --robot.type=so101_follower \\
         --robot.port=/dev/tty.usbmodem58760431541 \\
         --robot.cameras="{laptop: {type: opencv, index_or_path: 0, width: 640, height: 480, fps: 30}}" \\
         --robot.id=black \\
@@ -68,13 +68,6 @@
     (원본 line 194 + line 367: `~/smolvla/datacollector/data/` → `~/smolvla/dgx/data/`)
   - 기타 모든 상수·함수·로직 그대로 재사용.
 
-D12 변경 사항:
-  - _load_configs_for_record(configs_dir) helper 신설 — cameras.json + ports.json 로드.
-    precheck.py _run_calibrate() L979~1001 D9 패턴 동일 (JSONDecodeError fallback).
-  - build_record_args() 에 cam_wrist_left_index/cam_overview_index 타입을 int|str 로 확장.
-  - flow6_record() 에 configs_dir 인자 추가 — cameras.json·ports.json 로드 후 인자 갱신.
-  - _validate_camera_indices() 를 int|str 수용으로 확장 (str 은 /dev/videoN 형식 허용).
-  - 실행 직전 config 출처 명시 출력 (cameras/ports source 안내).
 """
 
 import json
@@ -83,6 +76,8 @@ import re
 import subprocess
 import sys
 from pathlib import Path
+
+from flows._back import is_back
 
 
 # ---------------------------------------------------------------------------
@@ -243,6 +238,10 @@ def build_record_args(
     single_task: "str | None" = None,
     follower_port: str = FOLLOWER_PORT,
     leader_port: str = LEADER_PORT,
+    follower_id: str = FOLLOWER_ID,
+    leader_id: str = LEADER_ID,
+    episode_time_s: int = 60,
+    reset_time_s: int = 60,
 ) -> "list[str]":
     """lerobot-record 인자 동적 생성.
 
@@ -253,13 +252,6 @@ def build_record_args(
       원본: ~/smolvla/datacollector/data/{dataset_name}
       dgx:  ~/smolvla/dgx/data/{dataset_name}
 
-    D12 변경:
-      - cam_wrist_left_index / cam_overview_index 타입을 int|str 로 확장.
-        str 경로 (/dev/videoN) 는 draccus CLI 에서 index_or_path 필드에 직접 전달 가능.
-        근거: OpenCVCameraConfig.index_or_path: int | Path (configuration_opencv.py L61).
-      - follower_port / leader_port 를 외부에서 주입 가능하도록 인자화.
-        기본값은 기존 hardcoded 상수 (ports.json 미설정 시 호환).
-
     Args:
         data_kind_choice: flow 5 에서 선택한 번호 (1~5)
         repo_id: HF Hub ID (예: "myuser/leftarm_pickplace_v1")
@@ -269,6 +261,10 @@ def build_record_args(
         single_task: G2-a 사용자 확인/커스텀 결과 (None 시 SINGLE_TASK_MAP 기본값 사용)
         follower_port: follower SO-ARM 포트 (ports.json 로드 결과 또는 hardcoded fallback)
         leader_port: leader SO-ARM 포트 (ports.json 로드 결과 또는 hardcoded fallback)
+        follower_id: follower calibration ID (calibration.json 로드 결과 또는 hardcoded fallback)
+        leader_id: leader calibration ID (calibration.json 로드 결과 또는 hardcoded fallback)
+        episode_time_s: 에피소드 당 녹화 시간(초). data_kind 기반 기본값 또는 사용자 입력.
+        reset_time_s: 에피소드 간 리셋 시간(초). data_kind 기반 기본값 또는 사용자 입력.
 
     Returns:
         lerobot-record 에 전달할 인자 리스트
@@ -299,15 +295,17 @@ def build_record_args(
         "lerobot-record",
         f"--robot.type={ROBOT_TYPE}",
         f"--robot.port={follower_port}",
-        f"--robot.id={FOLLOWER_ID}",
+        f"--robot.id={follower_id}",
         f"--robot.cameras={cameras_str}",
         f"--teleop.type={TELEOP_TYPE}",
         f"--teleop.port={leader_port}",
-        f"--teleop.id={LEADER_ID}",
+        f"--teleop.id={leader_id}",
         f"--dataset.repo_id={repo_id}",
         f"--dataset.root={data_root}",
         f"--dataset.num_episodes={num_episodes}",
         f"--dataset.single_task={single_task}",
+        f"--dataset.episode_time_s={episode_time_s}",
+        f"--dataset.reset_time_s={reset_time_s}",
         f"--dataset.push_to_hub={PUSH_TO_HUB}",
         f"--dataset.streaming_encoding={STREAMING_ENCODING}",
         f"--dataset.encoder_threads={ENCODER_THREADS}",
@@ -324,20 +322,26 @@ def _ask_repo_id() -> "str | None":
     """사용자에게 HF repo_id 입력 요청.
 
     Returns:
-        유효한 repo_id 문자열 / None: 종료
+        유효한 repo_id 문자열 / None: 종료 또는 b/back
     """
     print()
     print("HF Hub repo ID 를 입력하세요.")
     print("  형식: <hf_username>/<dataset_name>")
     print("  예:   myuser/leftarm_pickplace_v1")
-    print("  (종료: Ctrl+C)")
+    print("  (종료: Ctrl+C  /  b: 뒤로)")
     print()
 
     while True:
         try:
-            raw = input("repo_id: ").strip()
+            raw = input("repo_id (b: 뒤로): ").strip()
         except (EOFError, KeyboardInterrupt):
             print()
+            return None
+
+        # b/back: data_kind 선택으로 복귀
+        if is_back(raw):
+            print()
+            print("[flow 6] 뒤로가기 — 학습 종류 선택으로 돌아갑니다.")
             return None
 
         if not raw:
@@ -357,24 +361,30 @@ def _ask_num_episodes(default: int) -> "int | None":
         default: 권장 에피소드 수 (data_kind 기반)
 
     Returns:
-        유효한 num_episodes / None: 종료
+        유효한 num_episodes / None: 종료 또는 b/back
     """
     print()
-    print(f"수집할 에피소드 수를 입력하세요. (기본값 Enter → {default})")
+    print(f"수집할 에피소드 수를 입력하세요. (기본값 Enter → {default}  /  b: 뒤로)")
     print()
 
     while True:
         try:
-            raw = input(f"num_episodes [{default}]: ").strip()
+            raw = input(f"num_episodes [{default}] (b: 뒤로): ").strip()
         except (EOFError, KeyboardInterrupt):
             print()
+            return None
+
+        # b/back: repo_id 입력으로 복귀 (None 반환 시 flow6_record 가 중단)
+        if is_back(raw):
+            print()
+            print("[flow 6] 뒤로가기 — repo_id 입력으로 돌아갑니다.")
             return None
 
         if not raw:
             return default
 
         if not raw.isdigit():
-            print("  양수 정수를 입력하세요.")
+            print("  양수 정수 또는 b(뒤로) 를 입력하세요.")
             continue
 
         num = int(raw)
@@ -382,6 +392,84 @@ def _ask_num_episodes(default: int) -> "int | None":
         if ok:
             return num
         print(f"  [오류] {msg}")
+
+
+def _ask_episode_time_s(default: int) -> "int | None":
+    """에피소드 당 녹화 시간 입력.
+
+    DatasetRecordConfig.episode_time_s (lerobot_record.py line 11):
+      episode_time_s: int | float = 60  — 에피소드 당 녹화 시간 (초)
+
+    data_kind 기반 기본값 제공. b/back 지원.
+
+    Args:
+        default: data_kind 기반 기본 에피소드 시간(초)
+
+    Returns:
+        유효한 episode_time_s (양수 정수) / None: b/back 또는 인터럽트
+    """
+    print()
+    print(f"에피소드 당 녹화 시간 (초). [기본: {default}초, b: 뒤로]")
+    print()
+
+    while True:
+        try:
+            raw = input(f"episode_time_s [{default}] (b: 뒤로): ").strip()
+        except (EOFError, KeyboardInterrupt):
+            print()
+            return None
+
+        if is_back(raw):
+            print()
+            print("[flow 6] 뒤로가기 — num_episodes 입력으로 돌아갑니다.")
+            return None
+
+        if not raw:
+            return default
+
+        if raw.isdigit() and int(raw) > 0:
+            return int(raw)
+
+        print("  양수 정수 또는 b(뒤로) 를 입력하세요.")
+
+
+def _ask_reset_time_s(default: int) -> "int | None":
+    """에피소드 간 리셋 시간 입력.
+
+    DatasetRecordConfig.reset_time_s (lerobot_record.py line 12):
+      reset_time_s: int | float = 60  — 에피소드 간 리셋 시간 (초)
+
+    data_kind 기반 기본값 제공. b/back 지원.
+
+    Args:
+        default: data_kind 기반 기본 리셋 시간(초)
+
+    Returns:
+        유효한 reset_time_s (양수 정수) / None: b/back 또는 인터럽트
+    """
+    print()
+    print(f"에피소드 간 리셋 시간 (초). [기본: {default}초, b: 뒤로]")
+    print()
+
+    while True:
+        try:
+            raw = input(f"reset_time_s [{default}] (b: 뒤로): ").strip()
+        except (EOFError, KeyboardInterrupt):
+            print()
+            return None
+
+        if is_back(raw):
+            print()
+            print("[flow 6] 뒤로가기 — episode_time_s 입력으로 돌아갑니다.")
+            return None
+
+        if not raw:
+            return default
+
+        if raw.isdigit() and int(raw) > 0:
+            return int(raw)
+
+        print("  양수 정수 또는 b(뒤로) 를 입력하세요.")
 
 
 # ---------------------------------------------------------------------------
@@ -395,6 +483,10 @@ def flow6_record(
     cam_wrist_left_index: "int | str" = 0,
     cam_overview_index: "int | str" = 1,
     configs_dir: "Path | None" = None,
+    default_episode_time_s: int = 60,
+    default_reset_time_s: int = 60,
+    follower_id: str = FOLLOWER_ID,
+    leader_id: str = LEADER_ID,
 ) -> "tuple[bool, str, str]":
     """flow 6: lerobot-record subprocess 호출.
 
@@ -404,12 +496,6 @@ def flow6_record(
     이식 변경: data_root 경로 (build_record_args 내부 처리 + local_dataset_path)
       ~/smolvla/datacollector/data/ → ~/smolvla/dgx/data/
 
-    D12 변경:
-      - configs_dir 인자 추가 — cameras.json·ports.json 로드.
-        None 이면 hardcoded fallback (기존 동작과 동일).
-      - 로드 성공 시 cam_wrist_left_index / cam_overview_index / follower_port / leader_port 갱신.
-      - 실행 직전 config 출처 명시 출력.
-
     Args:
         data_kind_choice: flow 5 에서 선택한 번호 (1~5)
         single_task: flow 5 에서 결정된 task instruction
@@ -417,6 +503,10 @@ def flow6_record(
         cam_wrist_left_index: wrist_left 카메라 인덱스(int) 또는 경로(str). configs_dir 전달 시 덮어씀.
         cam_overview_index: overview 카메라 인덱스(int) 또는 경로(str). configs_dir 전달 시 덮어씀.
         configs_dir: dgx/interactive_cli/configs/ 경로. None 이면 hardcoded fallback.
+        default_episode_time_s: data_kind 기반 기본 에피소드 시간(초).
+        default_reset_time_s: data_kind 기반 기본 리셋 시간(초).
+        follower_id: calibration.json 로드 결과 또는 hardcoded fallback (FOLLOWER_ID).
+        leader_id: calibration.json 로드 결과 또는 hardcoded fallback (LEADER_ID).
 
     Returns:
         (success: bool, local_dataset_path: str, repo_id: str)
@@ -429,7 +519,7 @@ def flow6_record(
     print("=" * 60)
     print()
 
-    # D12: cameras.json + ports.json 로드 (D9 패턴 — precheck.py _run_calibrate 동일)
+    # cameras.json + ports.json 로드 (precheck.py _run_calibrate 동일 패턴)
     follower_port: str = FOLLOWER_PORT
     leader_port: str = LEADER_PORT
     cameras_source = "hardcoded fallback"
@@ -458,7 +548,26 @@ def flow6_record(
             leader_port = lp
             ports_source = "ports.json 검출 결과"
 
-    # config 출처 안내 (D12 §Step 4)
+        # calibration.json 에서 follower_id / leader_id 추출
+        # lerobot calibration 파일명 = robot.id → ID 정합이 calibration 정합
+        calib_path = configs_dir / "calibration.json"
+        ids_source = "hardcoded fallback"
+        if calib_path.exists():
+            try:
+                with calib_path.open() as f:
+                    calib_data = json.load(f)
+                if calib_data.get("follower_id"):
+                    follower_id = calib_data["follower_id"]
+                    ids_source = "calibration.json"
+                if calib_data.get("leader_id"):
+                    leader_id = calib_data["leader_id"]
+                    ids_source = "calibration.json"
+            except (json.JSONDecodeError, OSError) as e:
+                print(f"[record] 경고: calibration.json 로드 실패 ({e}) — hardcoded fallback")
+    else:
+        ids_source = "hardcoded fallback"
+
+    # config 출처 안내
     print("[record] config 출처:")
     if cameras_source == "cameras.json 검출 결과":
         print(
@@ -478,6 +587,7 @@ def flow6_record(
         print(
             "  ports: hardcoded (ttyACM1, ttyACM0) — ports.json 미설정"
         )
+    print(f"  IDs: follower={follower_id}, leader={leader_id} ({ids_source})")
     if cameras_source != "cameras.json 검출 결과" or ports_source != "ports.json 검출 결과":
         print(
             "  ⚠ 미설정 항목 — v4l2 메타 device 차단 가능."
@@ -502,10 +612,16 @@ def flow6_record(
     print()
 
     try:
-        raw_choice = input("번호 선택 [1~2, Enter=1 기본값]: ").strip()
+        raw_choice = input("번호 선택 [1~2, Enter=1 기본값, b: 뒤로]: ").strip()
     except (EOFError, KeyboardInterrupt):
         print()
         print("[flow 6] 취소됨.")
+        return False, "", ""
+
+    # b/back: data_kind 선택으로 복귀
+    if is_back(raw_choice):
+        print()
+        print("[flow 6] 뒤로가기 — 학습 종류 선택으로 돌아갑니다.")
         return False, "", ""
 
     if raw_choice == "2":
@@ -547,6 +663,18 @@ def flow6_record(
         print("[flow 6] 취소됨.")
         return False, "", ""
 
+    # 사용자 입력: episode_time_s (C0 신규)
+    episode_time_s = _ask_episode_time_s(default_episode_time_s)
+    if episode_time_s is None:
+        print("[flow 6] 취소됨.")
+        return False, "", ""
+
+    # 사용자 입력: reset_time_s (C0 신규)
+    reset_time_s = _ask_reset_time_s(default_reset_time_s)
+    if reset_time_s is None:
+        print("[flow 6] 취소됨.")
+        return False, "", ""
+
     # validation 4항목 (D1 §4):
     #   1. repo_id 형식 확인 (data_kind_choice early-exit 이후 재확인)
     #   2. num_episodes 양수 정수
@@ -565,7 +693,6 @@ def flow6_record(
             return False, "", ""
 
     # 인자 동적 생성 (G2-b: 결정된 single_task 전달 — 커스텀 또는 기본값)
-    # D12: follower_port / leader_port 는 ports.json 로드 결과 또는 hardcoded fallback
     cmd_args = build_record_args(
         data_kind_choice=data_kind_choice,
         repo_id=repo_id,
@@ -575,6 +702,10 @@ def flow6_record(
         single_task=single_task,
         follower_port=follower_port,
         leader_port=leader_port,
+        follower_id=follower_id,
+        leader_id=leader_id,
+        episode_time_s=episode_time_s,
+        reset_time_s=reset_time_s,
     )
 
     # 로컬 저장 경로 (flow 7 에 전달) — dgx 경로로 변경
@@ -589,14 +720,22 @@ def flow6_record(
     print(f"[flow 6] 데이터 저장 경로: {local_dataset_path}")
     print()
     print("Enter 를 누르면 lerobot-record 가 시작됩니다.")
-    print("(종료하려면 Ctrl+C)")
+    print("(종료하려면 Ctrl+C  /  b: 뒤로(실행 전 취소))")
+    print()
+    print("※ lerobot-record 실행 중에는 뒤로가기 불가 — Ctrl+C 로만 종료 가능.")
     print()
 
     try:
-        input()
+        pre_raw = input("Enter 또는 b(뒤로): ").strip()
     except (EOFError, KeyboardInterrupt):
         print()
         print("[flow 6] 취소됨.")
+        return False, "", ""
+
+    # b/back: 실행 전 취소
+    if is_back(pre_raw):
+        print()
+        print("[flow 6] 뒤로가기 — num_episodes 입력으로 돌아갑니다.")
         return False, "", ""
 
     result = subprocess.run(cmd_args, check=False)

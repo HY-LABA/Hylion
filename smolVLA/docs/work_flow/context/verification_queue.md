@@ -16,5 +16,3 @@
 - **prod-test-runner 결과 요약**: ...
 - **참고 파일**: `context/todos/XX/03_prod-test.md`
 ```
-
-(빈 상태 — 다음 사이클 진입 시 누적 시작)

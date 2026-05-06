@@ -90,7 +90,7 @@
 
 - 목표: Orin 위에서 사전학습 smolVLA 추론 동작 확인
 
-### [ ] 04_infra_setup
+### [x] 04_infra_setup
 
 <!-- *본 가정은 06_dgx_absorbs_datacollector 사이클에서 DGX 흡수로 정정됨 (2026-05-02). 본문 텍스트는 04 결정 시점 그대로 보존. DataCollector 별도 노드 가정은 이 시점에서의 역사적 결정이며, 실제 구현 단계에서 DGX 단일 노드 흡수로 전환되었음.* -->
 
@@ -108,7 +108,7 @@
   - 데이터 전송 방식 (HuggingFace Hub vs rsync 직접 vs 둘 다)
   - 시연장 미러링 검증 깊이 (육안 + 사진 vs 자동 검증 스크립트)
 
-### [ ] 05_interactive_cli
+### [x] 05_interactive_cli
 
 <!-- *본 마일스톤의 datacollector 측 flow 구현 (datacollector/interactive_cli/) 은 06_dgx_absorbs_datacollector (2026-05-02) 사이클에서 DGX 흡수로 전환됨. 05 사이클 완료 시점 기준 datacollector 노드 구현은 미완 상태 (BACKLOG D3). DGX 흡수 후 통합: dgx/interactive_cli/ 가 수집/학습 두 모드 분기 담당. 장치 선택 옵션도 datacollector 제거 → orin/dgx 2 옵션으로 축소 (06 X2 처리).* -->
 
@@ -131,7 +131,7 @@
   - 공통 console 프레임워크 코드 공유 방식 (각 노드별 중복 vs 공통 모듈 import)
 - 위치: 본 마일스톤은 04 인프라의 사용자 인터페이스 통합. 06_dgx_absorbs_datacollector 흡수 후에는 **DGX (데이터 수집 흡수)** 가 수집·학습 두 모드를 단일 진입점 (`bash dgx/interactive_cli/main.sh`) 으로 통합하여 07_leftarmVLA 진입 준비 완료.
 
-### [ ] 06_dgx_absorbs_datacollector
+### [x] 06_dgx_absorbs_datacollector
 
 <!-- 신규 삽입 (2026-05-02). 기존 06~09 → 07~10 시프트. -->
 
@@ -154,7 +154,7 @@
   - 시연장 미러링 원칙 유지: DGX 자체가 시연장 이동 → 미러링 원칙 충족. 데이터 수집 → 학습이 DGX 한 곳으로 통합, Orin 추론과 합쳐 단순 2-step 흐름
 - spec 파일: `docs/work_flow/specs/06_dgx_absorbs_datacollector.md`
 
-### [ ] 07_e2e_pilot_and_cleanup
+### [x] 07_e2e_pilot_and_cleanup
 
 <!-- 신규 삽입 (2026-05-03). 기존 07~10 → 08~11 시프트. -->
 
@@ -179,26 +179,49 @@
 - 종착점: 시연장에서 SO-ARM 만 달면 `dgx/interactive_cli/main.sh` → 수집 → 학습 → `sync_ckpt_dgx_to_orin.sh` → `orin/interactive_cli/main.sh` → hil_inference 흐름이 검증된 도구 위에서 즉시 가능
 - spec 파일: `docs/work_flow/specs/07_e2e_pilot_and_cleanup.md`
 
-### [ ] 08_leftarmVLA
+### [x] 08_final_e2e
 
-<!-- 구 07_leftarmVLA. 07_e2e_pilot_and_cleanup (2026-05-03) 삽입으로 인해 08 로 시프트.
+<!-- 신규 삽입 (2026-05-04). 기존 08~11 → 09~12 시프트. -->
+
+- 목표: 활성 코드 so100/101 정합 + 신규 wrist 카메라 (U20CAM-720P) 흡수 + interactive-cli 뒤로가기 UX + 활성 spec 정합성 정리
+- 주요 결정 사항 (Phase 1 합의, 2026-05-04):
+  - A. spec 이름·시프트: `08_final_e2e`. 기존 08~11 → 09~12 시프트 (07 패턴 따라)
+  - B. wrist 카메라 모델: INNO-MAKER U20CAM-720P (1280×720, FOV-H 102°, USB 2.0 UVC 1.0.0, MJPEG/YUY2 30fps)
+  - G. so100/101 정합 범위: upstream 두 클래스 차이 study 후 일괄 마이그레이션 (데이터셋 ID `svla_so100_pickplace` 는 그대로 유지)
+  - H. interactive-cli 뒤로가기 UX: dgx + orin 일괄 적용 (`b/back` 입력 시 직전 분기점 복귀, entry 에서는 종료)
+  - I. Phase 2 wave 모드: 07 패턴 답습 (wave 의존성 + 게이트 분리)
+- 주요 작업 (그룹별 요약):
+  - [그룹 S] Setup·정합성 정리 — arm_2week_plan.md·specs/README.md 시프트, BACKLOG 정합
+  - [그룹 R] Robot type 정합 — SO100 vs SO101 upstream 차이 study → 활성 코드 SO101 일괄 마이그레이션
+  - [그룹 H] Hardware 신규 wrist 카메라 — U20CAM-720P 사양 문서화 + 코드·config 영향 적용
+  - [그룹 N] Navigation 뒤로가기 UX — dgx + orin interactive_cli 공통 뒤로가기 패턴
+- 종착점: 활성 코드 SO101 일괄 마이그레이션 완료 + U20CAM-720P 사양 문서화·코드 영향 검토 완료 + dgx + orin interactive_cli 공통 뒤로가기 (`b/back`) 패턴 적용 + arm_2week_plan / specs/README 정합 갱신
+- spec 파일: `docs/work_flow/specs/08_final_e2e.md`
+
+### [ ] 09_leftarmVLA
+
+<!-- 구 08_leftarmVLA. 08_final_e2e (2026-05-04) 삽입으로 09 로 시프트.
+     구 07_leftarmVLA. 07_e2e_pilot_and_cleanup (2026-05-03) 삽입으로 인해 08 로 시프트.
      구 06_leftarmVLA. 06_dgx_absorbs_datacollector (2026-05-02) 삽입으로 인해 07 로 시프트.
-     "DataCollector" 역할은 DGX (데이터 수집 흡수) 로 대체됨. -->
+     "DataCollector" 역할은 DGX (데이터 수집 흡수) 로 대체됨.
+     "데이터 수집·학습·배포 한 사이클 완주" 책임은 08_final_e2e 로 이전. 본 마일스톤은 팔 배치 차이만 (휴머노이드 토르소 부착 좌표계 재정의·작업 영역) 담당. -->
 
-- 목표: 단일 팔 (left arm, 휴머노이드 토르소 부착) 기준 smolVLA 파인튜닝 → Orin 배포까지 한 사이클 완주
+- 목표: 단일 팔 (left arm, 휴머노이드 토르소 부착) 기준 smolVLA 파인튜닝 → Orin 배포까지 한 사이클 — 팔 배치 차이만 (책상 mount → 토르소 부착 좌표계 재정의·작업 영역)
+- 전제: 08_final_e2e 에서 데이터 수집·학습·배포 한 사이클 완주 + 도구·정합 정리 완료 후 진입. 본 마일스톤은 "토르소 부착 팔 배치"가 추가되는 차이만 담당.
 - 주요 작업:
-  - 휴머노이드 토르소 부착 SO-ARM (left arm) calibration 및 작업 영역 재정의
-  - 풀 6 DOF 유지로 데이터 수집 (DGX 데이터 수집 흡수) → 학습(DGX) → 시연장 Orin 배포까지 한 사이클 완주 (자유도 축소는 적용하지 않음, 02 TODO-11 결론)
-  - 데이터 수집·전송은 05 의 interactive_cli (06 흡수 후 dgx/interactive_cli/) 활용
+  - 휴머노이드 토르소 부착 SO-ARM (left arm) calibration 및 작업 영역 재정의 (08 책상 mount 대비 좌표계·관절 한계 차이)
+  - 08_final_e2e 사이클과 동일한 흐름으로 실행 (데이터 수집·학습 2,000+ step·Orin 추론) — 토르소 좌표계가 유일한 차이
+  - 데이터 수집·전송은 dgx/interactive_cli/ 활용 (08 검증 완료 도구)
 - 고려사항:
   - 표준 SO-ARM 책상 mount 와 다른 좌표계·관절 한계 (어깨가 토르소에 부착되어 가용 작업 공간 변화)
   - 사전학습 smolvla_base 가 표준 SO-ARM 분포로 학습된 점 → 도메인 시프트 존재
   - **DGX (데이터 수집 흡수)** 가 시연장 이동 환경에서 데이터 수집 (06 결정으로 DataCollector 역할 통합)
-- 위치: 본 마일스톤은 "left arm 단일팔 사이클 자체의 검증·데모" 가 목적이며, 10 양팔 학습의 사전 단계가 아니다 (10 은 양팔 데이터로 처음부터 학습).
+- 위치: 본 마일스톤은 08 의 "팔 배치 변경" 버전. 10 양팔 학습의 사전 단계가 아니다 (10 은 양팔 데이터로 처음부터 학습).
 
-### [ ] 09_biarm_teleop_on_dgx
+### [ ] 10_biarm_teleop_on_dgx
 
-<!-- 구 08_biarm_teleop_on_dgx. 07_e2e_pilot_and_cleanup (2026-05-03) 삽입으로 인해 09 로 시프트.
+<!-- 구 09_biarm_teleop_on_dgx. 08_final_e2e (2026-05-04) 삽입으로 10 으로 시프트.
+     구 08_biarm_teleop_on_dgx. 07_e2e_pilot_and_cleanup (2026-05-03) 삽입으로 인해 09 로 시프트.
      구 07_biarm_teleop_on_dgx. 06_dgx_absorbs_datacollector (2026-05-02) 삽입으로 인해 08 로 시프트.
      "DataCollector 기준" → "DGX (데이터 수집 흡수) 기준" 으로 정정. -->
 
@@ -206,7 +229,7 @@
 - 주요 작업:
   - 양팔 teleop 동작 검증 (좌·우 leader → 좌·우 follower)
   - 카메라 3대 구성 확정 및 데이터 수집 (손목 좌·우 2대 + 전체 조망 1대, base 미포함)
-- 결정사항 (09 진행 중 확정):
+- 결정사항 (10 진행 중 확정):
   - 데이터셋 카메라 키 컨벤션: `observation.images.{wrist_left, wrist_right, overview}` (또는 동등)
   - `observation.state` / `action` 12 DOF 매핑: `[left_6, right_6]` 단일 키 vs 좌·우 분리 키
 - 고려사항:
@@ -214,14 +237,15 @@
   - 손목 카메라는 그리퍼 동작을 가까이서 촬영 → 사전학습된 SmolVLM2 vision encoder 분포와 차이
   - 양팔이 토르소에 부착된 상태에서 teleop 시 좌·우 팔 충돌 회피 작업 영역 정의 필요
 
-### [ ] 10_biarm_VLA
+### [ ] 11_biarm_VLA
 
-<!-- 구 09_biarm_VLA. 07_e2e_pilot_and_cleanup (2026-05-03) 삽입으로 인해 10 으로 시프트.
+<!-- 구 10_biarm_VLA. 08_final_e2e (2026-05-04) 삽입으로 11 로 시프트.
+     구 09_biarm_VLA. 07_e2e_pilot_and_cleanup (2026-05-03) 삽입으로 인해 10 으로 시프트.
      구 08_biarm_VLA. 06_dgx_absorbs_datacollector (2026-05-02) 삽입으로 인해 09 로 시프트. -->
 
 - 목표: 양팔 데이터로 smolVLA 파인튜닝 → 양팔 추론 동작 검증
 - 주요 작업:
-  - 09 에서 수집한 양팔 12 DOF + 카메라 3대 구성 데이터로 smolVLA 파인튜닝 (단일팔에서 전이하지 않고 양팔 데이터로 처음부터 학습)
+  - 10 에서 수집한 양팔 12 DOF + 카메라 3대 구성 데이터로 smolVLA 파인튜닝 (단일팔에서 전이하지 않고 양팔 데이터로 처음부터 학습)
 - 고려사항:
   - SmolVLA `max_state_dim=32` / `max_action_dim=32` padding 으로 12 DOF 양팔 수용 가능 (코드 차원 확인 완료, `docs/lerobot_study/03_smolvla_architecture.md` §A·§E 참조)
   - 카메라 3대 → smolvla_base 사전학습 분포 차이로 vision/connector 까지 푸는 풀 파인튜닝(S3) 검토 필요할 수 있음. 첫 시도는 표준 파인튜닝(S1) 부터.
@@ -229,9 +253,10 @@
 - 비상 옵션:
   - 잘 안되면 머리 위에 더듬이 카메라 다는 것 고려 (조망 카메라 보강)
 
-### [ ] 11_biarm_deploy
+### [ ] 12_biarm_deploy
 
-<!-- 구 10_biarm_deploy. 07_e2e_pilot_and_cleanup (2026-05-03) 삽입으로 인해 11 로 시프트.
+<!-- 구 11_biarm_deploy. 08_final_e2e (2026-05-04) 삽입으로 12 로 시프트.
+     구 10_biarm_deploy. 07_e2e_pilot_and_cleanup (2026-05-03) 삽입으로 인해 11 로 시프트.
      구 09_biarm_deploy. 06_dgx_absorbs_datacollector (2026-05-02) 삽입으로 인해 10 으로 시프트. -->
 
 - 목표: 양팔 VLA 정책을 시연장 Orin 에 배포하여 최종 데모 가능 상태로 완성

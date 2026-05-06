@@ -27,6 +27,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+from flows._back import is_back
+
 # 기본 model ID (hil_inference.py line 48 에서 동기화)
 DEFAULT_MODEL_ID = "lerobot/smolvla_base"
 
@@ -65,10 +67,17 @@ def flow3_select_ckpt() -> tuple[str, str | None, str | None]:
 
     while True:
         try:
-            raw = input("번호 선택 [1~3]: ").strip()
+            raw = input("번호 선택 [1~3, b: 뒤로(종료)]: ").strip()
         except (EOFError, KeyboardInterrupt):
             print()
             print("[취소] ckpt 선택을 취소합니다.")
+            sys.exit(0)
+
+        # flow 3 최상위 — b/back 시 종료 (entry flow 1 으로 재진입 불가)
+        if is_back(raw):
+            print()
+            print("[flow 3] 뒤로가기 — CLI 를 종료합니다.")
+            print("  (다시 시작: bash orin/interactive_cli/main.sh)")
             sys.exit(0)
 
         if raw == "1":
@@ -79,7 +88,7 @@ def flow3_select_ckpt() -> tuple[str, str | None, str | None]:
             print(f"\n[선택] 기본값 사용: {DEFAULT_MODEL_ID}")
             return "default", None, None
         else:
-            print("  1, 2, 3 중 하나를 입력하세요.")
+            print("  1, 2, 3 또는 b(뒤로) 를 입력하세요.")
 
 
 def _flow3_hub_input() -> tuple[str, str | None, str | None]:
@@ -87,15 +96,21 @@ def _flow3_hub_input() -> tuple[str, str | None, str | None]:
     print()
     print("  HF Hub repo_id 를 입력하세요.")
     print("  (예: lerobot/smolvla_base, <username>/<repo>)")
-    print(f"  빈 줄 입력 시 기본값 사용 ({DEFAULT_MODEL_ID})")
+    print(f"  빈 줄 입력 시 기본값 사용 ({DEFAULT_MODEL_ID})  /  b: 뒤로")
     print()
 
     try:
-        raw = input("  repo_id: ").strip()
+        raw = input("  repo_id (b: 뒤로): ").strip()
     except (EOFError, KeyboardInterrupt):
         print()
         print("[취소] ckpt 선택을 취소합니다.")
         sys.exit(0)
+
+    # b/back: ckpt 선택 메뉴로 복귀
+    if is_back(raw):
+        print()
+        print("[flow 3] 뒤로가기 — ckpt 선택 메뉴로 돌아갑니다.")
+        return flow3_select_ckpt()
 
     if not raw:
         print(f"  [기본값] {DEFAULT_MODEL_ID}")
@@ -110,14 +125,21 @@ def _flow3_local_input() -> tuple[str, str | None, str | None]:
     print()
     print("  로컬 ckpt pretrained_model 경로를 입력하세요.")
     print("  예: ~/smolvla/orin/checkpoints/<run>/<step>/pretrained_model")
+    print("  b: 뒤로 (ckpt 선택 메뉴로)")
     print()
 
     try:
-        raw = input("  경로: ").strip()
+        raw = input("  경로 (b: 뒤로): ").strip()
     except (EOFError, KeyboardInterrupt):
         print()
         print("[취소] ckpt 선택을 취소합니다.")
         sys.exit(0)
+
+    # b/back: ckpt 선택 메뉴로 복귀
+    if is_back(raw):
+        print()
+        print("[flow 3] 뒤로가기 — ckpt 선택 메뉴로 돌아갑니다.")
+        return flow3_select_ckpt()
 
     if not raw:
         print("  경로를 입력하지 않았습니다. 기본값을 사용합니다.")
@@ -143,8 +165,12 @@ def _flow3_local_input() -> tuple[str, str | None, str | None]:
     return "local", None, expanded
 
 
-def _flow4_ask_mode() -> str:
-    """flow 4 전처리: dry-run 또는 live 선택."""
+def _flow4_ask_mode() -> str | None:
+    """flow 4 전처리: dry-run 또는 live 선택.
+
+    Returns:
+        "dry-run" | "live" | None (b/back — ckpt 선택으로 복귀 신호)
+    """
     print()
     print("실행 모드를 선택하세요:")
     print("  1. dry-run  (SO-ARM 미구동 — action 로그만 출력, 기본값)")
@@ -153,10 +179,16 @@ def _flow4_ask_mode() -> str:
 
     while True:
         try:
-            raw = input("번호 선택 [1~2, 기본 1]: ").strip()
+            raw = input("번호 선택 [1~2, 기본 1, b: 뒤로]: ").strip()
         except (EOFError, KeyboardInterrupt):
             print()
             sys.exit(0)
+
+        # b/back: ckpt 선택 단계로 복귀
+        if is_back(raw):
+            print()
+            print("[flow 4] 뒤로가기 — ckpt 선택으로 돌아갑니다.")
+            return None
 
         if raw in ("", "1"):
             print("[모드] dry-run")
@@ -177,7 +209,7 @@ def _flow4_ask_mode() -> str:
                 print("  dry-run 으로 선택합니다.")
                 return "dry-run"
         else:
-            print("  1 또는 2 를 입력하세요.")
+            print("  1, 2 또는 b(뒤로) 를 입력하세요.")
 
 
 def flow4_run_inference(
@@ -236,8 +268,10 @@ def flow4_run_inference(
     if mode == "live":
         print("[flow 4] 로봇이 움직이고 있습니다.")
         print("         관찰 후 Ctrl+C 로 종료하세요.")
+        print("  ※ hil_inference 실행 중에는 뒤로가기 불가 — Ctrl+C 로만 종료 가능.")
     else:
         print("[flow 4] dry-run 중 (SO-ARM 미구동). action 로그를 확인하세요.")
+        print("  ※ hil_inference 실행 중에는 뒤로가기 불가 — Ctrl+C 로만 종료 가능.")
 
     print()
     print(f"  실행 명령: {' '.join(str(c) for c in cmd)}")
@@ -297,15 +331,22 @@ def run_inference_flow(script_dir: Path) -> int:
     """flow 3·4·5 순차 실행 진입점.
 
     entry.py 에서 orin 분기 시 호출.
+    _flow4_ask_mode 가 None 반환 (b/back) 시 flow 3 재실행 (ckpt 재선택).
 
     Returns:
         종료 코드 (0 = 정상, 1 = 오류)
     """
-    # flow 3: ckpt 선택
-    source_label, model_id, ckpt_path = flow3_select_ckpt()
+    while True:
+        # flow 3: ckpt 선택
+        source_label, model_id, ckpt_path = flow3_select_ckpt()
 
-    # flow 4 전처리: 모드 선택
-    mode = _flow4_ask_mode()
+        # flow 4 전처리: 모드 선택 (b/back 시 None 반환 → ckpt 재선택)
+        mode = _flow4_ask_mode()
+        if mode is None:
+            # b/back: ckpt 선택 단계로 복귀 → 루프 재시작
+            continue
+
+        break
 
     # flow 4: hil_inference 실행
     returncode = flow4_run_inference(
