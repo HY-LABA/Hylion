@@ -703,3 +703,30 @@
 - 코드량 변화: 508줄 삭제 / 60줄 net 추가 (+ 신규 패키지 11파일은 untracked → commit 시 추가)
 - 다음 환경에서 할 일:
   - **단계 4** — `core/stt/groq_whisper.py` 신규 구현 (Groq audio.transcriptions, `whisper-large-v3-turbo`), 팩토리에서 online=True 시 GroqWhisperBackend 반환하도록 교체. 한국어 인식률/지연 실측.
+
+### 2026-05-06 (단계 4 — Groq Whisper online STT)
+
+- 한 줄 요약:
+  - online STT를 `whisper-large-v3-turbo`로 라이브. `GroqWhisperBackend` 신규 + 팩토리 분기 추가. 실 음성 4초 wav 한 개로 엔드투엔드 검증, 로컬 whisper(CUDA) 4.79s 대비 **0.63s**(약 7-8배 빠름) 확인.
+- 실행한 검증 명령:
+  - `python3 -m pytest tests/3_interface/test_groq_whisper.py tests/3_interface/test_groq_api.py tests/4_unit/test_stt_whisper.py -q` → 15 passed
+  - `python3 -c "...GroqWhisperBackend().transcribe('data/episodes/live_20260422_203303.wav')..."` → 0.632s, "안녕 넌 누구야?" (ko)
+  - `python3 -m jetson.core.coordinator --help` → 정상
+- 신규 파일:
+  - `jetson/core/stt/groq_whisper.py` — `GroqWhisperBackend(model='whisper-large-v3-turbo', language='ko', timeout_sec=30.0)`. Groq SDK `client.audio.transcriptions.create()` 호출, `(filename, bytes)` 튜플로 업로드, 결과의 `.text`만 추출
+  - `tests/3_interface/test_groq_whisper.py` — fake Groq client으로 SDK 호출 인자 검증 + 팩토리 분기 검증 (6 tests)
+- 수정 파일:
+  - `jetson/core/stt/factory.py` — online=True → `GroqWhisperBackend`, online=False → `LocalWhisperBackend` 으로 분기
+  - `WORKLOG.md`
+- 측정값 (Jetson Orin Nano Super 8GB, JP6.x, GROQ_API_KEY 설정):
+  - `warm_up()`: 0.530s (SDK 임포트 + Groq() 인스턴스 생성)
+  - `transcribe()` first call: 0.632s (4초 WAV, 한국어, network round-trip 포함)
+  - 전사 결과 정확도: 사람이 들은 발화와 동일
+- 결정/관찰:
+  - Groq SDK 1.2.0이 venv에 이미 있어 추가 설치 불필요
+  - STT와 LLM은 같은 `GROQ_API_KEY` 공유, 모델별 별도 rate limit 버킷 → 한도 안 겹침
+  - 무료 티어 한도(20 RPM, 28.8K audio sec/day)로 일상 사용 충분, 실측 호출당 ~5 audio sec 소모
+- 남은 할 일:
+  - **단계 5** — Ollama + `exaone3.5:2.4b` 백엔드 신규 (`core/llm/ollama_llm.py`), 팩토리 offline=True → OllamaLLMBackend 교체. JSON 모드 schema 통과 검증.
+  - 단계 6 — coordinator inner-loop graceful degradation (네트워크 예외 시 즉석 재프로브 + 강등)
+  - 단계 7 — 오프라인 TTS (XTTS-v2 + CLOVA child clip)

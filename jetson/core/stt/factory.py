@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from jetson.core.stt.base import STTBackend
+from jetson.core.stt.groq_whisper import GroqWhisperBackend
 from jetson.core.stt.local_whisper import DEFAULT_MODEL_SIZE, LocalWhisperBackend
 
 
@@ -12,8 +13,9 @@ def build_stt_backend(
 ) -> STTBackend:
     """Pick STT backend based on network state.
 
-    Step 3 returns LocalWhisperBackend on both branches so behavior matches the
-    pre-refactor pipeline. Step 4 will swap online=True to GroqWhisperBackend.
+    online → Groq whisper-large-v3-turbo (cloud, ~216x realtime, free tier).
+    offline → openai-whisper local (CUDA → CPU fallback).
     """
-    # online branch will be replaced by GroqWhisperBackend in step 4.
+    if online:
+        return GroqWhisperBackend(language=language)
     return LocalWhisperBackend(model_size=model_size, language=language)
