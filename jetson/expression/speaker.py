@@ -627,18 +627,25 @@ def build_tts_backend(
     if use_mock:
         logger.info("✅ MockSpeaker 생성")
         return MockSpeaker(device=device, enable_lipsync=enable_lipsync)
-    else:
-        logger.info(f"✅ Speaker 생성 (device: {device}, tts_provider: {tts_provider})")
-        return Speaker(
-            device=device,
-            enable_lipsync=enable_lipsync,
-            tts_provider=tts_provider,
-            voice=voice or speaker,
-            pitch=pitch,
-            rate=rate,
-            speed=speed,
-            volume=volume,
-            audio_format=audio_format,
-            emotion=emotion,
-            emotion_strength=emotion_strength,
-        )
+
+    if not is_online:
+        # Offline path: HTTP client to local MeloTTS daemon (services/tts_server).
+        # Daemon must already be running (systemd or manual launch).
+        from jetson.core.tts.melotts_client import MeloTTSSpeaker
+        logger.info("✅ MeloTTSSpeaker 생성 (offline TTS via local daemon)")
+        return MeloTTSSpeaker(device=device, enable_lipsync=enable_lipsync)
+
+    logger.info(f"✅ Speaker 생성 (device: {device}, tts_provider: {tts_provider})")
+    return Speaker(
+        device=device,
+        enable_lipsync=enable_lipsync,
+        tts_provider=tts_provider,
+        voice=voice or speaker,
+        pitch=pitch,
+        rate=rate,
+        speed=speed,
+        volume=volume,
+        audio_format=audio_format,
+        emotion=emotion,
+        emotion_strength=emotion_strength,
+    )

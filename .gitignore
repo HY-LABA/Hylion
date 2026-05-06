@@ -214,3 +214,5 @@ Legacy/
 *no_pr*
 tmp_test.py
 data/sessions/*
+third_party/
+data/tts_ref/

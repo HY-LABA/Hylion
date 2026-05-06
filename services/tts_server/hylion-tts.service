@@ -1,0 +1,23 @@
+[Unit]
+Description=Hylion MeloTTS daemon (offline Korean TTS)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=laba
+Group=laba
+WorkingDirectory=/home/laba/Hylion
+Environment=HYLION_TTS_HOST=127.0.0.1
+Environment=HYLION_TTS_PORT=8001
+# HF cache reuse so first start has no download cost
+Environment=HF_HOME=/home/laba/.cache/huggingface
+ExecStart=/home/laba/Hylion/jetson/expression/.venv-melotts/bin/python3 -m uvicorn services.tts_server.server:app --host 127.0.0.1 --port 8001 --log-level info
+Restart=on-failure
+RestartSec=5
+TimeoutStartSec=300
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

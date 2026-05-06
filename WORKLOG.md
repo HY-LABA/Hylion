@@ -768,3 +768,51 @@
 - 다음 환경에서 할 일:
   - **단계 6** — coordinator inner-loop graceful degradation (transcribe/build_action 실패 시 즉석 `is_online()` 재프로브 + 백엔드 일시 강등 + 1회 재시도)
   - 단계 7 — 오프라인 TTS (XTTS-v2 + 보유 CLOVA `ndain` child clip을 voice cloning reference로 등록, 메모리 budget 실측)
+
+### 2026-05-06 (단계 7 — 오프라인 TTS via MeloTTS daemon)
+
+- 한 줄 요약:
+  - 오프라인 한국어 TTS를 **MeloTTS 데몬 + HTTP 클라이언트** 패턴으로 추가. Hylion 메인 venv (torch 2.5)는 손 안 대고, 별도 venv (`.venv-melotts`, torch 2.8 + torchaudio 2.8 jetson-ai-lab)에 FastAPI 서버를 띄워 loopback HTTP로 통신. Ollama와 동일 패턴.
+- 배경 — 시도했다가 막힌 옵션들:
+  1. **XTTS-v2** — 동작은 했으나 한국어 voice cloning 품질 매우 낮음 (사용자 평가 "알아듣기 어려움"). 게다가 PyPI torchaudio가 NVIDIA Jetson torch와 ABI 충돌 (undefined symbol `_ZNK5torch8autograd4Node4nameEv`).
+  2. **Piper KSS Korean** — pygoruut 비표준 phonemizer 사용으로 mainstream piper-tts 1.4.2가 못 읽음. 공식 한국어 voice는 piper 카탈로그에 0개 (espeak-ng 한국어 G2P 품질이 낮아 학습이 안 됨).
+  3. **Kokoro v1.0** — 한국어 voice 부재.
+  4. **MeloTTS** ⭐ 채택. 한국어 native 학습, RTF 0.22~0.27x, GPU 0.76 GB.
+- 통합 패턴 결정 (옵션 B = daemon):
+  - 옵션 A (메인 venv torch 2.8 업그레이드) 대신 옵션 B (daemon HTTP) 채택
+  - 이유: smolvla(자체 venv torch 2.5) / NUC bhl(별도 머신) 등 미래 ML 컴포넌트도 모두 IPC 패턴 → **모든 ML 서비스 = 별도 데몬, 코디네이터는 가벼운 오케스트레이션 역할**로 통일
+  - HTTP 오버헤드: 1-5ms (전체 응답의 0.1% 미만, 무시 가능)
+- 신규 파일:
+  - `services/tts_server/server.py` — FastAPI app, GET /health + POST /synthesize, 부팅 시 모델 로드 + warm-up (warm 후 모든 호출 ~1초 미만)
+  - `services/tts_server/hylion-tts.service` — systemd unit
+  - `services/tts_server/setup.sh` — 재현 가능 venv/모델 설치 스크립트
+  - `services/tts_server/README.md` — 운영 문서 (manual launch, systemd, 오프라인 검증, 메모리 footprint, 미래 OpenVoice v2 확장 메모)
+  - `services/tts_server/patches/melotts_korean_only.patch` — MeloTTS upstream에 적용할 Korean-only path 패치 (Japanese MeCab / Chinese 의존 import 제거)
+  - `jetson/core/tts/__init__.py`
+  - `jetson/core/tts/melotts_client.py` — `MeloTTSSpeaker` (HTTP 클라이언트, `expression/speaker.py:Speaker`와 동일한 `speak_with_lipsync()` 시그니처, WAV 재생은 `aplay`)
+  - `jetson/expression/.venv-melotts/` (gitignore된 venv) — torch 2.8 + torchaudio 2.8 + coqui-tts deps + MeloTTS
+  - `third_party/MeloTTS/` (gitignore) — clone + 패치 적용 상태
+  - `data/tts_ref/ndain.wav` (gitignore) — 향후 OpenVoice v2 voice cloning reference clip
+- 수정 파일:
+  - `jetson/expression/speaker.py` — `build_tts_backend(is_online=False)` 분기 추가 → `MeloTTSSpeaker` 반환. online 분기는 기존 Clova Speaker 그대로
+  - `.gitignore` — `third_party/`, `data/tts_ref/` 추가
+  - `WORKLOG.md`
+- 실행한 검증:
+  - 메인 venv torch 그대로 (`2.5.0a0+nv24.08`), 27/27 기존 테스트 통과
+  - 데몬 manual 기동 → `/health` ok, `/synthesize` 1.6s에 6.6초 WAV 응답
+  - 메인 venv에서 `MeloTTSSpeaker.synthesize_reply_audio()` 3회 호출 → 0.63~0.86s/호출, `data/reply/*.wav`로 저장 정상
+  - 오프라인 검증: HF cache 완전(`models--myshell-ai--MeloTTS-Korean` 199MB + `models--kykim--bert-kor-base` 908MB), 합성 시 데몬의 외부 socket 모두 CLOSE-WAIT (잔여) — 새 네트워크 호출 0
+- 측정값 (Jetson Orin Nano 8GB):
+  - 데몬 메모리 RSS: ~2.0~2.5 GB (모델 + framework + Korean BERT)
+  - GPU: 0.76 GB
+  - 합성 RTF: 0.22~0.27x (5초 응답 → 1초 합성)
+  - 첫 호출 콜드 (BERT 다운 포함, 1회만): ~140s → warm-up에서 처리됨
+- 음질 평가 (사용자):
+  - 알아들을 수 있음 ✅ — 단계 7 baseline 합격선
+  - 다소 "연기 로봇 톤" — 단계 8(별도 작업)에서 OpenVoice v2 추가해서 CLOVA `nhajun` 톤으로 voice clone 예정
+- 사용자가 다음에 할 일:
+  - (선택) systemd 등록: `sudo cp services/tts_server/hylion-tts.service /etc/systemd/system/ && sudo systemctl enable --now hylion-tts`
+  - (선택) 비행기 모드 켜고 `curl POST /synthesize` 한 번 더 → 진짜 오프라인 동작 확인
+- 다음 환경에서 할 일:
+  - **단계 6** — coordinator inner-loop graceful degradation (STT/LLM/TTS 호출 실패 시 try/except + 즉석 `is_online()` 재프로브 + 백엔드 일시 강등 + 1회 재시도)
+  - 단계 8 — OpenVoice v2 추가 (MeloTTS daemon에 tone color converter layer) → CLOVA `nhajun.wav` 톤으로 음성 클론 → 자연스러운 어린아이 voice
