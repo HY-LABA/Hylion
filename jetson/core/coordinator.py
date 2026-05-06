@@ -298,13 +298,43 @@ def _parse_args() -> argparse.Namespace:
 	return parser.parse_args()
 
 
+def _startup_warm_up(args: argparse.Namespace) -> None:
+	"""§F5 warm-up policy: warm only the side likely to be hot.
+
+	online → Groq probe (no model load). offline → local whisper + Ollama model.
+	The other side stays cold and lazy-loads on first runtime fallback. Failures
+	here are logged but never abort startup; the pipeline degrades gracefully.
+	"""
+	initial_online = is_online()
+	print(f"[Startup] is_online={initial_online}")
+
+	if initial_online:
+		try:
+			build_llm_backend(online=True).warm_up()
+			print("[Warm-up] online Groq LLM probe OK")
+		except Exception as exc:
+			print(f"[Warm-up] online probe failed (will lazy-build): {exc}")
+		return
+
+	try:
+		print(f"[Warm-up] loading openai-whisper '{args.whisper_model_size}'...")
+		warm_up_local_whisper(model_size=args.whisper_model_size)
+		print("[Warm-up] local whisper OK")
+	except Exception as exc:
+		print(f"[Warm-up] local whisper failed: {exc}")
+	try:
+		build_llm_backend(online=False).warm_up()
+		print("[Warm-up] offline Ollama LLM OK")
+	except Exception as exc:
+		print(f"[Warm-up] offline Ollama warm-up failed (will lazy-load): {exc}")
+
+
 def main() -> None:
 	args = _parse_args()
 	wakeword_listener = None
 	try:
 		wakeword_listener = build_wake_word_listener()
-		print(f"[STT] warming up whisper '{args.whisper_model_size}' model...")
-		warm_up_local_whisper(model_size=args.whisper_model_size)
+		_startup_warm_up(args)
 		run_live_pipeline(
 			record_sec=args.record_sec,
 			preferred_keyword=args.preferred_keyword,

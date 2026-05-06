@@ -730,3 +730,41 @@
   - **단계 5** — Ollama + `exaone3.5:2.4b` 백엔드 신규 (`core/llm/ollama_llm.py`), 팩토리 offline=True → OllamaLLMBackend 교체. JSON 모드 schema 통과 검증.
   - 단계 6 — coordinator inner-loop graceful degradation (네트워크 예외 시 즉석 재프로브 + 강등)
   - 단계 7 — 오프라인 TTS (XTTS-v2 + CLOVA child clip)
+
+### 2026-05-06 (단계 5 — Ollama + EXAONE 3.5 2.4B 오프라인 LLM 라이브)
+
+- 한 줄 요약:
+  - offline 경로의 stub LLM을 실제 Ollama + `exaone3.5:2.4b`로 교체. 슬림 prompt + intent 기반 backfill + cross-field policy로 한국어 schema-conformant ACTION_JSON 안정 생성. 6/6 케이스 성공, 평균 ~9.7s/turn (워밍 후 ~8.8s).
+- 실행한 검증 명령:
+  - `curl -fsSL https://ollama.com/install.sh | sh` (사용자 별도 터미널)
+  - `sudo systemctl enable --now ollama`
+  - `ollama pull exaone3.5:2.4b` (~1.6 GB Q4_K_M)
+  - `python3 -m pytest tests/3_interface tests/4_unit tests/5_integration tests/2_hw_connection -q` → 27 passed
+  - 엔드투엔드 6 케이스 (안녕/컵/이동/정지/standby/지식질문) → fallback 0건, 모두 정확 분류, 평균 9.69s
+- 신규 파일:
+  - `jetson/core/llm/ollama_llm.py` — `OllamaLLMBackend(model='exaone3.5:2.4b', host='http://127.0.0.1:11434', num_ctx=2048, num_predict=150)`, urllib HTTP /api/chat 호출, 슬림 system prompt 내장
+  - `tests/3_interface/test_ollama_llm.py` — 7 tests (성공 path / 히스토리 / 요청 실패 / JSON 깨짐 / 메시지 누락 / 팩토리 분기)
+- 수정 파일:
+  - `jetson/core/llm/factory.py` — offline=True → `OllamaLLMBackend` (이전 stub 제거)
+  - `jetson/core/llm/prompt.py`:
+    - `_apply_conversation_policy` 확장 — standby뿐 아니라 pick_place/move/stop/chat/unknown 모두 cross-field 강제 정규화
+    - `_backfill_required_defaults` 신규 — 모델이 boolean/enum 필드 빠뜨려도 intent 기반 기본값으로 schema 통과
+  - `jetson/core/coordinator.py` — `_startup_warm_up()` 추가 (§F5 정책: online=Groq probe만, offline=local whisper + Ollama 모델 모두 미리 로드)
+  - `WORKLOG.md`
+- 삭제 파일:
+  - `jetson/core/llm/offline_stub.py` — Ollama가 자체 fallback(`_offline_action_json`)을 가지므로 dead code
+- 측정값 (Jetson Orin Nano Super 8GB, JP6.x, GPU 100%):
+  - 모델 로드 (warm_up): 4.95s
+  - 첫 콜드 turn: ~14s
+  - 워밍 후 turn: 7.7~10.7s (한국어 1~2문장 응답, num_predict=150 캡)
+  - 메모리: 2.7GB → 5.0GB (델타 +2.3GB; 가용 4.5GB → 2.2GB)
+  - prompt eval: 76~542ms (445 토큰), 가장 큰 비용은 generation 18 tok/s
+- 최적화 적용 비교:
+  - full schema 주입 (1,038 prompt tokens) → 평균 21.0s/turn
+  - **슬림 prompt (445 tokens) + num_predict=150** → 평균 9.7s/turn (**2.4배 빠름**)
+- 남은 한계:
+  - 8-10s/turn은 빠르진 않지만 graceful degradation 용도로 수용 가능
+  - 더 줄이려면 (a) 더 작은 모델 (gemma2:2b, qwen2.5:1.5b) 한국어 평가 필요, (b) `format=json` 제약 생성 오버헤드 측정 — JSON 모드 끄고 직접 파싱 시도 등
+- 다음 환경에서 할 일:
+  - **단계 6** — coordinator inner-loop graceful degradation (transcribe/build_action 실패 시 즉석 `is_online()` 재프로브 + 백엔드 일시 강등 + 1회 재시도)
+  - 단계 7 — 오프라인 TTS (XTTS-v2 + 보유 CLOVA `ndain` child clip을 voice cloning reference로 등록, 메모리 budget 실측)

@@ -94,6 +94,34 @@ def _validate_action_payload(action: Dict[str, Any], schema_path: Path) -> tuple
 		return False, str(exc)
 
 
+_INTENT_DEFAULT_GAIT = {"move": "walk_forward", "stop": "stop"}
+_INTENT_DEFAULT_STATE = {
+	"chat": "TALKING",
+	"move": "WALKING",
+	"stop": "WALKING",
+	"pick_place": "PICKING",
+}
+
+
+def _backfill_required_defaults(action: Dict[str, Any]) -> Dict[str, Any]:
+	"""Provide safe intent-driven defaults for fields the LLM may have omitted.
+
+	Smaller offline LLMs sometimes truncate output and skip boolean/enum fields
+	when the chat reply is long. Backfilling here keeps schema validation from
+	failing on otherwise-correct intents; cross-field invariants are still
+	enforced afterwards by _apply_conversation_policy.
+	"""
+	intent = action.get("intent", "unknown")
+	action.setdefault("target_object", "none")
+	action.setdefault("reply_text", "")
+	action.setdefault("requires_smolvla", intent == "pick_place")
+	action.setdefault("requires_bhl", intent in {"move", "stop"})
+	action.setdefault("gait_cmd", _INTENT_DEFAULT_GAIT.get(intent, "none"))
+	action.setdefault("state_current", _INTENT_DEFAULT_STATE.get(intent, "IDLE"))
+	action.setdefault("safety_allowed", True)
+	return action
+
+
 def _parse_and_validate_action_json(
 	content: str,
 	# parameters
@@ -113,6 +141,8 @@ def _parse_and_validate_action_json(
 	action["source"] = "stt"
 	action["network_online"] = network_online
 	action["fallback_policy"] = fallback_policy
+
+	action = _backfill_required_defaults(action)
 
 	valid, reason = _validate_action_payload(action, schema_path=DEFAULT_ACTION_SCHEMA_PATH)
 	if not valid:
@@ -142,11 +172,32 @@ def _offline_action_json(session_id: str, reason: str) -> Dict[str, Any]:
 
 
 def _apply_conversation_policy(action: Dict[str, Any]) -> Dict[str, Any]:
-	if action.get("intent") == "standby":
+	"""Enforce intent → cross-field invariants regardless of which LLM emitted the JSON.
+
+	Smaller offline LLMs (e.g. EXAONE 2.4B) sometimes pick a correct intent but
+	mis-fill requires_smolvla/requires_bhl/gait_cmd. This normalization makes
+	downstream routing safe without depending on model fidelity.
+	"""
+	intent = action.get("intent")
+	if intent == "standby":
 		action["requires_smolvla"] = False
 		action["requires_bhl"] = False
 		action["gait_cmd"] = "none"
 		action["state_current"] = "IDLE"
+	elif intent == "pick_place":
+		action["requires_smolvla"] = True
+		action["requires_bhl"] = False
+	elif intent == "move":
+		action["requires_smolvla"] = False
+		action["requires_bhl"] = True
+	elif intent == "stop":
+		action["requires_smolvla"] = False
+		action["requires_bhl"] = True
+		action["gait_cmd"] = "stop"
+	elif intent in {"chat", "unknown"}:
+		action["requires_smolvla"] = False
+		action["requires_bhl"] = False
+		action["gait_cmd"] = "none"
 
 	return action
 

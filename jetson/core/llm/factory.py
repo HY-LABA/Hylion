@@ -2,15 +2,15 @@ from __future__ import annotations
 
 from jetson.core.llm.base import LLMBackend
 from jetson.core.llm.groq_llm import GroqLLMBackend
-from jetson.core.llm.offline_stub import OfflineStubLLMBackend
+from jetson.core.llm.ollama_llm import OllamaLLMBackend
 
 
 def build_llm_backend(online: bool) -> LLMBackend:
 	"""Pick LLM backend based on network state.
 
-	Step 3 wires Groq → online and the offline stub → offline.
-	Step 5 will swap online=False to OllamaLLMBackend.
+	online → Groq llama-3.1-8b-instant (cloud, free tier).
+	offline → Ollama exaone3.5:2.4b (LG Korean-native, ~1.5GB Q4_K_M, on-device).
 	"""
 	if online:
 		return GroqLLMBackend()
-	return OfflineStubLLMBackend()
+	return OllamaLLMBackend()
