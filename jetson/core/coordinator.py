@@ -17,13 +17,14 @@ CHAT_STANDBY_COOLDOWN_SEC = 1.2
 # Increase for longer memory at the cost of more tokens / latency per request.
 MAX_HISTORY_TURNS = 10
 
-from jetson.cloud.groq_client import GroqClient, build_action_json_from_stt
-from jetson.core.brain.network_probe import is_online
-from jetson.expression.mouth_servo import cleanup_gpio, MouthServoController
-from jetson.expression.wake_word import build_wake_word_listener
-from jetson.expression.speaker import DEFAULT_CLOVA_SPEAKER, build_tts_backend
+from jetson.core.llm import build_llm_backend
+from jetson.core.network import is_online
+from jetson.core.stt import build_input_event, build_stt_backend
+from jetson.core.stt.local_whisper import warm_up as warm_up_local_whisper
 from jetson.expression.microphone import record_to_wav
-from jetson.expression.stt_whisper import build_input_event, transcribe_wav, warm_up as warm_up_stt
+from jetson.expression.mouth_servo import cleanup_gpio, MouthServoController
+from jetson.expression.speaker import DEFAULT_CLOVA_SPEAKER, build_tts_backend
+from jetson.expression.wake_word import build_wake_word_listener
 
 
 
@@ -69,60 +70,44 @@ def _build_standby_action(session_id: str, reason: str = "task_completed") -> di
 	}
 
 
-def _probe_real_groq_connection(client: GroqClient) -> None:
-	probe = client.request_chat_completion(
-		system_prompt='Return JSON only: {"ok": true}',
-		user_text="연결 점검",
-		retries=0,
-		retry_delay_sec=0.0,
-		timeout_sec=10.0,
-		json_mode=True,
-	)
-	if not probe.ok:
-		raise RuntimeError(f"Groq API connection failed: {probe.error}")
+def _build_turn_services(
+	online: bool,
+	*,
+	whisper_model_size: str,
+	whisper_language: str,
+):
+	"""Pick STT/LLM/TTS backends for this turn.
 
-
-class LocalLLM:
-	def build_action_json_from_stt(self, stt_text: str, session_id: str, in_chat_mode: bool) -> dict:
-		print("[Offline Mode] LocalLLM 동작 예정 (현재 미구현)")
-		reply_text = "오프라인 모드는 아직 준비 중이에요."
-		intent = "standby" if stt_text.strip() else "unknown"
-		return {
-			"action_id": str(uuid4()),
-			"timestamp": datetime.now(timezone.utc).isoformat(),
-			"session_id": session_id,
-			"schema_version": "1.0",
-			"source": "local_llm_stub",
-			"network_online": False,
-			"intent": intent,
-			"target_object": "none",
-			"reply_text": reply_text,
-			"requires_smolvla": False,
-			"requires_bhl": False,
-			"gait_cmd": "none",
-			"state_current": "IDLE",
-			"safety_allowed": True,
-			"fallback_policy": "offline_stub",
-		}
-
-
-def _build_turn_services(online: bool):
+	If the online path fails its warm-up probe (e.g. Groq unreachable despite
+	is_online=True), fall back to offline backends so the user still gets a
+	response this turn.
+	"""
 	if online:
 		try:
-			client = GroqClient()
-			_probe_real_groq_connection(client)
+			llm_backend = build_llm_backend(online=True)
+			llm_backend.warm_up()
+			stt_backend = build_stt_backend(
+				online=True,
+				model_size=whisper_model_size,
+				language=whisper_language,
+			)
 			tts_backend = build_tts_backend(
 				is_online=True,
 				speaker=DEFAULT_CLOVA_SPEAKER,
 				tts_provider="clova",
 			)
-			return True, client, tts_backend
+			return True, stt_backend, llm_backend, tts_backend
 		except Exception as exc:
 			print(f"[Hybrid] online route unavailable -> fallback to offline stub: {exc}")
 
-	local_llm = LocalLLM()
+	stt_backend = build_stt_backend(
+		online=False,
+		model_size=whisper_model_size,
+		language=whisper_language,
+	)
+	llm_backend = build_llm_backend(online=False)
 	tts_backend = build_tts_backend(is_online=False)
-	return False, local_llm, tts_backend
+	return False, stt_backend, llm_backend, tts_backend
 
 
 def _route_action(action_json: dict) -> None:
@@ -192,7 +177,7 @@ def run_live_pipeline(
 	preferred_keyword: str,
 	whisper_model_size: str,
 	whisper_language: str,
-    wakeword_listener,
+	wakeword_listener,
 ) -> None:
 	session_id = f"sess-live-{uuid4().hex[:8]}"
 	# Conversation memory persists across wake-word re-activations within a single
@@ -214,9 +199,14 @@ def run_live_pipeline(
 			f"device={activation.device_name}"
 		)
 
-		online = is_online()
-		print(f"[Network] is_online={online}")
-		online, llm_backend, tts_backend = _build_turn_services(online)
+		online_probe = is_online()
+		print(f"[Network] is_online={online_probe}")
+		online, stt_backend, llm_backend, tts_backend = _build_turn_services(
+			online_probe,
+			whisper_model_size=whisper_model_size,
+			whisper_language=whisper_language,
+		)
+		print(f"[Backends] stt={stt_backend.name} llm={llm_backend.name}")
 
 		# Issue greeting action to enter chat mode (greeting is a meta-event and is
 		# intentionally NOT added to LLM history so it doesn't pollute the dialogue).
@@ -239,11 +229,7 @@ def run_live_pipeline(
 			)
 			print("[Mic] STOP recording")
 
-			stt_result = transcribe_wav(
-				recorded_path,
-				model_size=whisper_model_size,
-				language=whisper_language,
-			)
+			stt_result = stt_backend.transcribe(recorded_path)
 
 			if not stt_result.text.strip():
 				print("[STT] Empty transcription. Keeping current mode.")
@@ -252,20 +238,12 @@ def run_live_pipeline(
 			input_event = build_input_event(stt_result=stt_result, session_id=session_id, source="stt")
 			_print_block("INPUT_JSON", input_event)
 
-			if online:
-				action_json = build_action_json_from_stt(
-					client=llm_backend,
-					stt_text=stt_result.text,
-					session_id=session_id,
-					in_chat_mode=in_chat_mode,
-					history=history,
-				)
-			else:
-				action_json = llm_backend.build_action_json_from_stt(
-					stt_text=stt_result.text,
-					session_id=session_id,
-					in_chat_mode=in_chat_mode,
-				)
+			action_json = llm_backend.build_action(
+				stt_text=stt_result.text,
+				session_id=session_id,
+				history=history,
+				in_chat_mode=in_chat_mode,
+			)
 			_print_block("ACTION_JSON", action_json)
 
 			intent = action_json.get("intent", "unknown")
@@ -326,7 +304,7 @@ def main() -> None:
 	try:
 		wakeword_listener = build_wake_word_listener()
 		print(f"[STT] warming up whisper '{args.whisper_model_size}' model...")
-		warm_up_stt(model_size=args.whisper_model_size)
+		warm_up_local_whisper(model_size=args.whisper_model_size)
 		run_live_pipeline(
 			record_sec=args.record_sec,
 			preferred_keyword=args.preferred_keyword,

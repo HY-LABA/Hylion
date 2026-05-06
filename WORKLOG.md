@@ -669,3 +669,37 @@
   - 단계 2: 기존 `expression/stt_whisper.py` → `core/stt/local_whisper.py` 이전, `cloud/groq_client.py` 분해해서 `core/llm/{prompt,groq_llm}.py`로 분배 (기능 변화 0)
   - 단계 3: `coordinator.py` 평탄화 — `_build_turn_services` / inner-loop if online / `LocalLLM` 더미 클래스 제거, 백엔드 메서드 호출로 통일 (여전히 기능 변화 0)
   - 단계 4 이후: Groq Whisper 백엔드 신규 구현 → Ollama 백엔드 신규 구현 → graceful degradation → 오프라인 TTS
+
+### 2026-05-06 (단계 1~3 — 백엔드 추상화 리팩터, 기능 변화 0)
+
+- 한 줄 요약:
+  - STT/LLM을 `core/stt/`, `core/llm/` 패키지로 분해하고 `STTBackend`/`LLMBackend` Protocol 도입. coordinator는 `_build_turn_services` 한 곳에서 백엔드를 고르고 inner 루프는 `stt_backend.transcribe()` / `llm_backend.build_action()` 한 줄씩으로 평탄화. 동작은 이전과 byte-identical.
+- 실행한 검증 명령:
+  - `python3 -m pytest tests/4_unit/test_stt_whisper.py tests/3_interface/test_groq_api.py -q` → 9 passed
+  - `python3 -m pytest tests/4_unit tests/3_interface tests/5_integration tests/2_hw_connection -q` → 14 passed
+  - `python3 -m jetson.core.coordinator --help` → 정상 출력
+  - `python3 -c "from jetson.core.brain.network_probe import is_online; ..."` → shim OK
+- 신규 파일:
+  - `jetson/core/network.py` (network_probe 이전)
+  - `jetson/core/stt/{__init__.py, base.py, local_whisper.py, factory.py}`
+  - `jetson/core/llm/{__init__.py, base.py, prompt.py, groq_llm.py, offline_stub.py, factory.py}`
+- 삭제 파일:
+  - `jetson/expression/stt_whisper.py` (→ `core/stt/local_whisper.py` + `core/stt/base.py`)
+  - `jetson/cloud/groq_client.py` (→ `core/llm/{prompt,groq_llm}.py`)
+- 수정 파일:
+  - `jetson/core/coordinator.py` — `LocalLLM` 더미 클래스 삭제, online/offline if 분기 제거, 백엔드 메서드 호출로 평탄화. `_build_turn_services` 시그니처에 `whisper_model_size`/`whisper_language` 추가
+  - `jetson/core/brain/network_probe.py` — `core.network`로 re-export 하는 thin shim (legacy `brain_main.py` 보호용)
+  - `tests/4_unit/test_stt_whisper.py` — import 경로를 `core.stt.local_whisper` + `core.stt.base`로 갱신
+  - `tests/3_interface/test_groq_api.py` — import 경로를 `core.llm.groq_llm` + `core.llm.prompt`로 갱신
+- 주요 인터페이스:
+  - `STTBackend.transcribe(wav_path, *, language=None) -> STTResult`
+  - `STTBackend.warm_up()`
+  - `LLMBackend.build_action(stt_text, *, session_id, history, in_chat_mode) -> dict(ACTION_JSON)`
+  - `LLMBackend.warm_up()`
+  - 팩토리: `build_stt_backend(online, *, model_size, language)`, `build_llm_backend(online)`
+- 현재 백엔드 매핑 (변경 무):
+  - online → `LocalWhisperBackend` + `GroqLLMBackend` + Clova TTS  ※ 단계 4에서 STT만 GroqWhisper로 교체 예정
+  - offline → `LocalWhisperBackend` + `OfflineStubLLMBackend` (기존 LocalLLM 클래스 동일 reply) + offline TTS
+- 코드량 변화: 508줄 삭제 / 60줄 net 추가 (+ 신규 패키지 11파일은 untracked → commit 시 추가)
+- 다음 환경에서 할 일:
+  - **단계 4** — `core/stt/groq_whisper.py` 신규 구현 (Groq audio.transcriptions, `whisper-large-v3-turbo`), 팩토리에서 online=True 시 GroqWhisperBackend 반환하도록 교체. 한국어 인식률/지연 실측.

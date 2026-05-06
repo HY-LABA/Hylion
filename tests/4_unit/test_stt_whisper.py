@@ -7,7 +7,8 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from jetson.expression import stt_whisper
+from jetson.core.stt import local_whisper
+from jetson.core.stt.base import STTResult, build_input_event
 
 
 class _FakeWhisperModel:
@@ -24,12 +25,12 @@ def test_transcribe_wav_with_mocked_model(monkeypatch, tmp_path):
     fake_module = types.ModuleType("whisper")
     fake_module.load_model = lambda model_size, device="cpu": _FakeWhisperModel(model_size, device)
     monkeypatch.setitem(sys.modules, "whisper", fake_module)
-    stt_whisper._MODEL_CACHE.clear()
+    local_whisper._MODEL_CACHE.clear()
 
     wav_file = tmp_path / "sample.wav"
     wav_file.write_bytes(b"RIFF....WAVE")
 
-    result = stt_whisper.transcribe_wav(
+    result = local_whisper.transcribe_wav(
         str(wav_file), model_size="small", language="ko", device="cpu"
     )
 
@@ -38,8 +39,8 @@ def test_transcribe_wav_with_mocked_model(monkeypatch, tmp_path):
 
 
 def test_build_input_event_has_required_fields():
-    result = stt_whisper.STTResult(text="컵 집어줘", language="ko")
-    event = stt_whisper.build_input_event(result, session_id="sess-001")
+    result = STTResult(text="컵 집어줘", language="ko")
+    event = build_input_event(result, session_id="sess-001")
 
     required = [
         "event_id",

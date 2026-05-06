@@ -7,12 +7,8 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(PROJECT_ROOT) not in sys.path:
 	sys.path.insert(0, str(PROJECT_ROOT))
 
-from jetson.cloud.groq_client import (
-	GroqCallResult,
-	GroqClient,
-	build_action_json_from_stt,
-	build_system_prompt,
-)
+from jetson.core.llm.groq_llm import GroqCallResult, GroqClient
+from jetson.core.llm.prompt import build_action_json_from_stt, build_system_prompt
 
 
 class _FakeMessage:

@@ -1,10 +1,9 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
-from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, Optional
-from uuid import uuid4
+
+from jetson.core.stt.base import STTResult
 
 
 _MODEL_CACHE: Dict[str, Any] = {}
@@ -18,12 +17,6 @@ DEFAULT_MODEL_SIZE = "small"
 DEFAULT_DEVICE = "cuda"
 DEFAULT_COMPUTE_TYPE = "float16"
 CPU_FALLBACK_COMPUTE_TYPE = "int8"
-
-
-@dataclass(frozen=True)
-class STTResult:
-    text: str
-    language: str
 
 
 def _get_model(
@@ -94,24 +87,30 @@ def transcribe_wav(
     return STTResult(text=merged_text, language=detected_lang)
 
 
-def build_input_event(
-    stt_result: STTResult,
-    session_id: str,
-    source: str = "stt",
-    schema_version: str = "1.0",
-    confidence: Optional[float] = None,
-) -> Dict[str, Any]:
-    event: Dict[str, Any] = {
-        "event_id": str(uuid4()),
-        "timestamp": datetime.now(timezone.utc).isoformat(),
-        "session_id": session_id,
-        "source": source,
-        "schema_version": schema_version,
-        "input_text": stt_result.text,
-        "language": stt_result.language,
-    }
+class LocalWhisperBackend:
+    """STTBackend wrapping openai-whisper. CUDA when available, CPU fallback."""
 
-    if confidence is not None:
-        event["confidence"] = confidence
+    def __init__(
+        self,
+        model_size: str = DEFAULT_MODEL_SIZE,
+        language: str = "ko",
+        compute_type: str = DEFAULT_COMPUTE_TYPE,
+        device: str = DEFAULT_DEVICE,
+    ) -> None:
+        self.name = f"local-whisper-{model_size}"
+        self._model_size = model_size
+        self._language = language
+        self._compute_type = compute_type
+        self._device = device
 
-    return event
+    def warm_up(self) -> None:
+        warm_up(model_size=self._model_size, compute_type=self._compute_type, device=self._device)
+
+    def transcribe(self, wav_path: str, *, language: Optional[str] = None) -> STTResult:
+        return transcribe_wav(
+            wav_path,
+            model_size=self._model_size,
+            language=language or self._language,
+            compute_type=self._compute_type,
+            device=self._device,
+        )
