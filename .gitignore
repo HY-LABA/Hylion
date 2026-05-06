@@ -209,8 +209,8 @@ __marimo__/
 # Ignore all Legacy folders and their contents
 Legacy/
 
-.mp3
-.wav
+*.mp3
+*.wav
 *no_pr*
 tmp_test.py
-data/sessions/
+data/sessions/*

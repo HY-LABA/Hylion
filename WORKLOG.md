@@ -642,3 +642,30 @@
   - `.gitignore` 의 `.mp3`/`.wav` → `*.mp3`/`*.wav` 보강 + `data/episodes/`, `data/reply/`, root `Error` 처리 결정
   - whisper `small` 모델로 GPU/지연 측정 재확인 후 모델 사이즈 확정
   - SMOLVLA/BHL 라우팅(_route_action) 실제 구현 진입점 결정
+
+### 2026-05-06 (하이브리드 online/offline 리팩터 — 설계 단계)
+
+- 한 줄 요약:
+  - 현재 wake(offline) → STT(offline whisper) → LLM(online Groq) 의 환경 혼합 구조를, 웨이크워드 직후 `is_online()` 1회 측정으로 STT/LLM/TTS 백엔드를 일괄 선택하는 깨끗한 양 갈래 구조로 재설계. 코드 구현 전 설계 문서 + 결정사항을 먼저 정리.
+- 수정/추가 파일:
+  - `docs/10_hybrid_online_offline_refactor_plan.md` (신규 327줄 → +1줄, 무료 티어 정보 추가)
+  - `.gitignore` — `.mp3`/`.wav` → `*.mp3`/`*.wav` 와일드카드 보정 + `data/sessions/` → `data/sessions/*`
+  - `WORKLOG.md`
+- 주요 결정사항:
+  - **모듈 구조**: `jetson/core/stt/` 와 `jetson/core/llm/` 패키지 신설 (사용자 요청대로 `core` 안에 위치). 각 패키지는 `base.py`(Protocol+dataclass), `factory.py`, 백엔드별 1파일.
+  - **온라인 STT**: Groq `whisper-large-v3-turbo` (속도 우선, 한국어 large-v3와 사실상 동일). 무료 티어로 충분 (20 RPM, 28.8K audio sec/day). LLM과 별도 버킷이라 같은 API 키로 둘 다 호출해도 안 겹침.
+  - **오프라인 LLM**: Ollama + `exaone3.5:2.4b` Q4_K_M (~1.5GB, LG 한국어 native, 30-40 tok/s on Orin Nano). 엔드포인트는 Jetson 내부 `127.0.0.1:11434` 데몬, systemd로 부팅 자동기동.
+  - **오프라인 TTS**: Coqui XTTS-v2 + 보유 중인 CLOVA child voice mp3 (`ndain_final_test.mp3` 등)를 voice cloning reference로 사용. 메모리 빠듯해서 LLM/TTS 순차 사용 패턴(ollama keep_alive=0) 검토 필요.
+  - **online 측정 빈도**: outer 루프(웨이크워드 활성화) 직후 1회만. inner 채팅 루프에서는 재측정 X. 호출 실패 시 1회 즉석 재프로브 후 강등.
+  - **warm-up 정책**: 부팅 시 `is_online()` 결과로 한쪽만 로드 (8GB 시스템에서 양쪽 적재 비현실적). 강등 시 lazy load.
+- Jetson 환경 확인:
+  - 모델: NVIDIA Jetson Orin Nano Engineering Reference Developer Kit Super
+  - JetPack 6.x (R36 release), CUDA 12.6
+  - RAM 7.4 GiB 공유 (현재 사용 2.6GB / 가용 4.5GB), 스왑 3.7 GiB
+- 보유 자산 확인:
+  - CLOVA voice mp3 8개 (root 위치) — 그 중 child voice (`ndain`/`nhajun`/`nara`/`ngaram`) 4개를 오프라인 TTS reference clip으로 활용 예정.
+- 다음 환경에서 할 일 (구현 단계 진입):
+  - 단계 1: `core/stt/`, `core/llm/`, `core/network.py` 디렉토리 골격 생성 (빈 껍데기 + Protocol)
+  - 단계 2: 기존 `expression/stt_whisper.py` → `core/stt/local_whisper.py` 이전, `cloud/groq_client.py` 분해해서 `core/llm/{prompt,groq_llm}.py`로 분배 (기능 변화 0)
+  - 단계 3: `coordinator.py` 평탄화 — `_build_turn_services` / inner-loop if online / `LocalLLM` 더미 클래스 제거, 백엔드 메서드 호출로 통일 (여전히 기능 변화 0)
+  - 단계 4 이후: Groq Whisper 백엔드 신규 구현 → Ollama 백엔드 신규 구현 → graceful degradation → 오프라인 TTS
