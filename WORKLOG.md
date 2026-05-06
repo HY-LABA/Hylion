@@ -816,3 +816,31 @@
 - 다음 환경에서 할 일:
   - **단계 6** — coordinator inner-loop graceful degradation (STT/LLM/TTS 호출 실패 시 try/except + 즉석 `is_online()` 재프로브 + 백엔드 일시 강등 + 1회 재시도)
   - 단계 8 — OpenVoice v2 추가 (MeloTTS daemon에 tone color converter layer) → CLOVA `nhajun.wav` 톤으로 음성 클론 → 자연스러운 어린아이 voice
+
+### 2026-05-06 (단계 7 보강 — TTS 데몬 lazy-load + /warmup, /unload)
+
+- 한 줄 요약:
+  - 사용자 지적("online 모드일 때도 TTS 데몬이 2.3GB 헛점유 중") 반영. 데몬을 lazy-load 패턴으로 전환 — 부팅 직후 RSS 40MB, coordinator가 offline일 때만 `/warmup` 트리거. **online 모드에서 RAM 약 2GB 절약**.
+- 실행한 검증:
+  - `/warmup` (cold): 22s, RSS 40MB → 2.5GB
+  - `/warmup` (idempotent): 0s
+  - `/unload`: refs 제거 + cuda cache flush (※ host RSS는 PyTorch allocator 한계로 안 떨어짐 — 진짜 회수하려면 daemon 재시작)
+  - `/warmup` (재로드): 4s (BERT cache 살아있음)
+  - 메인 venv `MeloTTSSpeaker.warm_up()` / `.unload()` 호출 정상
+  - 27/27 기존 테스트 통과
+- 수정 파일:
+  - `services/tts_server/server.py` — `lifespan` 훅에서 `_load_model()`/`_warm_up_synth()` 제거, threading.Lock으로 idempotent하게 lazy 로드, `POST /warmup` + `POST /unload` 신규, `/synthesize`는 첫 호출에서 자동 warm-up (graceful)
+  - `jetson/core/tts/melotts_client.py` — `MeloTTSSpeaker.warm_up()` / `.unload()` 신규
+  - `jetson/core/coordinator.py` — `_startup_warm_up()` offline 분기에 MeloTTS warm-up 추가
+  - `services/tts_server/README.md` — lazy lifecycle, /warmup/unload 동작, RAM 회수 한계 명시
+- 메모리 비교 (online 평상시):
+  - 이전 (eager load): 시스템 2.5 + 코디 1.0 + Ollama 0.3 + TTS **2.3** = **6.1 GB**
+  - 이후 (lazy load): 시스템 2.5 + 코디 1.0 + Ollama 0.3 + TTS **0.04** = **3.84 GB**
+  - 절약: **~2.3 GB** → 미래 OpenVoice/smolvla 동시 적재 여유 확보
+- offline 평상시 메모리는 동일 (어차피 모델 로드해야 함)
+- PyTorch host RAM 회수 한계:
+  - `/unload` → CUDA cache는 비워지지만 `python` process RSS는 PyTorch allocator가 잡고 있어 안 떨어짐 (알려진 동작)
+  - 진짜 RAM 회수: `sudo systemctl restart hylion-tts` (~5초). 단계 6 graceful degradation에서 online 복귀 시 시도해볼 옵션
+- 다음 환경에서 할 일:
+  - **단계 6** — graceful degradation (STT/LLM/TTS 호출 실패 시 try/except + 재프로브 + 백엔드 일시 강등 + 1회 재시도). offline→online 복귀 시 `MeloTTSSpeaker.unload()` 호출 또는 daemon restart
+  - 단계 8 — OpenVoice v2 추가 (CLOVA nhajun voice cloning)

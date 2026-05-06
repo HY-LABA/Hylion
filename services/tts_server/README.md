@@ -29,9 +29,40 @@ Runtime dependencies:
 
 ## Endpoints
 
-- `GET  /health`        → `{"status":"ok","model":"melotts-KR","device":"cuda"}`
+- `GET  /health`        → `{"status":"ok","model":"melotts-KR","device":"cuda","loaded":bool}`
+- `POST /warmup`        → load model + run a 1-call warm-up. Idempotent.
+                          Blocks until ready (~22s first ever, ~4s after unload).
+- `POST /unload`        → drop model references; **does not free host RAM**
+                          (PyTorch allocator caches it). To fully reclaim RAM,
+                          restart the daemon (`systemctl restart hylion-tts`).
 - `POST /synthesize`    → body `{"text": str, "speed": float}`,
-                          response `audio/wav` (44.1 kHz mono PCM int16)
+                          response `audio/wav` (44.1 kHz mono PCM int16).
+                          Auto-warms model if not loaded (first call pays
+                          ~22s cold-load cost).
+
+## Lifecycle (lazy-load)
+
+The daemon process starts at **~40 MB** with no model loaded. Coordinator
+controls when to actually load the heavy model:
+
+```
+[coordinator startup]
+  is_online() probe
+    │
+    ├─ online  → daemon stays at 40 MB (never warmed)
+    │           Online TTS uses Clova HTTP, this daemon idle
+    │
+    └─ offline → coordinator calls POST /warmup
+                 daemon loads MeloTTS + Korean BERT (~22s first time, ~4s after)
+                 RSS jumps to ~2.5 GB, GPU 0.76 GB
+                 subsequent /synthesize calls: ~1s each
+```
+
+Online → offline transition (graceful degradation, step 6) calls /warmup
+on demand; first offline turn pays the cold-load cost once.
+
+Offline → online transition calls /unload to flush GPU cache (host RAM stays
+held by PyTorch allocator — restart daemon for full reclaim).
 
 ## Manual launch (development / troubleshooting)
 
@@ -90,11 +121,18 @@ sudo nmcli networking on
 
 ## Memory footprint
 
-Steady state on Jetson Orin Nano 8 GB:
-- Daemon process RSS: ~2.0–2.5 GB (model + framework + Korean BERT)
-- GPU memory: ~0.76 GB
+Daemon process RSS:
+- **Idle (no warmup yet)**: ~40 MB
+- **After /warmup**: ~2.5 GB (model + framework + Korean BERT)
+- **After /unload**: stays at ~2.5 GB (PyTorch allocator caches host pages)
+- **After daemon restart**: back to ~40 MB
 
-Coexists with Ollama (EXAONE 2.4B, ~2.3 GB) — combined ~5 GB, leaves ~2 GB headroom.
+GPU memory: 0.76 GB while loaded.
+
+Coexists with Ollama (EXAONE 2.4B, ~2.3 GB when active) —
+- **Online mode**: this daemon idle at 40 MB, Ollama unloaded after 5 min
+  → total Hylion footprint ~3 GB, leaves ~4 GB headroom for future smolvla.
+- **Offline mode**: both loaded → ~5–6 GB combined, leaves ~1.5 GB headroom.
 
 ## Performance
 

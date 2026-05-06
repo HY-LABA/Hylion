@@ -139,6 +139,50 @@ class MeloTTSSpeaker:
 			logger.error("MeloTTS request failed: %s", exc)
 			return None
 
+	def warm_up(self, timeout_sec: float = 60.0) -> bool:
+		"""Tell daemon to load the model now (blocking). Idempotent.
+
+		Coordinator calls this in offline mode at startup so the first user-
+		facing turn doesn't pay the ~22s cold-load cost. In online mode it is
+		intentionally NOT called so the daemon stays at ~40 MB.
+		"""
+		req = urllib.request.Request(
+			f"{self.host}/warmup",
+			data=b"",
+			headers={"Content-Type": "application/json"},
+			method="POST",
+		)
+		try:
+			with urllib.request.urlopen(req, timeout=timeout_sec) as resp:
+				body = resp.read().decode("utf-8")
+			logger.info("MeloTTS daemon warm-up: %s", body)
+			return True
+		except urllib.error.URLError as exc:
+			logger.error("MeloTTS warm-up failed (daemon unreachable): %s", exc)
+			return False
+		except Exception as exc:
+			logger.error("MeloTTS warm-up failed: %s", exc)
+			return False
+
+	def unload(self, timeout_sec: float = 5.0) -> bool:
+		"""Tell daemon to drop model references. PyTorch's allocator caches host
+		RAM so RSS doesn't fully fall — this mostly clears CUDA cache. To fully
+		reclaim RAM, restart the daemon (systemctl restart hylion-tts)."""
+		req = urllib.request.Request(
+			f"{self.host}/unload",
+			data=b"",
+			headers={"Content-Type": "application/json"},
+			method="POST",
+		)
+		try:
+			with urllib.request.urlopen(req, timeout=timeout_sec) as resp:
+				body = resp.read().decode("utf-8")
+			logger.info("MeloTTS daemon unload: %s", body)
+			return True
+		except Exception as exc:
+			logger.error("MeloTTS unload failed: %s", exc)
+			return False
+
 	def synthesize_reply_audio(
 		self,
 		reply_text: str,

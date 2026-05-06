@@ -301,9 +301,10 @@ def _parse_args() -> argparse.Namespace:
 def _startup_warm_up(args: argparse.Namespace) -> None:
 	"""§F5 warm-up policy: warm only the side likely to be hot.
 
-	online → Groq probe (no model load). offline → local whisper + Ollama model.
-	The other side stays cold and lazy-loads on first runtime fallback. Failures
-	here are logged but never abort startup; the pipeline degrades gracefully.
+	online → Groq probe (no model load). offline → local whisper + Ollama
+	model + MeloTTS daemon model. The other side stays cold and lazy-loads on
+	first runtime fallback. Failures here are logged but never abort startup;
+	the pipeline degrades gracefully.
 	"""
 	initial_online = is_online()
 	print(f"[Startup] is_online={initial_online}")
@@ -327,6 +328,12 @@ def _startup_warm_up(args: argparse.Namespace) -> None:
 		print("[Warm-up] offline Ollama LLM OK")
 	except Exception as exc:
 		print(f"[Warm-up] offline Ollama warm-up failed (will lazy-load): {exc}")
+	try:
+		from jetson.core.tts.melotts_client import MeloTTSSpeaker
+		MeloTTSSpeaker(enable_lipsync=False).warm_up()
+		print("[Warm-up] offline MeloTTS daemon OK")
+	except Exception as exc:
+		print(f"[Warm-up] offline MeloTTS warm-up failed (will lazy-load): {exc}")
 
 
 def main() -> None:

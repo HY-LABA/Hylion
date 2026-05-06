@@ -12,10 +12,12 @@ Endpoints:
 
 from __future__ import annotations
 
+import gc
 import logging
 import os
 import sys
 import tempfile
+import threading
 import time
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -44,32 +46,57 @@ DEFAULT_LANGUAGE = "KR"
 DEFAULT_DEVICE = "cuda"
 DEFAULT_SPEAKER_ID = 0
 
+# Daemon stays at ~300MB until first warmup/synthesis. Coordinator triggers
+# /warmup explicitly when starting in offline mode, or implicitly on first
+# /synthesize call if it hasn't been warmed yet. /unload frees memory when
+# the system flips back to online (handed off to graceful-degradation logic).
 
-_TTS_MODEL = None  # populated on startup
+_TTS_MODEL = None
+_LOAD_LOCK = threading.Lock()
 
 
-def _load_model() -> None:
+def _ensure_model_loaded() -> None:
+	"""Idempotent: load MeloTTS + run a 1-call warm-up exactly once."""
 	global _TTS_MODEL
-	from melo.api import TTS
-	t0 = time.time()
-	_TTS_MODEL = TTS(language=DEFAULT_LANGUAGE, device=DEFAULT_DEVICE)
-	logger.info("MeloTTS '%s' loaded on %s in %.2fs", DEFAULT_LANGUAGE, DEFAULT_DEVICE, time.time() - t0)
-
-
-def _warm_up_synth() -> None:
-	"""Trigger Korean BERT download + first inference path so subsequent calls
-	hit the warm path. Without this the first user-facing turn is ~140s."""
-	with tempfile.NamedTemporaryFile(suffix=".wav", delete=True) as fh:
+	if _TTS_MODEL is not None:
+		return
+	with _LOAD_LOCK:
+		if _TTS_MODEL is not None:
+			return
+		from melo.api import TTS
 		t0 = time.time()
-		_TTS_MODEL.tts_to_file("준비 완료", DEFAULT_SPEAKER_ID, fh.name, speed=1.0)
-		logger.info("warm-up synthesis done in %.2fs", time.time() - t0)
+		model = TTS(language=DEFAULT_LANGUAGE, device=DEFAULT_DEVICE)
+		logger.info("MeloTTS '%s' loaded on %s in %.2fs", DEFAULT_LANGUAGE, DEFAULT_DEVICE, time.time() - t0)
+		# Trigger Korean BERT download + first inference path so subsequent
+		# calls hit the warm path (without this, first turn is ~140s).
+		with tempfile.NamedTemporaryFile(suffix=".wav", delete=True) as fh:
+			t0 = time.time()
+			model.tts_to_file("준비 완료", DEFAULT_SPEAKER_ID, fh.name, speed=1.0)
+			logger.info("warm-up synthesis done in %.2fs", time.time() - t0)
+		_TTS_MODEL = model
+
+
+def _unload_model() -> None:
+	global _TTS_MODEL
+	with _LOAD_LOCK:
+		if _TTS_MODEL is None:
+			return
+		_TTS_MODEL = None
+		gc.collect()
+		try:
+			import torch
+			if torch.cuda.is_available():
+				torch.cuda.empty_cache()
+		except Exception:
+			pass
+		logger.info("model unloaded; CUDA cache cleared")
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-	_load_model()
-	_warm_up_synth()
+	logger.info("daemon ready (lazy: model not loaded yet, ~300MB)")
 	yield
+	_unload_model()
 	logger.info("shutting down")
 
 
@@ -84,19 +111,47 @@ class SynthesizeRequest(BaseModel):
 
 @app.get("/health")
 def health():
-	if _TTS_MODEL is None:
-		return {"status": "loading", "model": f"melotts-{DEFAULT_LANGUAGE}"}
 	return {
 		"status": "ok",
 		"model": f"melotts-{DEFAULT_LANGUAGE}",
 		"device": DEFAULT_DEVICE,
+		"loaded": _TTS_MODEL is not None,
 	}
+
+
+@app.post("/warmup")
+def warmup():
+	"""Eagerly load model + run warm-up synthesis. Blocks until ready.
+
+	Coordinator calls this in offline mode at startup so the first user-facing
+	turn doesn't pay the ~10s cold-load cost. Idempotent.
+	"""
+	t0 = time.time()
+	already_loaded = _TTS_MODEL is not None
+	_ensure_model_loaded()
+	return {
+		"status": "ok",
+		"already_loaded": already_loaded,
+		"elapsed_sec": round(time.time() - t0, 2),
+	}
+
+
+@app.post("/unload")
+def unload():
+	"""Free model memory; daemon process stays alive at ~300MB.
+
+	Coordinator calls this when graceful-degradation flips back to online so
+	the offline TTS pipeline doesn't squat on ~2GB unnecessarily.
+	"""
+	was_loaded = _TTS_MODEL is not None
+	_unload_model()
+	return {"status": "ok", "was_loaded": was_loaded}
 
 
 @app.post("/synthesize")
 def synthesize(req: SynthesizeRequest) -> Response:
-	if _TTS_MODEL is None:
-		raise HTTPException(status_code=503, detail="model not loaded yet")
+	# Auto-warmup if coordinator forgot to /warmup; first call pays cold cost.
+	_ensure_model_loaded()
 
 	t0 = time.time()
 	with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as fh:
