@@ -906,3 +906,54 @@
 - 사용자가 다음에 할 일:
   - `bash scripts/run_coordinator.sh` 다시 돌려 25자 강제 + intent=chat 분류 안정 확인.
   - 만족하면 streaming TTS 또는 voice cloning 으로 진행 결정.
+
+### 2026-05-11 — BHL Bridge 초안 (Coordinator JSON ↔ BHL UDP)
+
+- 목표: NUC 의 Berkeley Humanoid Lite lowlevel C 컨트롤러를 게임패드 대신
+  Jetson coordinator 의 action JSON 으로 제어. `BHL_Bridge_Handoff.md`(인수인계 문서)
+  사양에 맞춰 브리지 신규 구현.
+- 추가한 파일:
+  - `nuc/bhl/bridge.py` — TCP/NDJSON(:9000) 수신 → 13-byte `<Bfff` UDP 패킷
+    (`127.0.0.1:10011`, BHL `consts.h:JOYSTICK_PORT`) 송신. cold start(IDLE→RL_INIT
+    1.5s→RL_RUNNING 0.1s) 자동 + watchdog 200ms + EMERGENCY/safety_off/intent=stop
+    즉시 STOP + TCP 끊김 시 STOP + 재연결 시 cold start 재실행. 모든 TUNE 지점
+    주석 마킹 + env 오버라이드 (`BRIDGE_*`).
+  - `nuc/bhl/tests/mock_coordinator.py` — 7가지 시나리오
+    (walk/turn/emergency/safety_off/bad_json/watchdog/loop).
+  - `nuc/bhl/tests/mock_bhl_receiver.py` — UDP 디코드 + 상태 변화 시점만 출력.
+  - `nuc/bhl/systemd/hylion-bridge.service` + `hylion-bridge.env.example`
+    — 부팅 자동 실행, journald 로깅, EnvironmentFile 로 무재컴파일 튜닝.
+  - `nuc/bhl/README.md` — NUC 검증 + 실배포 절차.
+  - `nuc/bhl/BHL_Bridge_Handoff.md` — 원본 인수인계 문서(별도 작성분, 같이 커밋).
+- BHL 원본 코드 조사로 확정한 사실:
+  - 모드 매핑: `command_mode=1→IDLE, 2→RL_INIT, 3→RL_RUNNING, 0→유지`
+    (`csrc/real_humanoid.cpp:259-273`).
+  - 명령 정규화 범위는 `[-1.0, 1.0]` 으로 추정 (`gamepad.py` 의 `raw/-32768`).
+    → `VEL_FORWARD_MPS=0.5`, `VEL_TURN_LEFT_RPS=0.5` 보수적 시작값으로 채택.
+  - 양방향 telemetry 패턴은 BHL 측에 없음 (`run_locomotion.py:16` 이 obs를
+    UDP 단방향 visualize 만 함). IMU 채널 확장 시 이 패턴 참고.
+- 구현 중 발견·수정한 버그:
+  - 초안 cold_start 는 mode=2 / mode=3 패킷을 1회씩만 직접 송신했음. 그러나
+    20 Hz sender 가 즉시 `STOP_PACKET`(mode=1) 으로 덮어써 C 의 `next_state`
+    가 매 패킷마다 `STATE_IDLE` 로 되돌아감 (real_humanoid.cpp:259 가 `mode!=0`
+    이면 매번 next_state 갱신). → cold_start 가 `state.current_packet` 자체를
+    mode=2/3 패킷으로 바꿔 sender 가 1.5s 동안 같은 모드를 broadcast 하도록 수정.
+- 테스트 결과 (NUC 로컬, mock_coordinator + mock_bhl_receiver):
+  - cold start: mode=1(idle) → mode=2 × 30패킷 (1.5s @ 20Hz) → mode=3 × 2 (0.1s)
+    → mode=0 vx=+0.500 (walk_forward) → mode=1 (stop) — 모두 정확.
+  - emergency 시나리오: walk 1건 → EMERGENCY 1건 → 즉시 mode=1.
+  - watchdog: walk 1건 송신 후 침묵 → 정확히 200ms 후 sender 가 mode=1 로 전환
+    (실측 t=237.601 → t=237.802).
+  - bad_json: 깨진 라인 한 줄 → 파싱 에러 로그만 남기고 다음 정상 JSON 수신 정상 처리.
+  - TCP 끊김 → STOP + accept 재진입, 재연결 시 cold start 자동 재실행.
+- 수정 파일: 위 목록의 신규 파일만. 기존 코드 변경 없음.
+- 다음 환경에서 할 일 (NUC 에 실배포):
+  1. `nuc/bhl/Berkeley-Humanoid-Lite-Lowlevel-main/` 빌드 (`make run`).
+  2. `python -m berkeley_humanoid_lite_lowlevel.policy.rl_controller` 정책 추론.
+  3. `python3 bridge.py` 로 검증 보행 1회 — `VEL_FORWARD_MPS` 가 학습 범위 안인지,
+     `velocity_y/yaw` 부호가 좌측/좌회전이 양수 맞는지 실로봇 거동으로 확인.
+  4. systemd 등록 (`README.md` 4번 항목) 후 전원 재투입으로 자동 기동 확인.
+- 미해결:
+  - BHL `configs/` 가 비어있어 정책 학습 명령 범위 yaml 확인 불가. 0.5 보수값.
+  - `velocity_y` 와 `velocity_yaw` 의 부호 (gamepad.py 기준 +X=좌측/좌회전으로 가정).
+  - Jetson coordinator 측 TCP 클라이언트 코드 — 아직 없음, 다음 단계.
