@@ -161,7 +161,7 @@ def _offline_action_json(session_id: str, reason: str) -> Dict[str, Any]:
 		"network_online": False,
 		"intent": "unknown",
 		"target_object": "none",
-		"reply_text": "지금은 연결 상태가 불안정해서 잠시 안전 대기할게요. 다시 말씀해 주시면 최선을 다해 도와드릴게요!",
+		"reply_text": "잠깐 생각이 헝클어졌어요. 다시 한 번 말씀해 주실래요?",
 		"requires_smolvla": False,
 		"requires_bhl": False,
 		"gait_cmd": "none",

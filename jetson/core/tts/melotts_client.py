@@ -30,6 +30,13 @@ DEFAULT_HOST = os.getenv("HYLION_TTS_HOST", "http://127.0.0.1:8001")
 DEFAULT_TIMEOUT_SEC = 30.0
 DEFAULT_REPLY_DIR = Path(__file__).resolve().parents[3] / "data" / "reply"
 
+# Sox post-process defaults — pitch shift up to make MeloTTS adult voice sound
+# closer to a young Korean child. 100 cents = 1 semitone; +400 ≈ +4 semitones.
+# tempo > 1.0 speeds the speech without changing pitch (so the cadence feels
+# slightly more energetic). Either knob can be disabled per session via env.
+DEFAULT_PITCH_CENTS = int(os.getenv("HYLION_TTS_PITCH_CENTS", "400"))
+DEFAULT_TEMPO = float(os.getenv("HYLION_TTS_TEMPO", "1.05"))
+
 
 def _ensure_reply_dir() -> Path:
 	candidates = [DEFAULT_REPLY_DIR, Path("/tmp/hylion_reply")]
@@ -111,6 +118,8 @@ class MeloTTSSpeaker:
 		timeout_sec: float = DEFAULT_TIMEOUT_SEC,
 		device: str = "default",
 		enable_lipsync: bool = True,
+		pitch_cents: int = DEFAULT_PITCH_CENTS,
+		tempo: float = DEFAULT_TEMPO,
 	) -> None:
 		self.host = host.rstrip("/")
 		self.timeout_sec = timeout_sec
@@ -119,7 +128,12 @@ class MeloTTSSpeaker:
 		usb = _find_usb_audio_sink()
 		self.device = usb or device
 		self.last_audio_file: Optional[str] = None
-		logger.info("MeloTTSSpeaker initialized (host=%s, sink=%s)", self.host, self.device)
+		self._pitch_cents = pitch_cents
+		self._tempo = tempo
+		logger.info(
+			"MeloTTSSpeaker initialized (host=%s, sink=%s, pitch=%+d cents, tempo=%.2f)",
+			self.host, self.device, self._pitch_cents, self._tempo,
+		)
 
 	def _post_synthesize(self, text: str, speed: float = 1.0) -> Optional[bytes]:
 		body = json.dumps({"text": text, "speed": speed}).encode("utf-8")
@@ -213,9 +227,43 @@ class MeloTTSSpeaker:
 		ts_ms = int(time.time() * 1000)
 		out_path = self._reply_dir / f"reply_{ts_ms}.wav"
 		out_path.write_bytes(audio_bytes)
-		self.last_audio_file = str(out_path)
-		logger.info("offline TTS saved: %s (%d bytes)", out_path, len(audio_bytes))
-		return str(out_path)
+		final_path = self._apply_voice_postprocess(str(out_path))
+		self.last_audio_file = final_path
+		logger.info("offline TTS saved: %s (%d bytes raw)", final_path, len(audio_bytes))
+		return final_path
+
+	def _apply_voice_postprocess(self, wav_path: str) -> str:
+		"""Run sox pitch/tempo on the synthesized WAV to push the MeloTTS voice
+		toward a child-like timbre. Identity values (0 cents / 1.0 tempo) skip
+		the call. Any sox failure logs a warning and returns the original path
+		so the user still hears the unmodified reply."""
+		if self._pitch_cents == 0 and abs(self._tempo - 1.0) < 1e-3:
+			return wav_path
+		effects: list[str] = []
+		if self._pitch_cents != 0:
+			effects += ["pitch", str(self._pitch_cents)]
+		if abs(self._tempo - 1.0) >= 1e-3:
+			effects += ["tempo", f"{self._tempo:.3f}"]
+		out_path = wav_path.replace(".wav", "_voiced.wav")
+		try:
+			result = subprocess.run(
+				["sox", wav_path, out_path, *effects],
+				capture_output=True,
+				timeout=15,
+			)
+		except FileNotFoundError:
+			logger.warning("sox not installed; skipping voice post-process")
+			return wav_path
+		except Exception as exc:
+			logger.warning("sox post-process error: %s", exc)
+			return wav_path
+		if result.returncode != 0:
+			logger.warning(
+				"sox post-process failed (rc=%d): %s",
+				result.returncode, result.stderr.decode(errors="replace"),
+			)
+			return wav_path
+		return out_path
 
 	def get_audio_duration_sec(self, audio_file: str) -> float:
 		try:
