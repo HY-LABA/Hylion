@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import os
+import tempfile
+import wave
 from pathlib import Path
 from typing import Any, Dict, Optional
 
@@ -37,19 +40,30 @@ def _get_model(
 
     try:
         model = whisper.load_model(model_size, device=device)
-        print(f"[STT] loaded openai-whisper '{model_size}' on {device} ({compute_type})")
     except Exception as exc:
         if device == "cpu":
             raise
-        print(f"[STT] {device} unavailable ({exc}); falling back to cpu")
+        print(f"[Warm-up] STT  {device} unavailable ({exc}); falling back to cpu")
         cache_key = f"{model_size}:cpu"
         if cache_key in _MODEL_CACHE:
             return _MODEL_CACHE[cache_key]
         model = whisper.load_model(model_size, device="cpu")
-        print(f"[STT] loaded openai-whisper '{model_size}' on cpu ({CPU_FALLBACK_COMPUTE_TYPE})")
 
     _MODEL_CACHE[cache_key] = model
     return model
+
+
+def _write_silent_wav(duration_sec: float = 1.0, sample_rate: int = 16000) -> str:
+    """Create a tiny silent mono WAV in /tmp and return its path."""
+    fd, path = tempfile.mkstemp(prefix="whisper_warmup_", suffix=".wav")
+    os.close(fd)
+    n_frames = int(duration_sec * sample_rate)
+    with wave.open(path, "wb") as wf:
+        wf.setnchannels(1)
+        wf.setsampwidth(2)
+        wf.setframerate(sample_rate)
+        wf.writeframes(b"\x00\x00" * n_frames)
+    return path
 
 
 def warm_up(
@@ -57,8 +71,22 @@ def warm_up(
     compute_type: str = DEFAULT_COMPUTE_TYPE,
     device: str = DEFAULT_DEVICE,
 ) -> None:
-    """Eagerly load the whisper model so the first transcribe_wav call is fast."""
-    _get_model(model_size=model_size, compute_type=compute_type, device=device)
+    """Load weights AND run a dummy transcribe so the first real call doesn't
+    pay CUDA-kernel JIT / cuDNN handle / encoder-decoder first-op cost."""
+    model = _get_model(model_size=model_size, compute_type=compute_type, device=device)
+    dummy_path = _write_silent_wav(duration_sec=1.0)
+    try:
+        use_fp16 = (
+            compute_type == "float16"
+            and getattr(model, "device", None) is not None
+            and "cuda" in str(model.device)
+        )
+        model.transcribe(dummy_path, language="ko", fp16=use_fp16)
+    finally:
+        try:
+            os.remove(dummy_path)
+        except OSError:
+            pass
 
 
 def transcribe_wav(

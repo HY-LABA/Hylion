@@ -844,3 +844,116 @@
 - 다음 환경에서 할 일:
   - **단계 6** — graceful degradation (STT/LLM/TTS 호출 실패 시 try/except + 재프로브 + 백엔드 일시 강등 + 1회 재시도). offline→online 복귀 시 `MeloTTSSpeaker.unload()` 호출 또는 daemon restart
   - 단계 8 — OpenVoice v2 추가 (CLOVA nhajun voice cloning)
+
+### 2026-05-11 (오프라인 모드 안정화 + LLM/TTS 응답 단축)
+
+- 한 줄 요약:
+  - 오프라인 사이클(시작 → wake → STT/LLM/TTS)을 한 번에 정비. (1) `scripts/run_coordinator.sh` 런처 도입으로 venv + LD_LIBRARY_PATH 한 줄 실행. (2) MeloTTS 데몬 systemd 등록(부팅 자동기동). (3) Ollama/Whisper 워밍업 강화 + 출력 메시지 통일. (4) **LLM을 EXAONE 3.5 2.4B → qwen2.5:1.5b-instruct 로 다운사이즈 + 프롬프트 보강**해서 응답 latency 19s → 7~9s. (5) MeloTTS WAV에 sox `pitch +400 tempo 1.05` 후처리로 어린이 톤 근사. (6) fallback 문구 "연결 불안정" 표현 정정.
+- 신규 파일:
+  - `scripts/run_coordinator.sh` — coordinator 런처. `jetson/expression/.venv` 의 `nvidia/cusparselt/lib` 를 `LD_LIBRARY_PATH` 에 prepend 한 뒤 venv python 으로 `jetson.core.coordinator` 실행. 이전엔 시스템 python3 로 실행하면 `libcusparseLt.so.0` import 실패로 `RuntimeError: openai-whisper is not installed` (오해의 소지가 큰 에러 메시지)가 떴음.
+- 수정 파일:
+  - `jetson/core/llm/ollama_llm.py`
+    - `DEFAULT_OLLAMA_MODEL` `exaone3.5:2.4b` → **`qwen2.5:1.5b-instruct`** (한국어 품질 유지, 1.6GB → 986MB, decode ~2배 빠름). EXAONE 3.5 시리즈에는 공식 1.2B 가 없어 같은 클래스의 다른 패밀리(Qwen)로 교체.
+    - `num_ctx` 2048 → **1536** (1024 도 시도했지만 system prompt 잘림 → schema validation 실패 / 500 사이클 발생해서 1536 절충). KV cache 25% 절약.
+    - `temperature` 0.2 → **0.0** (greedy).
+    - `num_predict` 150 → **80** (reply_text 25자 + JSON 보일러플레이트 ≈ 70 토큰. 모델이 어겨도 강제 cut).
+    - `num_gpu=999` (env `HYLION_OLLAMA_NUM_GPU` override) — ollama 자동 offload 가 EXAONE 의 6개 layer 를 CPU 에 두던 것을 모든 layer GPU 로.
+    - `warm_up()` — 1-token "ok" 만 보내던 것을 **system_prompt + format=json + keep_alive=30m** 풀 패스로 전환. wake-word 대기 동안 unload 방지 + grammar-constrained decoding 초기화 비용을 startup 에 흡수.
+    - `build_action()` 도 `keep_alive=30m` 동봉 (ollama 는 요청마다 keep_alive 가 reset 되는 특성).
+    - `OLLAMA_SLIM_SYSTEM_PROMPT` 재작성 — intent → (smolvla, bhl, gait, state) 4필드 1라인 매핑, 매핑 힌트 첫 줄에 "**질문/대답/소개/잡담/인사 → chat**" 명시(qwen이 모든 chat을 unknown으로 떨어뜨리던 회귀 차단), reply_text "**한국어 1문장, 25자 이내 (반드시. 길어지면 강제로 잘림)**" 강조, 마크다운/코드블록 금지 명시, **few-shot 예시 2개** (자기소개=chat, 빨간 컵 집어줘=pick_place) — 작은 모델은 규칙 산문보다 1~2개 demo 로 출력 shape 학습이 효율적.
+  - `jetson/core/llm/prompt.py`
+    - `_offline_action_json` 의 `reply_text` 를 "지금은 연결 상태가 불안정해서..." → **"잠깐 생각이 헝클어졌어요. 다시 한 번 말씀해 주실래요?"**. 사용자 보고: 네트워크 정상인데 LLM JSON 파싱 실패로 빠진 fallback 이 마치 네트워크 끊김처럼 보인 사고 차단.
+  - `jetson/core/coordinator.py`
+    - `MAX_HISTORY_TURNS` 10 → **4** (prefill 단축).
+    - `_startup_warm_up()` 출력 통일 — STT / LLM / TTS 각 한 줄, prefix 정렬:
+      ```
+      [Startup] is_online=False
+      [Warm-up] STT  whisper-small ... OK
+      [Warm-up] LLM  ollama-qwen2.5:1.5b-instruct ... OK
+      [Warm-up] TTS  MeloTTS daemon ... OK
+      ```
+      LLM 라인은 backend `.name` 자동 반영 (모델 교체 시 메시지 자동 갱신). 이전엔 "loading openai-whisper 'small'..." + "[STT] loaded openai-whisper 'small' on cuda (float16)" + "[Warm-up] local whisper OK" 3줄 중복.
+  - `jetson/core/stt/local_whisper.py`
+    - `warm_up()` — 모델 로드 후 **1초 무음 WAV `model.transcribe()` 까지 실행**. CUDA kernel JIT / cuDNN handle / encoder-decoder 첫-op 비용을 startup 단계에서 흡수 → 첫 발화 STT latency 가 둘째 발화와 동일해짐. `_write_silent_wav()` 헬퍼 추가 (stdlib `wave` 만 사용, 외부 의존성 0).
+    - `_get_model()` 정상 path 의 `print` 제거 (coordinator warm-up 출력과 중복). CPU fallback 경고만 유지.
+  - `jetson/core/tts/melotts_client.py`
+    - **sox pitch+tempo 후처리** — `synthesize_reply_audio()` 가 데몬 WAV 받은 직후 `sox in.wav out.wav pitch +400 tempo 1.05` 호출해 어린이 톤 근사. env `HYLION_TTS_PITCH_CENTS` (default 400, 즉 +4 semitone) / `HYLION_TTS_TEMPO` (default 1.05) 로 런타임 튜닝.
+    - `MeloTTSSpeaker.__init__` 가 pitch/tempo 받음, `_apply_voice_postprocess()` 신규. sox 미설치/실패 시 원본 WAV 반환 (graceful).
+- 시스템 변경 (코드 외, 운영 측):
+  - `sudo cp services/tts_server/hylion-tts.service /etc/systemd/system/`
+  - `sudo systemctl daemon-reload && sudo systemctl enable --now hylion-tts`
+  - 결과: 부팅 시 데몬 자동 시작, coordinator 재실행 시 데몬 cold-load 없이 즉시 사용.
+- 새로 설치한 ollama 모델:
+  - `ollama pull qwen2.5:1.5b-instruct` (986MB, Q4_K_M).
+- 실행한 검증:
+  - 시스템 python3 → venv python 전환 후 `import whisper` / `import torch` / `model.transcribe()` 정상 (이전엔 `libcusparseLt.so.0` 못 찾아서 깨짐).
+  - `ss -ltn` 에 8001 (TTS), 11434 (ollama) 둘 다 LISTEN.
+  - `bash scripts/run_coordinator.sh` 풀 사이클 동작 (wake → STT → LLM → TTS → 재생).
+  - 응답 latency 측정 (INPUT_JSON ↔ ACTION_JSON timestamp 비교):
+    - EXAONE 2.4B baseline: 19.5s (자기소개), 12s (짧은 chat).
+    - qwen 1.5B + num_ctx 1536 + greedy + 50자 강제: 17.4s (자기소개 55자), 8.9s ("키가 얼마야?" 18자), 7.5s ("이름이 뭐야?" 11자) — **decode 가 토큰 수에 선형**, 짧은 응답일수록 빠름.
+    - 25자 강제 + intent=chat 보강은 사용자 다음 측정 예정.
+- 측정 메모:
+  - 응답 latency ≈ prefill(~6s baseline, 모델 + system_prompt + history) + decode × 토큰수. EXAONE 2.4B → qwen 1.5B 교체로 prefill/decode 둘 다 약 절반.
+  - 메모리: qwen 1.5B Q4 ~1GB VRAM (EXAONE 2.4B 1.6GB 대비 ~600MB 절약). baseline 6.0Gi/7.4Gi 사용 중인 Jetson Orin Nano 에서 의미 큼.
+  - sox 후처리: ~50~100ms 추가, 메모리 영향 거의 0.
+  - OOM 사건 1회: TTS 데몬 cold warmup 직후 검증 명령에서 추가로 torch + ollama 동시 로드 시도 → SIGKILL + X 세션 종료. 데몬은 systemd 가 자동 복구. 이후 검증은 가볍게 진행 (torch import 없이 curl 만).
+- 알려진 한계 / 다음 세션:
+  - intent="unknown" 잘못 떨어지는 케이스 — qwen 보강 프롬프트로 1차 완화. 추가 사례 발생 시 keyword override 강화 또는 2단계 LLM 호출 고려.
+  - 첫 num_ctx 1024 시도 → ollama 500 + system prompt 잘림. 1536 이 한국어 25자 응답 + 4-turn history 의 sweet spot. 더 짜내려면 system prompt 영문 transliteration 또는 단계 분리 필요.
+  - 본격 latency 단축: (a) **streaming TTS** — LLM 토큰 받으면서 reply_text partial 추출해 즉시 TTS, 체감 latency ~3s, 반나절 작업. (b) **TensorRT-LLM** 으로 qwen 재컴파일, 2~3배 prefill 단축, 1~2일. 둘 다 별도 단계.
+  - voice cloning (CLOVA `nhajun` → OpenVoice v2) — 메모리 budget 검토 후 별도 단계 (계획은 docs/10 에 이미 있음).
+- 사용자가 다음에 할 일:
+  - `bash scripts/run_coordinator.sh` 다시 돌려 25자 강제 + intent=chat 분류 안정 확인.
+  - 만족하면 streaming TTS 또는 voice cloning 으로 진행 결정.
+
+### 2026-05-11 — BHL Bridge 초안 (Coordinator JSON ↔ BHL UDP)
+
+- 목표: NUC 의 Berkeley Humanoid Lite lowlevel C 컨트롤러를 게임패드 대신
+  Jetson coordinator 의 action JSON 으로 제어. `BHL_Bridge_Handoff.md`(인수인계 문서)
+  사양에 맞춰 브리지 신규 구현.
+- 추가한 파일:
+  - `nuc/bhl/bridge.py` — TCP/NDJSON(:9000) 수신 → 13-byte `<Bfff` UDP 패킷
+    (`127.0.0.1:10011`, BHL `consts.h:JOYSTICK_PORT`) 송신. cold start(IDLE→RL_INIT
+    1.5s→RL_RUNNING 0.1s) 자동 + watchdog 200ms + EMERGENCY/safety_off/intent=stop
+    즉시 STOP + TCP 끊김 시 STOP + 재연결 시 cold start 재실행. 모든 TUNE 지점
+    주석 마킹 + env 오버라이드 (`BRIDGE_*`).
+  - `nuc/bhl/tests/mock_coordinator.py` — 7가지 시나리오
+    (walk/turn/emergency/safety_off/bad_json/watchdog/loop).
+  - `nuc/bhl/tests/mock_bhl_receiver.py` — UDP 디코드 + 상태 변화 시점만 출력.
+  - `nuc/bhl/systemd/hylion-bridge.service` + `hylion-bridge.env.example`
+    — 부팅 자동 실행, journald 로깅, EnvironmentFile 로 무재컴파일 튜닝.
+  - `nuc/bhl/README.md` — NUC 검증 + 실배포 절차.
+  - `nuc/bhl/BHL_Bridge_Handoff.md` — 원본 인수인계 문서(별도 작성분, 같이 커밋).
+- BHL 원본 코드 조사로 확정한 사실:
+  - 모드 매핑: `command_mode=1→IDLE, 2→RL_INIT, 3→RL_RUNNING, 0→유지`
+    (`csrc/real_humanoid.cpp:259-273`).
+  - 명령 정규화 범위는 `[-1.0, 1.0]` 으로 추정 (`gamepad.py` 의 `raw/-32768`).
+    → `VEL_FORWARD_MPS=0.5`, `VEL_TURN_LEFT_RPS=0.5` 보수적 시작값으로 채택.
+  - 양방향 telemetry 패턴은 BHL 측에 없음 (`run_locomotion.py:16` 이 obs를
+    UDP 단방향 visualize 만 함). IMU 채널 확장 시 이 패턴 참고.
+- 구현 중 발견·수정한 버그:
+  - 초안 cold_start 는 mode=2 / mode=3 패킷을 1회씩만 직접 송신했음. 그러나
+    20 Hz sender 가 즉시 `STOP_PACKET`(mode=1) 으로 덮어써 C 의 `next_state`
+    가 매 패킷마다 `STATE_IDLE` 로 되돌아감 (real_humanoid.cpp:259 가 `mode!=0`
+    이면 매번 next_state 갱신). → cold_start 가 `state.current_packet` 자체를
+    mode=2/3 패킷으로 바꿔 sender 가 1.5s 동안 같은 모드를 broadcast 하도록 수정.
+- 테스트 결과 (NUC 로컬, mock_coordinator + mock_bhl_receiver):
+  - cold start: mode=1(idle) → mode=2 × 30패킷 (1.5s @ 20Hz) → mode=3 × 2 (0.1s)
+    → mode=0 vx=+0.500 (walk_forward) → mode=1 (stop) — 모두 정확.
+  - emergency 시나리오: walk 1건 → EMERGENCY 1건 → 즉시 mode=1.
+  - watchdog: walk 1건 송신 후 침묵 → 정확히 200ms 후 sender 가 mode=1 로 전환
+    (실측 t=237.601 → t=237.802).
+  - bad_json: 깨진 라인 한 줄 → 파싱 에러 로그만 남기고 다음 정상 JSON 수신 정상 처리.
+  - TCP 끊김 → STOP + accept 재진입, 재연결 시 cold start 자동 재실행.
+- 수정 파일: 위 목록의 신규 파일만. 기존 코드 변경 없음.
+- 다음 환경에서 할 일 (NUC 에 실배포):
+  1. `nuc/bhl/Berkeley-Humanoid-Lite-Lowlevel-main/` 빌드 (`make run`).
+  2. `python -m berkeley_humanoid_lite_lowlevel.policy.rl_controller` 정책 추론.
+  3. `python3 bridge.py` 로 검증 보행 1회 — `VEL_FORWARD_MPS` 가 학습 범위 안인지,
+     `velocity_y/yaw` 부호가 좌측/좌회전이 양수 맞는지 실로봇 거동으로 확인.
+  4. systemd 등록 (`README.md` 4번 항목) 후 전원 재투입으로 자동 기동 확인.
+- 미해결:
+  - BHL `configs/` 가 비어있어 정책 학습 명령 범위 yaml 확인 불가. 0.5 보수값.
+  - `velocity_y` 와 `velocity_yaw` 의 부호 (gamepad.py 기준 +X=좌측/좌회전으로 가정).
+  - Jetson coordinator 측 TCP 클라이언트 코드 — 아직 없음, 다음 단계.

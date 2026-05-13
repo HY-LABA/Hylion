@@ -15,7 +15,7 @@ AUTO_STANDBY_COOLDOWN_SEC = 1.5
 CHAT_STANDBY_COOLDOWN_SEC = 1.2
 # parameter: number of recent (user, assistant) turn pairs kept in the LLM context.
 # Increase for longer memory at the cost of more tokens / latency per request.
-MAX_HISTORY_TURNS = 10
+MAX_HISTORY_TURNS = 4
 
 from jetson.core.llm import build_llm_backend
 from jetson.core.network import is_online
@@ -311,29 +311,32 @@ def _startup_warm_up(args: argparse.Namespace) -> None:
 
 	if initial_online:
 		try:
-			build_llm_backend(online=True).warm_up()
-			print("[Warm-up] online Groq LLM probe OK")
+			llm = build_llm_backend(online=True)
+			llm.warm_up()
+			print(f"[Warm-up] LLM  {llm.name} ... OK")
 		except Exception as exc:
-			print(f"[Warm-up] online probe failed (will lazy-build): {exc}")
+			print(f"[Warm-up] LLM  online Groq ... FAIL (lazy-load): {exc}")
 		return
 
 	try:
-		print(f"[Warm-up] loading openai-whisper '{args.whisper_model_size}'...")
 		warm_up_local_whisper(model_size=args.whisper_model_size)
-		print("[Warm-up] local whisper OK")
+		print(f"[Warm-up] STT  whisper-{args.whisper_model_size} ... OK")
 	except Exception as exc:
-		print(f"[Warm-up] local whisper failed: {exc}")
+		print(f"[Warm-up] STT  whisper-{args.whisper_model_size} ... FAIL: {exc}")
+	llm_label = "ollama"
 	try:
-		build_llm_backend(online=False).warm_up()
-		print("[Warm-up] offline Ollama LLM OK")
+		llm = build_llm_backend(online=False)
+		llm_label = llm.name
+		llm.warm_up()
+		print(f"[Warm-up] LLM  {llm_label} ... OK")
 	except Exception as exc:
-		print(f"[Warm-up] offline Ollama warm-up failed (will lazy-load): {exc}")
+		print(f"[Warm-up] LLM  {llm_label} ... FAIL (lazy-load): {exc}")
 	try:
 		from jetson.core.tts.melotts_client import MeloTTSSpeaker
 		MeloTTSSpeaker(enable_lipsync=False).warm_up()
-		print("[Warm-up] offline MeloTTS daemon OK")
+		print("[Warm-up] TTS  MeloTTS daemon ... OK")
 	except Exception as exc:
-		print(f"[Warm-up] offline MeloTTS warm-up failed (will lazy-load): {exc}")
+		print(f"[Warm-up] TTS  MeloTTS daemon ... FAIL (lazy-load): {exc}")
 
 
 def main() -> None:
