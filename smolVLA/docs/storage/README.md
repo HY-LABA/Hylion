@@ -6,10 +6,11 @@
 
 ## 문서 목록 (활성)
 
-> 2026-05-07 활성 문서 01-10 으로 순차 재번호. 2026-05-12 11 추가 (`lerobot_study` → 이관). 2026-05-14 01 삭제 (02·03·본 README 와 중복) + 09·10·11 삭제 (새 계획 수립 위한 fresh start — 옛 결정·실측 자산 정리). 번호 재정렬은 안 함 (02·07·08 유지). legacy 이관 항목은 하단 별도 섹션 참조.
+> 2026-05-07 활성 문서 01-10 으로 순차 재번호. 2026-05-12 11 추가 (`lerobot_study` → 이관). 2026-05-14 구 01 삭제 (02·03·본 README 와 중복) + 09·10·11 삭제 (새 계획 수립 위한 fresh start — 옛 결정·실측 자산 정리). 2026-05-14 새 01 작성 (`01_collection_scenario.md` — leftarm 수집 시나리오, realplaying.md M1). 번호 재정렬은 안 함 (02·07·08 유지). legacy 이관 항목은 하단 별도 섹션 참조.
 
 | 번호 | 파일 | 내용 |
 |---|---|---|
+| 01 | [01_collection_scenario.md](01_collection_scenario.md) | leftarm 데이터 수집 시나리오 — v1→v2 task 설계·수집 전략(차수 번갈기 + 캔 배치 변형)·환경 파라미터 |
 | 02 | [02_hardware.md](02_hardware.md) | 하드웨어 실측/보유 현황 |
 | 03 | [03_software.md](03_software.md) | 소프트웨어 실측/설정 현황 |
 | 04 | [04_devnetwork.md](04_devnetwork.md) | 개발 네트워크 설정 |

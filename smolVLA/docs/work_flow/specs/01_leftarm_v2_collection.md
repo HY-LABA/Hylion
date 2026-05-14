@@ -25,24 +25,31 @@
 
 ## Todo
 
-### [ ] TODO-01: leftarm_v2 dataset 설계 확정 + config 확정 + 래퍼
+### [x] TODO-01: leftarm_v2 dataset 설계 확정 + config 확정 + 래퍼 — **완료 (2026-05-14)**
 
-> 사전 작업 완료 (2026-05-14, Phase 1): `dgx/finetune/` 디렉터리 신설 — `leftarm_v1/`(frozen 기록), `leftarm_v2/`, `README.md`. config 설계 = **데이터셋 폴더당 `config/{base,record,train}_config.yaml` 3파일 + `run.py` 래퍼**. **모든 lerobot-cli 인자는 config 출처** (run.py 하드코딩 0). **세션값(포트·카메라 인덱스)은 fallback 없이 env 변수 전용** — 미설정 시 무조건 에러 (`base_config.hardware` 는 *필요 env 목록* 일 뿐, run.py 가 읽지 않음 — 잘못 캐시된 fallback 사고 방지, 사용자 결정 2026-05-14). `leftarm_v2/config/{base,record}_config.yaml` M1 값 확정 완료. `run.py` 작성·dry-run 검증 완료. `train_config.yaml` 은 `[TBD-M2]` skeleton.
+> 사전 설계 (Phase 1): `dgx/finetune/` 디렉터리 신설 — `leftarm_v1/`(frozen 기록), `leftarm_v2/`, `README.md`. config 설계 = **데이터셋 폴더당 `config/{base,record,train}_config.yaml` 3파일 + 래퍼 스크립트군**. **모든 lerobot-cli 인자는 config 출처** (래퍼 하드코딩 0). **세션값(포트·카메라 인덱스)은 `base_config.yaml` 의 `hardware` 섹션에 직접 입력** — 확인 전엔 `null` → 래퍼가 무조건 에러 (env 변수도 fallback 도 아님; 잘못 캐시된 값 사고 방지, 사용자 결정 2026-05-14).
 
-- DOD: (a) `leftarm_v2/config/{base,record}_config.yaml` M1 값 확정 — **완료 (2026-05-14)** (b) 단일 `leftarm_v2` repo 내 2 task 구조 확정 — **완료** (c) `run.py` (config + 세션 env → `lerobot-record` 명령 구성) 작성·동작 확인 — **완료 (dry-run 검증, 실 DGX 검증은 배포 후)**.
-- 구현 대상:
-  - `dgx/finetune/leftarm_v2/config/{base,record}_config.yaml` — M1 값 확정 완료
-  - `dgx/finetune/leftarm_v2/run.py` — `config/` 읽어 `lerobot-record` 구성·실행. `--task`/`--episodes` 런타임 인자, resume 자동감지, `--dry-run`, HF_USER 주입. 세션값 env 전용
-  - 데이터셋 메타 관리 방식: `dgx/finetune/<name>/config/{base,record,train}_config.yaml` per-dataset 방식으로 확정 (구 `dgx/config/dataset_repos.json` 대체 — placeholder-only 로 2026-05-14 삭제)
-- 테스트: config YAML 파싱 + `run.py --dry-run` 으로 구성된 lerobot 명령이 `docs/reference/lerobot/` CLI 인자와 정합한지 검토. 실 DGX 검증은 배포 후 1 episode 또는 `lerobot-record --help` 대조.
-- 제약: `docs/reference/` 수정 금지. lerobot dataset 포맷·draccus 인자 준수. **세션값(포트·`/dev/videoN` 인덱스)은 config 에 fallback 으로 박지 않음** — env 전용, 미설정 시 무조건 에러 (구 `dgx/config/` 실패 교훈).
-- 잔여 리스크: task instruction 문구가 모델 성능에 직접 영향 — leftarm_v1 에서 `"left/right"` 구분 불가로 dataset 재시작한 이력 있음 (DGX `status.md` §3 인시던트). instruction 은 모호성 없이 작성.
+**완료 (2026-05-14)**: config 3파일 + 래퍼 4파일 확정, DGX 배포 후 `run_teleop.py` 실검증 통과 + `run_record.py` dry-run 정합 확인.
+
+- DOD: (a) `leftarm_v2/config/{base,record}_config.yaml` M1 값 확정 — **완료** (b) 단일 `leftarm_v2` repo 내 2 task 구조 확정 — **완료** (c) config → `lerobot-record`/`lerobot-teleoperate` 명령 구성 래퍼 작성·동작 확인 — **완료 (dry-run + DGX 실검증)**.
+- 산출물:
+  - `dgx/finetune/leftarm_v2/config/{base,record}_config.yaml` — `base_config.yaml`(셋업 컨텍스트: 식별·paths·accounts·robot/teleop/cameras·calibration·hardware), `record_config.yaml`(수집 job: dataset 옵션·record_opts·tasks). `train_config.yaml` 은 `[TBD-M2]` skeleton.
+  - `dgx/finetune/leftarm_v2/_lib.py` — 래퍼 공용 헬퍼 (config 로드·경로 전개·hardware null 검사·calibration 존재 확인·robot/teleop/camera 인자 구성).
+  - `dgx/finetune/leftarm_v2/check_port_and_camera_index.py` — `lerobot-find-port` ×2 + `lerobot-find-cameras opencv` 순차 실행 (hardware 값 확인용, yaml 자동 기록 X).
+  - `dgx/finetune/leftarm_v2/run_teleop.py` — `lerobot-teleoperate` 래퍼 (수집 전 셋업 검증, `--no-cameras`/`--dry-run`).
+  - `dgx/finetune/leftarm_v2/run_record.py` — `lerobot-record` 래퍼. `--task`/`--episodes` 런타임 인자, resume 자동감지, `--dry-run`, HF_USER 주입.
+  - 데이터셋 메타 관리 = `dgx/finetune/<name>/config/` per-dataset 방식으로 확정 (구 `dgx/config/dataset_repos.json` placeholder-only 로 2026-05-14 삭제 — Backlog #3 해결).
+- 검증: `lerobot-record` 23/23 · `lerobot-teleoperate` 8/8 인자 `--help` 대조 정합. DGX 배포 후 `run_teleop.py` 실검증 통과 (사용자 확인 2026-05-14). `deploy_dgx.sh` 는 `base_config.yaml`(세션 hardware 보존)·`outputs`·`gestures/*/` 제외.
+- 제약: `docs/reference/` 수정 금지. lerobot dataset 포맷·draccus 인자 준수. 세션값은 `base_config.yaml` hardware 직접 입력 — `null` 시 무조건 에러 (구 `dgx/config/` 실패 교훈).
+- 잔여 리스크: task instruction 문구가 모델 성능에 직접 영향 — leftarm_v1 에서 `"left/right"` 구분 불가로 dataset 재시작한 이력 있음 (DGX `status.md` §3 인시던트). v2 instruction 은 색상 기반 grounding 으로 모호성 제거.
 
 ### [ ] TODO-02: 수집 환경 최소 파라미터 기록 + 좌측팔 하드웨어 재검증
 
-- DOD: (a) 카메라 위치·조명·작업영역 핵심 파라미터가 기록 문서로 남음 (시연장 재현용 최소 셋) (b) 좌측 SO-101 follower/leader 포트 + top/wrist 카메라 인덱스 재확인 (c) 좌측팔 calibration 유효성 확인.
-- 구현 대상: 환경 파라미터 기록 문서 (신규). 하드웨어 재검증은 `dgx/scripts/check_hardware.sh` + `lerobot-find-port` 활용.
-- 테스트: `ssh dgx` read-only 하드웨어 점검 (SSH_AUTO) + 환경 파라미터 실측 (PHYS_REQUIRED — 사용자).
+> **자동화 완료, 실측 기입 대기 (2026-05-14)**: (b)·(c) 완료 — `check_port_and_camera_index.py` 로 포트·카메라 인덱스 확인 후 `base_config.yaml` hardware 기입, `run_teleop.py` 실검증 통과로 calibration 유효성 확인. (a) 환경 파라미터 기록 문서 골격 작성 — `docs/storage/01_collection_scenario.md` §4. 카메라 물리 배치·조명·작업영역 실측값은 leftarm_v2 수집을 진행하며 `[수집 중 실측 기입]` 항목에 채우면 (a) 완료 → 본 todo `[x]` 전환.
+
+- DOD: (a) 카메라 위치·조명·작업영역 핵심 파라미터가 기록 문서로 남음 (시연장 재현용 최소 셋) — **문서 골격 완료, 실측 기입 대기** (b) 좌측 SO-101 follower/leader 포트 + top/wrist 카메라 인덱스 재확인 — **완료** (c) 좌측팔 calibration 유효성 확인 — **완료 (run_teleop.py 실검증)**.
+- 구현 대상: 환경 파라미터 기록 문서 → `docs/storage/01_collection_scenario.md` (leftarm 수집 시나리오 + §4 환경 파라미터). 하드웨어 재검증은 `dgx/finetune/leftarm_v2/check_port_and_camera_index.py` (`lerobot-find-port` ×2 + `lerobot-find-cameras opencv`).
+- 테스트: `check_port_and_camera_index.py` interactive 확인 + `run_teleop.py` 실검증 (PHYS_REQUIRED — 사용자, 통과 확인 2026-05-14).
 - 제약: 좌측팔 calibration 파일 보존 (유효하면 재calibration 불필요). calibration 위치: `${HF_HOME}/lerobot/calibration/`.
 - 잔여 리스크: 우측팔 추가로 4 devices 환경 — `/dev/ttyACM*` enumeration 이 부팅마다 변동 가능 (DGX `status.md` §2 권고: serial 기반 udev rule). 수집 직전 재확인 필수.
 
