@@ -19,7 +19,7 @@ orin/checkpoints/
             └── model.safetensors
 ```
 
-`<run_name>` 은 DGX 측 `dgx/outputs/train/<run_name>/` 와 일치. `<step>` 은 `last` 또는 학습 step 수.
+`<run_name>` 은 DGX 측 `dgx/outputs/<run_name>/` 와 일치. `<step>` 은 `last` 또는 학습 step 수.
 
 ## 예시
 

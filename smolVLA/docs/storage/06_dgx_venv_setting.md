@@ -254,7 +254,7 @@ DGX 디스크 가용 3.3 TB 대비 충분. 다만 Walking RL 트랙도 같은 �
 `lerobot-train` 표준 구조 (TODO-10b 검증 시 실 파일 크기 확인 후 갱신):
 
 ```
-~/smolvla/dgx/outputs/train/<run_name>/
+~/smolvla/dgx/outputs/<run_name>/
 └── checkpoints/
     ├── last/                                # 심볼릭 링크 → 가장 최근 step
     └── <step>/                              # 예: 000001 (smoke), 020000 (실 학습)
@@ -272,7 +272,7 @@ DGX 디스크 가용 3.3 TB 대비 충분. 다만 Walking RL 트랙도 같은 �
 `scripts/sync_ckpt_dgx_to_orin.sh` 동작:
 
 ```
-DGX (~/smolvla/dgx/outputs/train/<run>/checkpoints/<step>/pretrained_model/)
+DGX (~/smolvla/dgx/outputs/<run>/checkpoints/<step>/pretrained_model/)
    ↓ rsync (1-hop)
 devPC (/tmp/smolvla_ckpt_<ts>/)
    ↓ rsync (2-hop)
@@ -329,7 +329,7 @@ mismatch 시 발생할 에러 (참고): `ImportError`, `KeyError` (state_dict �
 
 TODO-10b PASS 후 실 학습 체크포인트 반입 권장 절차 (4단계):
 
-1. **DGX 본 학습 진행** — `lerobot-train --policy.path=lerobot/smolvla_base --output_dir=~/smolvla/dgx/outputs/train/leftarm_v1 ...`
+1. **DGX 본 학습 진행** — `lerobot-train --policy.path=lerobot/smolvla_base --output_dir=~/smolvla/dgx/outputs/leftarm_v1 ...`
 2. **사전 dry-run** — `bash scripts/sync_ckpt_dgx_to_orin.sh --run leftarm_v1 --dry-run` 으로 전송 대상 확인
 3. **본 sync** — `bash scripts/sync_ckpt_dgx_to_orin.sh --run leftarm_v1` (필요 시 `--step` 명시)
 4. **사후 검증 (Orin)** — `python ~/smolvla/orin/examples/tutorial/smolvla/load_checkpoint_test.py --ckpt-path ~/smolvla/orin/checkpoints/leftarm_v1/<step>/`

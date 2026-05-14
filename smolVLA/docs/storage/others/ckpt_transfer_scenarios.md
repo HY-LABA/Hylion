@@ -145,7 +145,7 @@ ssh-copy-id -i ~/.ssh/id_ed25519.pub laba@<ORIN_IP>
    USB_MOUNT=/media/laba/<USB_LABEL>
    RUN=<run_name>; STEP=<step_id>
    mkdir -p ${USB_MOUNT}/smolvla_ckpt/${RUN}/${STEP}
-   cp -r /home/laba/smolvla/dgx/outputs/train/${RUN}/checkpoints/${STEP}/pretrained_model/ \
+   cp -r /home/laba/smolvla/dgx/outputs/${RUN}/checkpoints/${STEP}/pretrained_model/ \
          ${USB_MOUNT}/smolvla_ckpt/${RUN}/${STEP}/
    sync   # 버퍼 플러시 (USB 안전 제거 전)
    ```

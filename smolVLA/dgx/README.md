@@ -138,7 +138,7 @@ lerobot-train \
     --batch_size=64 \
     --steps=20000 \
     --num_workers=8 \
-    --output_dir=~/smolvla/outputs/train/leftarm_v1 \
+    --output_dir=~/smolvla/dgx/outputs/leftarm_v1 \
     --job_name=leftarm_v1 \
     --policy.device=cuda \
     --wandb.enable=true
@@ -195,7 +195,7 @@ DGX (데이터 수집):
 DGX (학습):
   lerobot-train --dataset.repo_id=<HF_USER>/... 또는 --dataset.local_path=...
       ↓
-  outputs/train/<run_name>/checkpoints/<step>/pretrained_model/
+  outputs/<run_name>/checkpoints/<step>/pretrained_model/
       ↓
 Orin (추론):
   sync_ckpt_dgx_to_orin.sh → Orin 체크포인트 배포

@@ -19,7 +19,7 @@ set -e
 
 DGX_HOST="dgx"
 ORIN_HOST="orin"
-DGX_OUTPUTS="/home/laba/smolvla/dgx/outputs/train"
+DGX_OUTPUTS="/home/laba/smolvla/dgx/outputs"
 ORIN_CKPT_BASE="/home/laba/smolvla/orin/checkpoints"
 
 RUN=""

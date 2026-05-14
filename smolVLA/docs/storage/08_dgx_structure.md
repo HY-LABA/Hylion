@@ -10,6 +10,7 @@
 > - `dgx/interactive_cli/` — 옛 interactive CLI. legacy 이관 (`docs/storage/legacy/arm_2week_plan/others/03_interactive_cli/`) 후 실 DGX 에서도 제거.
 > - `dgx/config/` (`dataset_repos.json` + README) — placeholder-only, 끝내 코드 미연결 → 삭제. 데이터셋 메타 관리 방식은 새 계획 M1 에서 재고려.
 > - `dgx/scripts/save_dummy_checkpoint.sh` — TODO-10 era 부트스트랩 도구 (실 ckpt 부재 시 DGX→Orin 전송 검증용 dummy 생성). 실 체크포인트 존재로 obsolete → 삭제 (산출물 `outputs/train/dummy_ckpt/` 동반).
+> - `dgx/outputs/` 학습 산출물 — `outputs/<run>/` flat 컨벤션으로 통일 (2026-05-14, 옛 `outputs/train/` 혼재 정리 + 옛 run `07_pilot_2k`·`lego_*` 삭제 ~5.25G). 본문의 `outputs/train/` 표기는 04 시점 기록.
 > - 현 dgx/ 구조 (repo): `docs/ scripts/ outputs/(런타임) README.md`. 실 DGX 에는 `gestures/`(별개 트랙) 추가 존재 — repo 미동기화 drift.
 
 ---
