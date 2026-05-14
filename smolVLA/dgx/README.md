@@ -1,7 +1,7 @@
 # dgx — DGX Spark 학습 환경
 
 > SmolVLA 학습 전용. orin/ (추론) 과 형제 디렉터리.
-> 결정 근거: `docs/work_flow/specs/history/02_dgx_setting.md` TODO-08
+> 결정 근거: `docs/storage/legacy/arm_2week_plan/work_flow/specs/history/02_dgx_setting.md` TODO-08
 > 갱신: 04_infra_setup TODO-X2 (2026-05-01) — tests/, config/ 신규 디렉터리 추가 + 데이터 수집 인터페이스 안내 추가
 > 갱신: 07_cleanup_datacollector_refs TODO-P5 (2026-05-03) — 06_dgx_absorbs_datacollector 결정 반영: DataCollector 노드 운영 종료, DGX 단일 노드 데이터 수집·학습 통합 구조로 갱신
 
@@ -178,7 +178,7 @@ lerobot-train \
 - **venv 경로**: `/home/laba/smolvla/dgx/.arm_finetune` (Walking RL `/home/laba/env_isaaclab/` 와 충돌 없음)
 - **HF 캐시**: `/home/laba/smolvla/.hf_cache` (rsync 영향 밖)
 
-자세한 근거: `docs/work_flow/specs/history/02_dgx_setting.md` TODO-07 / TODO-08
+자세한 근거: `docs/storage/legacy/arm_2week_plan/work_flow/specs/history/02_dgx_setting.md` TODO-07 / TODO-08
 
 ---
 

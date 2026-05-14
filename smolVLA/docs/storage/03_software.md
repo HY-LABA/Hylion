@@ -108,8 +108,8 @@ JetPack 판별 근거:
 
 <!-- 정정 (2026-05-02): DataCollector 노드 운영 종료 (06_dgx_absorbs_datacollector 결정).
      07_datacollector_venv_setting.md 는 legacy 이관됨.
-     참조 경로: docs/storage/legacy/02_datacollector_separate_node/docs_storage_07_datacollector_venv_setting.md -->
-DataCollector venv 상세는 ~~`docs/storage/07_datacollector_venv_setting.md`~~ → **legacy 이관**: `docs/storage/legacy/02_datacollector_separate_node/docs_storage_07_datacollector_venv_setting.md` 참조 (DataCollector 노드 운영 종료 — 06 결정).
+     참조 경로: docs/storage/legacy/arm_2week_plan/others/02_datacollector_separate_node/docs_storage_07_datacollector_venv_setting.md -->
+DataCollector venv 상세는 ~~`docs/storage/07_datacollector_venv_setting.md`~~ → **legacy 이관**: `docs/storage/legacy/arm_2week_plan/others/02_datacollector_separate_node/docs_storage_07_datacollector_venv_setting.md` 참조 (DataCollector 노드 운영 종료 — 06 결정).
 
 ## 7) 추가 확인 필요 항목
 

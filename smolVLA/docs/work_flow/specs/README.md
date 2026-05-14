@@ -102,30 +102,22 @@ reflection → workflow_reflections/<날짜>_<NN_name>.md
 
 자세한 정책: `BACKLOG.md` 본문, `ANOMALIES.md` 본문, `/CLAUDE.md` § 가시화 레이어.
 
+> **2026-05-14 fresh start**: 구 `arm_2week_plan` era 의 BACKLOG·ANOMALIES 누적 기록은 → [`docs/storage/legacy/arm_2week_plan/`](../../storage/legacy/arm_2week_plan/) (`BACKLOG.md`·`ANOMALIES.md`) 로 이관. 현재 `specs/BACKLOG.md`·`ANOMALIES.md` 는 `realplaying.md` 로드맵 기준 새 누적본. **워커가 풀리지 않는 문제·하네스 이상을 만났을 때, 옛 era 에 유사 사례가 있는지 위 legacy 경로를 참조할 수 있다.**
+
 ---
 
-## 활성 spec 번호 현황 (2026-05-04 기준)
+## 활성 spec 번호 현황 (2026-05-14 fresh start 기준)
 
-<!-- 06_dgx_absorbs_datacollector 삽입으로 기존 06~09 → 07~10 시프트 (M1 갱신) -->
-<!-- 07_e2e_pilot_and_cleanup 삽입으로 기존 07~10 → 08~11 시프트 (P4 갱신, 2026-05-03) -->
-<!-- 08_final_e2e 삽입으로 기존 08~11 → 09~12 시프트 (S2 갱신, 2026-05-04) -->
+> 구 `arm_2week_plan` era 의 완료 spec (01_teleoptest ~ 08_final_e2e) 는 `docs/storage/legacy/arm_2week_plan/work_flow/specs/history/` 로 이관. 새 numbering 은 `realplaying.md` 로드맵 마일스톤 기준 01 부터 다시 시작.
 
-| 번호 | spec 명 | 상태 |
+| 번호 | realplaying.md 마일스톤 | 상태 |
 |---|---|---|
-| 01 | orin_setting | history |
-| 02 | dgx_setting | history |
-| 03 | smolvla_test_on_orin | history |
-| 04 | infra_setup | history |
-| 05 | interactive_cli | history |
-| 06 | dgx_absorbs_datacollector | history |
-| 07 | e2e_pilot_and_cleanup | history |
-| 08 | final_e2e | 완료 (wrap-spec 대기) |
-| 09 | leftarmVLA | 대기 (구 08) |
-| 10 | biarm_teleop_on_dgx | 대기 (구 09) |
-| 11 | biarm_VLA | 대기 (구 10) |
-| 12 | biarm_deploy | 대기 (구 11) |
+| 01 | M1 — Task 정의 + 데이터 수집 | Phase 1 작성 예정 |
+| 02 | M2 — 학습 (DGX) | 대기 |
+| 03 | M3 — 배포 + 추론 (Orin) | 대기 |
+| 04 | M4 — E2E 검증 + 사이클 패키징 | 대기 |
 
-> 번호 시프트 배경: 08_final_e2e 삽입으로 기존 `08_leftarmVLA` → `09_leftarmVLA`, `09~11` → `10~12`. 상세: `08_final_e2e.md` §본 마일스톤의 위치.
+> 마일스톤 → spec 매핑: `realplaying.md` 의 M1~M4 가 각각 spec `01`~`04` 로 분해된다. spec 파일명의 `<name>` 부분은 각 Phase 1 작성 시 확정.
 
 ## Reference
 

@@ -23,7 +23,7 @@ description: orin·dgx 배포 절차 + 비대화형 검증 명령 시퀀스. pro
 | 경로 | 이유 |
 |---|---|
 | `orin/checkpoints/` | sync_ckpt_dgx_to_orin.sh 가 동기화한 ckpt. devPC 미존재 → rsync `--delete` 로 Orin 측 삭제됨 (07 BACKLOG #8 사고) |
-| `orin/config/*.json` | 시연장 포트·카메라 설정. 사용자 환경마다 다름 (07 W4 정책 문서 — `docs/storage/10_orin_config_policy.md`) |
+| `orin/config/*.json` | 시연장 포트·카메라 설정. 사용자 환경마다 다름 (git 추적 정책은 새 계획 수립 시 재논의 — 옛 정책 문서 `10_orin_config_policy.md` 는 2026-05-14 삭제) |
 
 exclude 추가 패턴:
 

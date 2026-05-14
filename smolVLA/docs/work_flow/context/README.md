@@ -2,6 +2,8 @@
 
 활성 spec 의 자동화가 진행되는 동안, 각 에이전트의 작업 흔적이 본 디렉터리에 누적된다. spec 사이클 종료 시 (`/wrap-spec`) 전체 내용이 `history/<spec명>/` 으로 이동.
 
+> **2026-05-14 fresh start**: 구 `arm_2week_plan` era 의 `history/` (01~08 사이클) 는 `docs/storage/legacy/arm_2week_plan/work_flow/context/history/` 로 이관됨. 현재 `history/` 는 `realplaying.md` 로드맵 기준 비어 있음 (README only — 새 사이클부터 누적).
+
 ## 구조
 
 ```

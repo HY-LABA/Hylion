@@ -9,7 +9,7 @@
 >   - ~~scripts/sync_ckpt_dgx_to_datacollector.sh~~  (케이스 3 — **legacy 이관 완료 L2**)
 > 정정 (2026-05-02): 06_dgx_absorbs_datacollector 결정으로 DataCollector 노드 운영 종료.
 >       케이스 3 (DataCollector 경유) 는 더 이상 사용되지 않음. 역사적 결정으로 본문 보존.
->       sync_ckpt_dgx_to_datacollector.sh → legacy 이관: docs/storage/legacy/02_datacollector_separate_node/scripts_sync_ckpt_dgx_to_datacollector.sh
+>       sync_ckpt_dgx_to_datacollector.sh → legacy 이관: docs/storage/legacy/arm_2week_plan/others/02_datacollector_separate_node/scripts_sync_ckpt_dgx_to_datacollector.sh
 >       현재 유효 케이스: 케이스 1·2 (sync_ckpt_dgx_to_orin.sh), 케이스 4 (USB 드라이브).
 
 ---

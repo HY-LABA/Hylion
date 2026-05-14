@@ -144,5 +144,5 @@ python ~/smolvla/orin/inference/hil_inference.py \
 ## 참고
 
 - `docs/storage/07_orin_structure.md` §2 (inference/ 컴포넌트 책임)
-- `docs/work_flow/specs/04_infra_setup.md` TODO-O2b (본 디렉터리 신설 사유)
-- `docs/work_flow/specs/history/03_smolvla_test_on_orin.md` TODO-07 / TODO-07b (hil_inference.py 의 출처 + prod 검증 결과)
+- `docs/storage/legacy/arm_2week_plan/work_flow/specs/history/04_infra_setup.md` TODO-O2b (본 디렉터리 신설 사유)
+- `docs/storage/legacy/arm_2week_plan/work_flow/specs/history/03_smolvla_test_on_orin.md` TODO-07 / TODO-07b (hil_inference.py 의 출처 + prod 검증 결과)

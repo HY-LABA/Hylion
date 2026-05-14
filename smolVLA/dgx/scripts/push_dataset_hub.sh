@@ -1,6 +1,6 @@
 #!/bin/bash
 # DGX 수집 dataset → HuggingFace Hub push
-# 원본: docs/storage/legacy/02_datacollector_separate_node/datacollector/scripts/push_dataset_hub.sh
+# 원본: docs/storage/legacy/arm_2week_plan/others/02_datacollector_separate_node/datacollector/scripts/push_dataset_hub.sh
 # 이식: 06_dgx_absorbs_datacollector TODO-X3 (2026-05-02)
 #
 # 변경 항목:

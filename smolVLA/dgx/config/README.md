@@ -93,6 +93,6 @@ $HF_HOME/lerobot/<HF_USER>/<dataset_name>/
 ## 참고
 
 - `docs/storage/08_dgx_structure.md` §4-3 (DataCollector ↔ DGX 인터페이스)
-- `docs/work_flow/specs/04_infra_setup.md` TODO-T1 (전송 방식 결정 + 스크립트)
+- `docs/storage/legacy/arm_2week_plan/work_flow/specs/history/04_infra_setup.md` TODO-T1 (전송 방식 결정 + 스크립트)
 - `docs/reference/lerobot/src/lerobot/scripts/lerobot_record.py` — DatasetRecordConfig.repo_id 패턴
 - `orin/config/README.md` — Orin 측 cached config 패턴 (형제 문서)

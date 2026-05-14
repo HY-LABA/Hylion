@@ -140,7 +140,7 @@ devPC scripts/                  DGX 측 효과
 
 <!-- 정정 (2026-05-02): DataCollector 운영 종료 (06 결정). DataCollector → DGX 전송 인터페이스 무효화.
      DGX 가 직접 데이터 수집하므로 sync 불필요. scripts/sync_dataset_collector_to_dgx.sh 는
-     legacy 이관 완료 (docs/storage/legacy/02_datacollector_separate_node/). -->
+     legacy 이관 완료 (docs/storage/legacy/arm_2week_plan/others/02_datacollector_separate_node/). -->
 DataCollector → DGX 데이터 전송 (TODO-T1 결정 후) — **정정: 06 결정으로 DataCollector 운영 종료, 아래 내용은 역사적 보존**:
 - **HF Hub 경유 (권장)**: DataCollector 에서 `lerobot-record --push-to-hub` → DGX 에서 `lerobot-train --dataset.repo_id=<HF_USER>/...`
 - **rsync 직접**: `scripts/sync_dataset_collector_to_dgx.sh` → **legacy 이관 완료 (L2, 2026-05-02)**

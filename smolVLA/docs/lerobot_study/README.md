@@ -16,8 +16,9 @@
 
 upstream snapshot 이 아닌 프로젝트 결정·적용 문서는 다음 위치로 이관:
 
-- `docs/storage/11_smolvla_model_decision.md` — SmolVLA 모델 선정 결정 (구 `05_hf_model_selection.md`)
 - `docs/storage/lerobot_upstream_check/05_so100_vs_so101.md` — SO-100 vs SO-101 정합 결정 (구 `06_so100_vs_so101.md`)
+
+> `11_smolvla_model_decision.md` (구 `05_hf_model_selection.md`) 은 2026-05-14 삭제 — 새 계획 수립 시 모델 선정 재논의 예정.
 
 ## 작성 이력
 

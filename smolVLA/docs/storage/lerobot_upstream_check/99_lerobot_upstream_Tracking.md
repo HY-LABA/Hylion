@@ -17,7 +17,7 @@
 | `check_update_diff.sh` | 2026-04-22 (03_smolvla_test_on_orin) | upstream lerobot diff 점검 보조 스크립트. `01_compatibility_check.md` 연계. |
 | `99_lerobot_upstream_Tracking.md` (본 파일) | 2026-04-22 (03_smolvla_test_on_orin) | 색인 역할 대행 + upstream 동기화 이력 누적. |
 
-> **이관됨**: `05_datacollector_lerobot_diff.md` (구 색인) → `docs/storage/legacy/02_datacollector_separate_node/lerobot_upstream_check_05_datacollector_lerobot_diff.md` (2026-05-06). DataCollector 노드 legacy 이관 (06 결정) 으로 본 디렉터리 활성 색인에서 제외. 역사 기록은 legacy 위치에 보존.
+> **이관됨**: `05_datacollector_lerobot_diff.md` (구 색인) → `docs/storage/legacy/arm_2week_plan/others/02_datacollector_separate_node/lerobot_upstream_check_05_datacollector_lerobot_diff.md` (2026-05-06). DataCollector 노드 legacy 이관 (06 결정) 으로 본 디렉터리 활성 색인에서 제외. 역사 기록은 legacy 위치에 보존.
 
 ### 등록 현황 노트
 

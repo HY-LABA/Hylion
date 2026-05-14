@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # DGX SO-ARM 텔레오퍼레이션 스크립트
-# 원본: docs/storage/legacy/02_datacollector_separate_node/datacollector/scripts/run_teleoperate.sh
+# 원본: docs/storage/legacy/arm_2week_plan/others/02_datacollector_separate_node/datacollector/scripts/run_teleoperate.sh
 # 이식: 06_dgx_absorbs_datacollector TODO-X3 (2026-05-02)
 #
 # 변경 항목:
