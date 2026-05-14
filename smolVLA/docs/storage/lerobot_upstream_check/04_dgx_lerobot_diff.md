@@ -246,3 +246,25 @@ D8 walkthrough 3 차단 사항 해소:
 
 - `python3 -m py_compile dgx/interactive_cli/flows/precheck.py` PASS
 - `ruff check dgx/interactive_cli/flows/precheck.py` PASS (TODO-D8 완료 후 확인)
+
+---
+
+### [2026-05-14] dgx/ 미사용 자산 정리 (runs·tests·config·interactive_cli·save_dummy_checkpoint) — fresh start cleanup
+
+**대상:** `dgx/runs/`, `dgx/tests/`, `dgx/config/`, `dgx/interactive_cli/`, `dgx/scripts/save_dummy_checkpoint.sh`
+
+**변경 항목:**
+
+| 항목 | 처리 |
+|---|---|
+| `dgx/runs/`, `dgx/tests/` | repo + 실 DGX 양쪽 **삭제**. placeholder-only(README.md 만) 로 끝내 미채용 — 학습 운영은 `dgx/outputs/` + `dgx/docs/training.md` 로 정착. |
+| `dgx/config/` | repo + 실 DGX 양쪽 **삭제**. `dataset_repos.json` placeholder + README 만 — 스키마만 설계되고 끝내 코드에 미연결. 데이터셋 메타 관리 방식은 새 계획 M1 에서 재고려. |
+| `dgx/interactive_cli/` | 옛 interactive CLI 프레임워크. repo 에서는 이미 legacy 이관 (`docs/storage/legacy/arm_2week_plan/others/03_interactive_cli/`) — 실 DGX 잔여본도 제거. `interactive_cli/configs/*` 는 stale (옛 calibration id·반대 포트), `outputs/captured_images/` (2026-05-04 ad-hoc 캡처 9장) 동반 삭제. |
+| `dgx/scripts/save_dummy_checkpoint.sh` | repo + 실 DGX 양쪽 **삭제**. TODO-10 era 부트스트랩 도구 (실 ckpt 부재 시 DGX→Orin 전송 검증용 dummy 생성) — 실 체크포인트 존재로 obsolete, 참조 0건. 산출물 `outputs/train/dummy_ckpt/` 동반 삭제. |
+| gesture 시스템 영향 | **없음** — `record_gesture.sh` 등 gesture 자산은 interactive_cli 의존 0 (양방향 grep 0건 확인). |
+| upstream lerobot 코드 | 변경 없음 (dgx/lerobot/ 미존재 유지) |
+
+**검증:**
+
+- 실 DGX `dgx/` 잔여: `docs/ scripts/ outputs/ gestures/ README.md` 확인
+- gesture ↔ interactive_cli 의존성 grep 양방향 0건

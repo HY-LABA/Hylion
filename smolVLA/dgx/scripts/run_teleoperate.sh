@@ -15,7 +15,7 @@ set -euo pipefail
 #   source ~/smolvla/dgx/.arm_finetune/bin/activate
 #
 # 포트 확인: lerobot-find-port 로 실제 포트 확인 후 아래 변수 갱신
-# 캐시 저장: 시연장 배치 후 dgx/config/ports.json 에 저장 권장
+# 포트 캐시: 시연장 배치 후 포트 매핑 기록 권장 (구 dgx/config/ 삭제 — 메타 관리 방식은 새 계획 M1 에서 결정)
 #
 # 이관 이력:
 #   datacollector/scripts/run_teleoperate.sh → 본 위치 (2026-05-02, TODO-X3)

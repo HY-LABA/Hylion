@@ -38,15 +38,10 @@ dgx/
 │   ├── setup_train_env.sh   # venv 생성 + PyTorch + lerobot editable 설치 + 환경변수 자동 적용
 │   ├── preflight_check.sh   # 학습 전 OOM/Walking RL 보호 게이트
 │   └── smoke_test.sh        # lerobot-train --steps=1 검증 (svla_so100_pickplace)
-├── tests/                   # ★ 신규 (04 TODO-X2) — dgx 측 환경 점검 + 회귀 검증 자산
-│   └── README.md            # tests/ 의 책임 + 자산 목록
-├── config/                  # ★ 신규 (04 TODO-X2) — dgx 측 학습 설정 캐시
-│   ├── README.md            # config/ 의 책임 + dataset_repos.json 스키마
-│   └── dataset_repos.json   # DGX 학습에 사용할 HF 데이터셋 repo_id 목록 (placeholder)
-├── runs/                    # 마일스톤별 학습 실행 자료 (05 진입 시 채움)
-│   └── README.md            # 구조 안내
 └── outputs/                 # 학습 출력 (체크포인트, 로그) — 자동 생성. rsync 배포 제외
 ```
+
+> ⚠️ **2026-05-14 정정**: `tests/`·`config/`·`runs/` 는 placeholder-only 로 끝내 미채용 → 삭제 (repo + 실 DGX). 위 트리는 정리 후 repo 기준 — 단 실 DGX 에는 `docs/`(운영 문서), `gestures/`(별개 트랙) 가 추가로 존재하나 아직 repo 미동기화 (drift, 별도 정리 예정).
 
 **환경 분리 원칙**:
 - `dgx/.arm_finetune/` 는 SmolVLA 학습 전용. orin/ 추론 venv (`orin/.hylion_arm`) 와 충돌 없음
@@ -188,7 +183,7 @@ lerobot-train \
      DGX 가 데이터 수집(lerobot-record·lerobot-teleoperate) + 학습(lerobot-train) 책임을 단일 노드에서 담당.
      이전 DataCollector ↔ DGX 2-노드 구조는 legacy 로 이관 (docs/storage/legacy/ 참조). -->
 
-DGX 에서 직접 데이터 수집 후 학습을 진행한다. 설정은 `dgx/config/dataset_repos.json` 에서 관리.
+DGX 에서 직접 데이터 수집 후 학습을 진행한다.
 
 ```
 DGX (데이터 수집):
@@ -208,7 +203,7 @@ Orin (추론):
 
 - `dataset.repo_id` 포맷: `{hf_username}/{dataset_name}` (lerobot upstream 표준)
 - HF 데이터셋 캐시: `$HF_HOME/lerobot/` = `/home/laba/smolvla/.hf_cache/lerobot/`
-- 실 데이터셋 목록은 `dgx/config/dataset_repos.json` 에 등록 (05_leftarmVLA 진입 시 채움)
+- 실 데이터셋 등록 방식(레지스트리 파일 필요 여부 등)은 새 계획 M1 에서 결정 (구 `dgx/config/` 는 placeholder-only 로 2026-05-14 삭제)
 
 ---
 

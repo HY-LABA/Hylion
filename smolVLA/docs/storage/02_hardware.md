@@ -111,7 +111,7 @@ Bus 01 (USB 2.0, 480M)   ← USB 2.0 path — 모든 디바이스 종속
 **해결 — `OpenCVCameraConfig.fourcc=MJPG` 강제** (`docs/reference/lerobot/src/lerobot/cameras/opencv/configuration_opencv.py:65`):
 
 ```python
-# datacollector/interactive_cli/flows/record.py
+# datacollector/interactive_cli/flows/record.py  (legacy: legacy/arm_2week_plan/others/02_datacollector_separate_node/)
 cameras_str = (
     f"{{wrist_left: {{type: opencv, index_or_path: {idx}, "
     f" width: 640, height: 480, fps: 30, fourcc: MJPG}}, "
@@ -123,7 +123,7 @@ cameras_str = (
 
 ### 5-3) `env_check` 7단계 통합 패턴 (2026-05-02 — 사용자 요청 §6·§7 추가)
 
-`datacollector/interactive_cli/flows/env_check.py` 의 `flow2_env_check()` 가 7단계로 통합 — 04 G3 (DataCollector check_hardware 이식) + G4 (실측 검증) 자연 흡수:
+`datacollector/interactive_cli/flows/env_check.py` (legacy 이관) 의 `flow2_env_check()` 가 7단계로 통합 — 04 G3 (DataCollector check_hardware 이식) + G4 (실측 검증) 자연 흡수:
 
 | 단계 | 검증 항목 | 패턴 |
 |---|---|---|
@@ -243,7 +243,7 @@ leader + follower(현재 보유 1쌍) 합계:
 
 | 노드 | 키 이름 | 파일 | 비고 |
 |---|---|---|---|
-| DGX (데이터 수집) | `wrist_left`, `overview` | `dgx/interactive_cli/flows/record.py` `cameras_str` | lerobot-record `--robot.cameras` draccus 인자 |
+| DGX (데이터 수집) | `wrist_left`, `overview` | `dgx/interactive_cli/flows/record.py` `cameras_str` (legacy 이관) | lerobot-record `--robot.cameras` draccus 인자 |
 | Orin (추론) | `top`, `wrist` | `orin/config/cameras.json`, `orin/inference/hil_inference.py` | hil_inference.py SLOT_MAP → smolvla_base `camera1/camera2` |
 
 두 노드가 카메라를 독립적으로 사용 (수집 시 DGX 키 → 데이터셋 저장, 추론 시 Orin 키 → policy forward). 노드 간 직접 키 공유 없으므로 현재 불일치는 동작 무관.

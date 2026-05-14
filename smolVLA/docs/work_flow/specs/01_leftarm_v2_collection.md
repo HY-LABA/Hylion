@@ -28,7 +28,7 @@
 ### [ ] TODO-01: leftarm_v2 dataset 설계 확정
 
 - DOD: leftarm_v2 dataset 설계가 문서로 확정됨 — (a) task instruction 문자열 2종 확정 (b) dataset 구조 결정: 단일 `leftarm_v2` repo 내 2 task vs task 별 분리 (c) HF repo id 명명 (d) 에피소드 배분 100/100 + 수집 차수 계획.
-- 구현 대상: dataset 설계 결정 문서 (DGX `dgx/docs/` 또는 본 spec 부속) + `dgx/config/dataset_repos.json` 에 leftarm_v2 등록.
+- 구현 대상: dataset 설계 결정 문서 (DGX `dgx/docs/` 또는 본 spec 부속). 데이터셋 메타 관리 방식(레지스트리 파일을 둘지·형태) 도 본 todo 에서 결정 — 구 `dgx/config/dataset_repos.json` 은 placeholder-only 로 2026-05-14 삭제됨.
 - 테스트: 설계 문서 정합성 검토 (lerobot dataset 포맷·multi-task 표현 방식이 `docs/reference/lerobot/` 와 일치하는지).
 - 제약: `docs/reference/` 수정 금지. lerobot dataset 포맷 준수.
 - 잔여 리스크: task instruction 문구가 모델 성능에 직접 영향 — leftarm_v1 에서 `"left/right"` 구분 불가로 dataset 재시작한 이력 있음 (DGX `status.md` §3 인시던트). instruction 은 모호성 없이 작성.
@@ -67,4 +67,4 @@
 |---|------|-----------|----------|
 | 1 | DGX `~/smolvla/dgx/docs/` 운영 문서(status·training·data_collection·backlog)와 devPC repo `dgx/docs/` 간 drift — 동기화 정책 결정 필요 | M1 작성 (2026-05-14) | 중간 |
 | 2 | 4 devices 환경 `/dev/ttyACM*` enumeration 안정화 — serial 기반 udev rule 채택 검토 | DGX status.md §2 | 중간 |
-| 3 | `dgx/config/dataset_repos.json` 가 placeholder(`example_dataset`)만 등록 — leftarm_v1/v2 메타 반영 | DGX status.md §3 | 낮음 |
+| 3 | 데이터셋 메타 관리 방식 재설계 — 구 `dgx/config/dataset_repos.json` 은 placeholder-only 로 삭제됨 (2026-05-14). 레지스트리 파일이 필요한지·형태를 TODO-01 에서 결정 | M1 작성 (2026-05-14) | 낮음 |

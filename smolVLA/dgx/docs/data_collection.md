@@ -272,5 +272,4 @@ GPU 여유 시 NVENC 가속:
 - `~/smolvla/dgx/scripts/check_hardware.sh` — 수집 환경 점검
 - `~/smolvla/docs/reference/lerobot/src/lerobot/scripts/lerobot_record.py` — `RecordConfig` / `DatasetRecordConfig` 정의
 - `~/smolvla/docs/reference/lerobot/src/lerobot/cameras/opencv/configuration_opencv.py` — `OpenCVCameraConfig` (color_mode / fourcc)
-- `~/smolvla/dgx/config/dataset_repos.json` — 데이터셋 메타 캐시
 - 본 repo CLAUDE.md — Walking RL 보호 원칙

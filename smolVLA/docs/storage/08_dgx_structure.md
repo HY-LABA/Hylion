@@ -5,6 +5,13 @@
 > 목적: 04 사이클의 dgx/ 마이그레이션 (TODO-X2) 입력 + 후속 마일스톤 (05~08) 에서 어느 컴포넌트가 어떤 책임을 지는지 한 곳에 정리.
 > 형제 문서: `docs/storage/07_orin_structure.md` (TODO-O1 산출물)
 
+> ⚠️ **2026-05-14 정정 (fresh start)**: 본문은 04 사이클 시점 구조 기록. 이후 변경:
+> - `dgx/runs/`, `dgx/tests/` — **삭제** (placeholder-only, 끝내 미채용 — 학습은 `dgx/outputs/` + `dgx/docs/training.md` 로 운영). repo + 실 DGX 양쪽 제거.
+> - `dgx/interactive_cli/` — 옛 interactive CLI. legacy 이관 (`docs/storage/legacy/arm_2week_plan/others/03_interactive_cli/`) 후 실 DGX 에서도 제거.
+> - `dgx/config/` (`dataset_repos.json` + README) — placeholder-only, 끝내 코드 미연결 → 삭제. 데이터셋 메타 관리 방식은 새 계획 M1 에서 재고려.
+> - `dgx/scripts/save_dummy_checkpoint.sh` — TODO-10 era 부트스트랩 도구 (실 ckpt 부재 시 DGX→Orin 전송 검증용 dummy 생성). 실 체크포인트 존재로 obsolete → 삭제 (산출물 `outputs/train/dummy_ckpt/` 동반).
+> - 현 dgx/ 구조 (repo): `docs/ scripts/ outputs/(런타임) README.md`. 실 DGX 에는 `gestures/`(별개 트랙) 추가 존재 — repo 미동기화 drift.
+
 ---
 
 ## 0) 본 문서의 위치

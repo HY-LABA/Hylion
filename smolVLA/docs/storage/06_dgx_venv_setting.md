@@ -25,11 +25,11 @@
     ├── scripts/
     │   ├── setup_train_env.sh
     │   ├── preflight_check.sh
-    │   ├── smoke_test.sh
-    │   └── save_dummy_checkpoint.sh
-    ├── runs/                   # 마일스톤별 학습 자료 (04 진입 시 채움)
+    │   └── smoke_test.sh        # + check_hardware·run_teleoperate·push_dataset_hub 등
     └── outputs/                # 학습 출력 (배포 제외, hidden 아님)
 ```
+
+> 2026-05-14 정정: `runs/`, `save_dummy_checkpoint.sh` 삭제 (placeholder 미채용 / TODO-10 era obsolete).
 
 DGX 는 lerobot 코드를 직접 수정하지 않으므로 `dgx/lerobot/` curated 디렉터리는 두지 않는다. 대신 `docs/reference/lerobot/` submodule 을 그대로 editable 설치한다 (분석 SHA 와 학습 환경 SHA 자동 일치).
 
