@@ -1,0 +1,60 @@
+# leftarm_v2/base_config.yaml — 셋업 컨텍스트 (record·teleop·train 공용).
+# record_config.yaml(수집 job) · train_config.yaml(학습 job) 이 본 파일을 참조.
+# 담는 것: 식별 · 저장 위치 · 계정 · 물리 셋업(robot/teleop/cameras) · 캘리브레이션 · 하드웨어.
+
+# ── 식별 ──────────────────────────────────────────────────────
+name: leftarm_v2
+hf_repo_id: BaboGaeguri/leftarm_v2
+status: collecting              # collecting | training | done
+
+# ── 저장 위치 (도구가 자동 결정 — 참조·검증용 명시. 2026-05-14 DGX 실측) ──
+paths:
+  # lerobot 표준 dataset 캐시: lerobot-record 가 여기 저장, lerobot-train 이 여기서 읽음.
+  # HF_HOME 은 setup_finetune_env.sh 가 venv activate 시 export (= /home/laba/smolvla/.hf_cache).
+  dataset_local: ${HF_HOME}/lerobot/BaboGaeguri/leftarm_v2
+  hf_hub: https://huggingface.co/datasets/BaboGaeguri/leftarm_v2
+  # 학습 산출물 — lerobot-train --output_dir 의 run 별 부모. outputs/<run> flat 컨벤션
+  # (2026-05-14 통일: 옛 outputs/train/ 혼재 정리 + 옛 run 07_pilot_2k·lego_* 삭제).
+  output_root: ~/smolvla/dgx/outputs
+
+# ── 계정 (2026-05-14 DGX 실측) ────────────────────────────────
+accounts:
+  hf_user: BaboGaeguri          # HF Hub 로그인 ✓ (hf auth whoami).
+                                # ⚠️ HF_USER env 는 venv 가 자동 export 안 함 — 래퍼가 주입 또는 수동 export 필요.
+  wandb_entity: BaboGaeguri     # wandb 인증 ✓ (~/.netrc). entity 는 --wandb.entity 로 전달.
+  wandb_project: leftarm_v2
+
+# ── 물리 셋업 (robot·teleop·cameras — record·teleop 공용, train 미사용. → lerobot --robot.* / --teleop.*) ──
+robot:
+  type: so101_follower
+  id: leftarm_test_follower       # calibration id — 안정값 (포트와 달리 enumeration 무관)
+teleop:
+  type: so101_leader
+  id: leftarm_test_leader
+cameras:                          # 녹화 파라미터 = 안정값. index_or_path 는 아래 hardware 섹션에서.
+  # ⚠️ width/height 는 "회전 후 출력 크기". top 은 하드웨어 640x480 캡처 → CCW 90° → 480x640.
+  top:   { width: 480, height: 640, fps: 30, color_mode: rgb, fourcc: MJPG, rotation: -90 }
+  wrist: { width: 640, height: 480, fps: 30, color_mode: rgb, fourcc: MJPG }
+
+# ── 캘리브레이션 (lerobot 표준 위치 — --robot.id / --teleop.id 로 자동 로드) ──────
+# lerobot 은 id 로 캘리브레이션을 자동 로드하지만, run_*.py 는 실행 전 *존재 확인* 용으로
+# 아래 경로를 읽는다 (없으면 에러 — calibrate 먼저 하라고 안내).
+# 재캘리브레이션: lerobot-calibrate, 또는 dgx/scripts/run_teleoperate.sh.
+calibration:
+  dir: ${HF_HOME}/lerobot/calibration
+  follower: ${HF_HOME}/lerobot/calibration/robots/so_follower/leftarm_test_follower.json
+  leader: ${HF_HOME}/lerobot/calibration/teleoperators/so_leader/leftarm_test_leader.json
+  calibrated_at: "2026-05-11"   # 파일 mtime 기준 (DGX 실측) — 재캘리브레이션 시 갱신
+  note: "leftarm follower/leader. wrist_roll 물리 범위 주의 — dgx/scripts/calibrate_wrist_roll.py 참조"
+
+# ── 하드웨어 (포트·카메라 인덱스 — 값을 여기 직접 입력. run.py 가 본 값을 읽음) ──
+# follower/leader 포트와 카메라 인덱스는 USB enumeration 의존 → 부팅·재연결마다 변동 가능.
+# 새 세션·재부팅 후 lerobot-find-port (포트) / v4l2-ctl --list-devices (카메라) 로 확인해
+# 아래 값을 갱신한다.
+# ⚠️ null = 미확인 → run.py 가 무조건 에러. 확인 안 된 값을 추측해 채우지 말 것
+#    (잘못된 값으로 조용히 실행되는 사고 방지 — 사용자 결정 2026-05-14).
+hardware:
+  follower_port: null           # 예: /dev/ttyACM0 — lerobot-find-port 로 확인 후 입력
+  leader_port: null             # 예: /dev/ttyACM1 — lerobot-find-port 로 확인 후 입력
+  camera_top_index: null        # 예: 0  (/dev/video0) — v4l2-ctl --list-devices 로 확인 후 입력
+  camera_wrist_index: null      # 예: 2  (/dev/video2) — v4l2-ctl --list-devices 로 확인 후 입력

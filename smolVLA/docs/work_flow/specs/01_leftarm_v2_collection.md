@@ -25,12 +25,17 @@
 
 ## Todo
 
-### [ ] TODO-01: leftarm_v2 dataset 설계 확정
+### [ ] TODO-01: leftarm_v2 dataset 설계 확정 + config 확정 + 래퍼
 
-- DOD: leftarm_v2 dataset 설계가 문서로 확정됨 — (a) task instruction 문자열 2종 확정 (b) dataset 구조 결정: 단일 `leftarm_v2` repo 내 2 task vs task 별 분리 (c) HF repo id 명명 (d) 에피소드 배분 100/100 + 수집 차수 계획.
-- 구현 대상: dataset 설계 결정 문서 (DGX `dgx/docs/` 또는 본 spec 부속). 데이터셋 메타 관리 방식(레지스트리 파일을 둘지·형태) 도 본 todo 에서 결정 — 구 `dgx/config/dataset_repos.json` 은 placeholder-only 로 2026-05-14 삭제됨.
-- 테스트: 설계 문서 정합성 검토 (lerobot dataset 포맷·multi-task 표현 방식이 `docs/reference/lerobot/` 와 일치하는지).
-- 제약: `docs/reference/` 수정 금지. lerobot dataset 포맷 준수.
+> 사전 작업 완료 (2026-05-14, Phase 1): `dgx/finetune/` 디렉터리 신설 — `leftarm_v1/`(frozen 기록), `leftarm_v2/`, `README.md`. config 설계 = **데이터셋 폴더당 `config/{base,record,train}_config.yaml` 3파일 + `run.py` 래퍼**. **모든 lerobot-cli 인자는 config 출처** (run.py 하드코딩 0). **세션값(포트·카메라 인덱스)은 fallback 없이 env 변수 전용** — 미설정 시 무조건 에러 (`base_config.hardware` 는 *필요 env 목록* 일 뿐, run.py 가 읽지 않음 — 잘못 캐시된 fallback 사고 방지, 사용자 결정 2026-05-14). `leftarm_v2/config/{base,record}_config.yaml` M1 값 확정 완료. `run.py` 작성·dry-run 검증 완료. `train_config.yaml` 은 `[TBD-M2]` skeleton.
+
+- DOD: (a) `leftarm_v2/config/{base,record}_config.yaml` M1 값 확정 — **완료 (2026-05-14)** (b) 단일 `leftarm_v2` repo 내 2 task 구조 확정 — **완료** (c) `run.py` (config + 세션 env → `lerobot-record` 명령 구성) 작성·동작 확인 — **완료 (dry-run 검증, 실 DGX 검증은 배포 후)**.
+- 구현 대상:
+  - `dgx/finetune/leftarm_v2/config/{base,record}_config.yaml` — M1 값 확정 완료
+  - `dgx/finetune/leftarm_v2/run.py` — `config/` 읽어 `lerobot-record` 구성·실행. `--task`/`--episodes` 런타임 인자, resume 자동감지, `--dry-run`, HF_USER 주입. 세션값 env 전용
+  - 데이터셋 메타 관리 방식: `dgx/finetune/<name>/config/{base,record,train}_config.yaml` per-dataset 방식으로 확정 (구 `dgx/config/dataset_repos.json` 대체 — placeholder-only 로 2026-05-14 삭제)
+- 테스트: config YAML 파싱 + `run.py --dry-run` 으로 구성된 lerobot 명령이 `docs/reference/lerobot/` CLI 인자와 정합한지 검토. 실 DGX 검증은 배포 후 1 episode 또는 `lerobot-record --help` 대조.
+- 제약: `docs/reference/` 수정 금지. lerobot dataset 포맷·draccus 인자 준수. **세션값(포트·`/dev/videoN` 인덱스)은 config 에 fallback 으로 박지 않음** — env 전용, 미설정 시 무조건 에러 (구 `dgx/config/` 실패 교훈).
 - 잔여 리스크: task instruction 문구가 모델 성능에 직접 영향 — leftarm_v1 에서 `"left/right"` 구분 불가로 dataset 재시작한 이력 있음 (DGX `status.md` §3 인시던트). instruction 은 모호성 없이 작성.
 
 ### [ ] TODO-02: 수집 환경 최소 파라미터 기록 + 좌측팔 하드웨어 재검증

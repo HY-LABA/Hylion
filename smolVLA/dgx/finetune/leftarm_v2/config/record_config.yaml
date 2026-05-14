@@ -1,0 +1,26 @@
+# leftarm_v2 — 데이터 수집 job 파라미터 (lerobot-record). realplaying.md M1.
+# 물리 셋업(robot·teleop·cameras·hardware·calibration)·식별·저장·계정은 base_config.yaml 참조.
+# 본 파일은 "무엇을·어떻게 수집할지" 만 — dataset 옵션 / record 옵션 / task.
+
+dataset:                          # → lerobot-record --dataset.*
+  fps: 30
+  episode_time_s: 60              # 상한값 — →키로 일찍 종료. pick-place 실길이 12~15s 예상
+  reset_time_s: 15                # episode 간 리셋 시간
+  video: true
+  vcodec: libsvtav1               # CPU 코덱 — Walking RL GPU 점유 시 안전 (data_collection.md §0)
+  streaming_encoding: true
+  push_to_hub: true               # 차수마다 Hub 증분 백업. push_dataset_hub.sh 는 크래시 복구용
+  private: false
+  tags: [smolvla, so101, leftarm, pick-place, hylion]
+
+record_opts:                      # → lerobot-record 최상위 인자 (--dataset.* 아님)
+  display_data: true              # Rerun viewer 표시 (수집/텔레옵 중 영상 확인)
+  play_sounds: true               # 녹화 시작/종료 오디오 큐
+
+# 멀티태스크 — 단일 leftarm_v2 dataset 에 instruction 별 수집.
+# instruction 은 카메라로 보이는 속성(색)으로 grounding (leftarm_v1 의 "left/right" 모호성 사고 회피).
+tasks:
+  - instruction: "Pick up the blue and yellow doll and place it in the yellow plastic box"
+    episodes: 100
+  - instruction: "Pick up the yellow can and place it in the yellow plastic box"
+    episodes: 100

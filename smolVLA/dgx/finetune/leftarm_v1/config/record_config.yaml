@@ -1,0 +1,20 @@
+# leftarm_v1 — 데이터 수집 설정 (frozen 기록). 식별·저장위치는 base_config.yaml 참조.
+# dgx/docs/finetune/status.md §3 기준 백필. 새 작업은 leftarm_v2 에서.
+
+robot:
+  type: so101_follower
+  id: leftarm_test_follower
+teleop:
+  type: so101_leader
+  id: leftarm_test_leader
+
+cameras:
+  top:   { width: 480, height: 640, fps: 30, color_mode: rgb, fourcc: MJPG, rotation: -90 }
+  wrist: { width: 640, height: 480, fps: 30, color_mode: rgb, fourcc: MJPG }
+
+dataset:
+  fps: 30
+
+tasks:
+  - instruction: "Pick up the doll and reach forward"
+    episodes: 40                  # 목표 100 중 40 수집 후 동결

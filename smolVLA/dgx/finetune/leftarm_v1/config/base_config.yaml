@@ -1,0 +1,23 @@
+# leftarm_v1/base_config.yaml — frozen 기록. 구 era 의 개념적 체크포인트.
+# dgx/docs/finetune/status.md 기준 백필 — 새 작업은 leftarm_v2 에서 진행.
+
+name: leftarm_v1
+hf_repo_id: BaboGaeguri/leftarm_v1
+status: frozen
+
+paths:
+  dataset_local: ${HF_HOME}/lerobot/BaboGaeguri/leftarm_v1
+  hf_hub: https://huggingface.co/datasets/BaboGaeguri/leftarm_v1
+  output_root: ~/smolvla/dgx/outputs             # outputs/<run> flat — v1 explore run 이 여기 생성됨
+
+accounts:
+  hf_user: BaboGaeguri
+  wandb_entity: BaboGaeguri
+  wandb_project: leftarm_v1
+
+hardware:
+  # status.md §2 기준 (2026-05-11, 우측팔 추가 전 — 현재값 아님, 기록용)
+  follower_port: /dev/ttyACM0
+  leader_port: /dev/ttyACM1
+  camera_top_index: 0
+  camera_wrist_index: 2

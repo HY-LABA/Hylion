@@ -1,0 +1,18 @@
+# leftarm_v2 — 학습 설정 (lerobot-train). realplaying.md M2.
+# 식별·저장위치·계정(wandb 포함)은 base_config.yaml 참조 (래퍼가 merge).
+#
+# ⚠️ 값 미확정 — M2 spec 작성 시 사용자에게 새로 질문해 확정한다.
+#    realplaying.md M2 결정 포인트 규칙: 옛 결정(leftarm_v1 의 lora/r16/batch16/5000)을
+#    default 로 깔지 않음. 아래는 구조만 — 값(null)은 M2 에서 채움.
+#
+# 참고 (leftarm_v1 실행값, 결정 아님 — M2 에서 재검토):
+#    LoRA all-linear r=16, batch 16, 5000 steps. 상세: dgx/docs/finetune/training.md, status.md §4
+
+policy_path:    # [TBD-M2] 후보: lerobot/smolvla_base
+method:         # [TBD-M2] lora | full
+lora:           # [TBD-M2] method=lora 일 때 — { target_modules: ..., r: ... }
+batch_size:     # [TBD-M2]
+steps:          # [TBD-M2]
+num_workers:    # [TBD-M2] 후보: 8 (Walking RL 미가동 시) / 4 (가동 시)
+save_freq:      # [TBD-M2]
+wandb_enable:   # [TBD-M2] true | false (DGX 인터넷 차단 시 false). entity·project 는 base_config.accounts

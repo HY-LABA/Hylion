@@ -1,0 +1,13 @@
+# leftarm_v1 — 학습 설정 (frozen 기록). 실제 실행된 값. 식별·계정은 base_config.yaml 참조.
+# 상세 이력: dgx/docs/finetune/status.md §4, training.md
+
+# 실 실행 기록 (run: leftarm_v1_explore_2026-05-11_17-04-20):
+policy_path: lerobot/smolvla_base
+method: lora
+lora: { target_modules: all-linear, r: 16 }
+batch_size: 16
+steps: 5000                       # 의도값 — 실제 500 step 에서 조기 중단
+num_workers: 8
+save_freq: 250
+wandb_enable: true
+note: "500/5000 step 조기 중단. adapter 46MB. 본격 재학습 미진행 (leftarm_v1 동결)."
