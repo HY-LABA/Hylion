@@ -1,8 +1,8 @@
 # Dev Network 설정 (WiFi SSH)
 
 > 작성일: 2026-04-21  
-> 업데이트: 2026-05-02 (DataCollector 추가)
-> 목적: devPC ↔ Jetson Orin, devPC ↔ DGX Spark, devPC ↔ DataCollector 간 WiFi SSH 연결 설정 기록
+> 업데이트: 2026-05-13 (eduroam 추가 + DataCollector 제거 — 06_dgx_absorbs_datacollector 흡수 반영)
+> 목적: devPC ↔ Jetson Orin, devPC ↔ DGX Spark 간 WiFi SSH 연결 설정 기록
 
 ---
 
@@ -12,19 +12,17 @@
 |---|---|---|---|---|
 | devPC | 코드 정리/문서화/배포 관리 | Ubuntu 22.04 | `babogaeguri-950QED` | `babogaeguri` |
 | Jetson Orin Nano Super | 실행/검증 (SO-ARM 연결) | Ubuntu 22.04 (L4T R36.5.0) | `ubuntu` | `laba` |
-| DGX Spark | 학습/파인튜닝 전용 | Ubuntu | `spark-8434` | `laba` |
-| DataCollector | 데이터 수집 (SO-ARM teleop + lerobot-record) | Ubuntu 22.04 (kernel 6.8.0-106 HWE) | `smallgaint` | `smallgaint` |
+| DGX Spark | 학습/파인튜닝 + 데이터 수집 (06 사이클 datacollector 흡수) | Ubuntu | `spark-8434` | `laba` |
 
 ---
 
 ## 2) 네트워크 정보 수집
 
-| 장비 | WiFi IP (예시) | 서브넷 게이트웨이 | 비고 |
+| 장비 | WiFi IP | 서브넷 게이트웨이 | 비고 |
 |---|---|---|---|
-| devPC | 동적 | `172.16.141.254` | DHCP, 변동 있음 |
-| Jetson Orin | `172.16.137.232` | `172.16.137.254` | DHCP, 변동 있음. 2026-04-29 확인 |
-| DGX Spark | WiFi `172.16.129.180` / LAN `192.168.0.7` | WiFi `172.16.129.254` / LAN `192.168.0.1` | DHCP, 변동 있음. 2026-05-06 재확인 (WiFi 재할당) |
-| DataCollector | `172.16.133.102` (`wlp1s0`) | `172.16.133.254` | DHCP, 변동 있음. 2026-05-02 확인. MAC `e4:70:b8:09:4c:ed`. unattended-upgrade 후 재부팅 시 IP 변경 가능 |
+| devPC | 동적 | (네트워크별 변동) | DHCP, 변동 있음 |
+| Jetson Orin | `172.16.137.232` (HY-WiFi) | `172.16.137.254` | DHCP, 변동 있음. 2026-04-29 확인. **eduroam 미사용** |
+| DGX Spark | eduroam `172.16.142.85` / HY-WiFi `172.16.133.237` / LAN `192.168.0.7` | 네트워크별 변동 / LAN `192.168.0.1` | DHCP, 변동 있음. 2026-05-13 eduroam 추가 확인. 2026-05-11 HY-WiFi 재확인 |
 
 > **접속 방식 결정 배경**
 >
@@ -56,13 +54,6 @@
 - `0.0.0.0:22`, `[::]:22` 리슨 확인 → 별도 설정 불필요
 - `avahi-daemon`: 미확인 (mDNS 사용 계획 없으므로 불필요)
 
-### DataCollector (확인됨, 2026-05-02)
-- `openssh-server 1:8.9p1-3ubuntu0.15` 설치 (sudo apt install — unattended-upgrade 락 해제 후)
-- `ssh.service`: `active`, `enabled` (자동 시작)
-- `0.0.0.0:22`, `[::]:22` 리슨 확인 (`ss -tlnp | grep :22`)
-- 방화벽 (`ufw`): `inactive` — 별도 SSH 허용 규칙 불필요
-- ED25519 host key fingerprint: `SHA256:OdTLLyHp0rxq9OrmDHjy9y8/On/GuKrWNuMVnhKs1R4`
-
 ---
 
 ## 4) SSH 키 기반 인증 설정 (패스워드 없이 접속)
@@ -74,20 +65,21 @@
 
 ## 5) SSH Config 설정 (`~/.ssh/config`)
 
-devPC의 `~/.ssh/config`에 Orin / DGX Spark / DataCollector 항목 추가:
+devPC의 `~/.ssh/config`에 Orin / DGX Spark 항목 추가:
 
-| 항목 | Orin | DGX Spark | DataCollector |
-|---|---|---|---|
-| Host alias | `orin` | `dgx` | `datacollector` |
-| HostName | Orin의 현재 IP 직접 기재 | 확인 후 기재 | `172.16.133.102` (확인 후 기재) |
-| User | `laba` | `laba` | `smallgaint` |
-| Port | `22` | `22` | `22` |
-| IdentityFile | `~/.ssh/id_ed25519` | `~/.ssh/id_ed25519` | `~/.ssh/id_ed25519` |
-| ServerAliveInterval | `30` | `30` | `30` |
-| ServerAliveCountMax | `5` | `5` | `5` |
+| 항목 | Orin | DGX Spark |
+|---|---|---|
+| Host alias | `orin` | `dgx` |
+| HostName | Orin의 현재 IP 직접 기재 | 현재 연결 네트워크의 IP 직접 기재 |
+| User | `laba` | `laba` |
+| Port | `22` | `22` |
+| IdentityFile | `~/.ssh/id_ed25519` | `~/.ssh/id_ed25519` |
+| ServerAliveInterval | `30` | `30` |
+| ServerAliveCountMax | `5` | `5` |
 
 > mDNS 불가 환경이므로 HostName에 IP를 직접 기재한다. IP 변경 시 수동 업데이트 필요.  
-> `ServerAliveInterval` / `ServerAliveCountMax`: WiFi 환경에서 idle 세션 끊김 방지
+> `ServerAliveInterval` / `ServerAliveCountMax`: WiFi 환경에서 idle 세션 끊김 방지  
+> DGX 네트워크별 IP 분기는 `scripts/dev-connect.sh` 가 직접 처리 (HY-WiFi / eduroam 별 IP 박혀 있음 — §6 참조)
 
 ---
 
@@ -102,18 +94,31 @@ devPC의 `~/.ssh/config`에 Orin / DGX Spark / DataCollector 항목 추가:
 
 | 장비 | Remote 워크스페이스 경로 |
 |---|---|
-| Orin | `/home/laba` (확정 후 업데이트) |
-| DGX Spark | `/home/laba` (확정 후 업데이트) |
-| DataCollector | `/home/smallgaint` (확정) |
+| Orin | `/home/laba` |
+| DGX Spark | `/home/laba` |
 
-`scripts/dev-connect.sh` 호출 시 3 노드 VS Code Remote 동시 진입.
+### `scripts/dev-connect.sh` — 네트워크 분기 진입
+
+`~/.ssh/config` alias 우회로 IP 를 직접 지정해 VS Code Remote 세션을 여는 헬퍼. 두 위치 인자.
+
+```bash
+./scripts/dev-connect.sh orin            # Orin 만
+./scripts/dev-connect.sh dgx  hy         # DGX 만, HY-WiFi IP
+./scripts/dev-connect.sh dgx  edu        # DGX 만, eduroam IP
+./scripts/dev-connect.sh both hy         # Orin + DGX(HY-WiFi)
+./scripts/dev-connect.sh both edu        # Orin + DGX(eduroam)
+```
+
+스크립트 상단 3변수(`ORIN_IP`, `DGX_IP_HY`, `DGX_IP_EDU`) 가 IP 를 보유 — DHCP 재할당 시 그 부분만 수정. Orin 은 eduroam 미사용이라 네트워크 인자 불필요.
 
 ---
 
-## 7) HY-WiFi 연결 방법 (WPA2 Enterprise)
+## 7) 학교 WiFi 연결 방법 (WPA2 Enterprise)
 
-학교 WiFi(HY-WiFi)는 기업용 WPA2 인증을 사용하므로 일반 비밀번호 입력이 아닌 아래 설정이 필요하다.  
+학교 WiFi(HY-WiFi·eduroam)는 기업용 WPA2 인증을 사용하므로 일반 비밀번호 입력이 아닌 아래 설정이 필요하다.  
 GUI(NetworkManager) 기준으로 설정한다.
+
+### 7-1) HY-WiFi
 
 | 항목 | 값 |
 |---|---|
@@ -127,9 +132,35 @@ GUI(NetworkManager) 기준으로 설정한다.
 | Username | 학교 포털 아이디 |
 | Password | 학교 포털 비밀번호 |
 
-> DGX Spark는 초기 WiFi 어댑터(`wlP9s9`)가 비활성화 상태이므로, GUI 연결 전 `nmcli radio wifi on`으로 활성화 필요.
+### 7-2) eduroam (2026-05-13 추가)
+
+| 항목 | 값 |
+|---|---|
+| SSID | `eduroam` |
+| Wi-Fi security | WPA & WPA2 Enterprise |
+| Authentication | Protected EAP (PEAP) |
+| Anonymous identity | (비워둠) |
+| Domain | (비워둠) |
+| CA certificate | (없음), `No CA certificate is required` 체크 |
+| PEAP version | Automatic |
+| Inner authentication | MSCHAPv2 |
+| Username | `<학교포털ID>@hanyang.ac.kr` (HY-WiFi 와 달리 **realm 필수**) |
+| Password | 학교 포털 비밀번호 |
+
+> eduroam GUI 다이얼로그 첫 진입 시 `Authentication` 이 `Tunneled TLS` 로 기본값 잡혀 있을 수 있음 → **Protected EAP (PEAP)** 로 먼저 변경해야 하부 필드 구성이 PEAP 용으로 다시 그려진다.
+
+### 7-3) DGX Spark WiFi 운영 주의
+
+> **DGX WiFi 활성화**: DGX Spark는 초기 WiFi 어댑터(`wlP9s9`)가 비활성화 상태이므로, GUI 연결 전 `nmcli radio wifi on`으로 활성화 필요.
 >
-> **DGX 라우팅 설정**: DGX는 LAN(`enP7s7`, `192.168.0.x`)과 WiFi(`wlP9s9`, `172.16.128.x`)가 동시에 연결되어 있으며, 기본 라우트가 LAN으로 잡혀 있어 WiFi 쪽에서 접속하면 패킷이 LAN으로 나가 통신 불가 상태가 된다. 이를 해결하기 위해 `172.16.0.0/16` 대역(학교 WiFi 장비들)만 WiFi 게이트웨이로 보내는 라우트를 추가하였다. 이 설정은 HY-WiFi 연결 프로파일에 영구 저장되어 있으므로 재연결 시에도 자동 적용된다. LAN을 통한 팀원의 SSH 접속에는 영향 없이 동시 사용 가능하다.
+> **DGX 라우팅 설정**: DGX는 LAN(`enP7s7`, `192.168.0.x`)과 WiFi(`wlP9s9`)가 동시에 연결되어 있으며, 기본 라우트가 LAN으로 잡혀 있어 WiFi 쪽에서 접속하면 패킷이 LAN으로 나가 통신 불가 상태가 된다. 이를 해결하기 위해 `172.16.0.0/16` 대역(학교 WiFi 장비들)만 WiFi 게이트웨이로 보내는 라우트를 추가한다. 이 설정은 **각 NetworkManager 프로파일별로 영구 저장** 되므로 HY-WiFi·eduroam 양쪽 프로파일에 각각 추가해야 한다. LAN을 통한 팀원의 SSH 접속에는 영향 없이 동시 사용 가능하다.
+>
+> ```bash
+> nmcli connection modify HY-WiFi  +ipv4.routes "172.16.0.0/16 <hy-wifi 게이트웨이>"
+> nmcli connection modify eduroam  +ipv4.routes "172.16.0.0/16 <eduroam 게이트웨이>"
+> ```
+>
+> 게이트웨이는 각 프로파일 연결 직후 `ip route | grep default` 의 해당 인터페이스 행에서 확인.
 
 ---
 
@@ -137,13 +168,12 @@ GUI(NetworkManager) 기준으로 설정한다.
 
 시연장이 평소 사용 WiFi와 다를 경우 IP가 바뀔 수 있으므로 아래를 순서대로 확인한다.
 
-- [ ] 시연장 WiFi에 devPC·Orin·DGX·DataCollector 모두 연결
-- [ ] Orin에서 현재 WiFi IP 확인
-- [ ] DGX에서 현재 WiFi IP 확인
-- [ ] DataCollector에서 현재 WiFi IP 확인 (`ip addr show wlp1s0 | grep inet`)
-- [ ] devPC `~/.ssh/config`의 Orin·DGX·DataCollector HostName을 확인된 IP로 업데이트
-- [ ] `ssh orin` / `ssh dgx` / `ssh datacollector` 접속 테스트
-- [ ] (장기) 학교 통신처에 Orin·DGX·DataCollector MAC주소 제출 → DHCP 예약 요청 (DataCollector MAC: `e4:70:b8:09:4c:ed`)
+- [ ] 시연장 WiFi 에 devPC·Orin·DGX 모두 연결 (Orin 은 HY-WiFi 만 지원 — eduroam 환경이면 Orin 핫스팟 별도 대응)
+- [ ] Orin 에서 현재 WiFi IP 확인 (`ip addr show | grep "inet "`)
+- [ ] DGX 에서 현재 WiFi IP 확인 (`ip addr show wlP9s9 | grep "inet "`)
+- [ ] devPC `~/.ssh/config` 의 Orin·DGX HostName 또는 `scripts/dev-connect.sh` 상단 IP 변수 갱신
+- [ ] `ssh orin` / `ssh dgx` 또는 `dev-connect.sh <target> <network>` 접속 테스트
+- [ ] (장기) 학교 통신처에 Orin·DGX MAC주소 제출 → DHCP 예약 요청
 
 ---
 
@@ -157,15 +187,13 @@ GUI(NetworkManager) 기준으로 설정한다.
 - [x] `~/.ssh/config`에 `ServerAliveInterval 30` / `ServerAliveCountMax 5` 추가 완료
 - [x] DGX Spark 호스트명(`spark-8434`), 유저명(`laba`) 확인
 - [x] DGX Spark WiFi IP 확인(`172.16.133.66`) 후 `~/.ssh/config` HostName 업데이트 (2026-04-22 WiFi 재연결로 변경됨)
-- [x] DGX 라우팅 설정 (LAN/WiFi 동시 연결 환경에서 `172.16.0.0/16` → WiFi 라우트 추가, nmcli 영구 저장)
+- [x] DGX 라우팅 설정 (LAN/WiFi 동시 연결 환경에서 `172.16.0.0/16` → WiFi 라우트 추가, HY-WiFi 프로파일 nmcli 영구 저장)
 - [x] devPC ↔ DGX SSH 접속 성공 확인
 - [x] Orin·DGX IP 변경 시 `~/.ssh/config` HostName 업데이트 절차 숙지 (섹션 8 시연 체크리스트, 섹션 10 트러블슈팅 참고)
-- [x] DataCollector 호스트명·유저명 확인 (`smallgaint` / `smallgaint`, 2026-05-02)
-- [x] DataCollector WiFi IP 확인 (`172.16.133.102`, 2026-05-02)
-- [x] DataCollector openssh-server 설치·active·enabled (2026-05-02)
-- [x] devPC `~/.ssh/config` 에 datacollector 항목 추가 (2026-05-02)
-- [x] devPC ↔ DataCollector SSH 키 기반 접속 성공 (2026-05-02)
-- [x] `scripts/dev-connect.sh` 에 datacollector 항목 추가 (2026-05-02)
+- [x] devPC eduroam 연결 성공 (2026-05-13, §7-2)
+- [x] DGX eduroam IP 확인 (`172.16.142.85`, 2026-05-13)
+- [x] `scripts/dev-connect.sh` 네트워크 분기 추가 (`hy`/`edu`, 2026-05-13)
+- [ ] DGX eduroam 프로파일에 `172.16.0.0/16` WiFi 라우트 추가 (§7-3) — 미확인, 첫 SSH 시도 시 검증
 
 ---
 
@@ -175,6 +203,9 @@ GUI(NetworkManager) 기준으로 설정한다.
 
 - **2026-04-22**: DGX Spark WiFi를 끊었다가 재연결하자 DHCP가 새 IP(`172.16.133.66`)를 할당 → 기존 `~/.ssh/config`의 IP(`172.16.128.93`)와 달라져 VS Code Remote SSH 및 터미널 SSH 모두 실패
 - **2026-05-06**: DGX Spark 재부팅·WiFi 재연결 후 DHCP 가 새 IP(`172.16.129.180`) 할당 → 서브넷 자체가 `172.16.129.x` 로 변경. `~/.ssh/config` HostName 갱신 필요
+- **2026-05-08**: DGX Spark WiFi 재할당으로 새 IP(`172.16.131.33`) → 서브넷 `172.16.131.x` 로 변경. `~/.ssh/config` HostName 갱신 완료
+- **2026-05-11**: DGX Spark WiFi 재할당으로 새 IP(`172.16.133.237`) → 서브넷 `172.16.133.x` 로 변경. `~/.ssh/config` HostName 갱신 완료
+- **2026-05-13**: DGX Spark 가 eduroam 으로 네트워크 전환 → 새 IP(`172.16.142.85`), 서브넷 `172.16.142.x`. devPC 도 eduroam 으로 이동 (§7-2), `scripts/dev-connect.sh` 가 네트워크별 IP 분기 흡수 (이제 `~/.ssh/config` HostName 직접 갱신 대신 dev-connect.sh 상단 변수만 갱신)
 
 ### 증상
 
@@ -214,18 +245,6 @@ Host dgx
 
 - ping 실패(100% loss)가 발생해도 DGX 자체가 꺼진 게 아닐 수 있음 — 방화벽이 ICMP를 차단하는 경우도 있으므로 SSH 직접 시도 및 물리적 확인이 우선
 - SSH 서비스 상태는 DGX에서 `systemctl status ssh`로 확인 가능
-
-### DataCollector 시연장 배치 시 DHCP 리스크 (흡수: 09_datacollector_setup.md §4-1)
-
-DataCollector 는 시연장 WiFi 에 의존하므로 DGX 와 동일한 DHCP 변동 리스크가 존재.
-
-| 상황 | 증상 | 대처 |
-|---|---|---|
-| 시연장 WiFi 재연결 | DataCollector IP 변경 → devPC SSH 단절 | DataCollector 에서 `ip addr show wlp1s0` 확인 후 `~/.ssh/config` HostName 업데이트 |
-| 평소와 다른 시연장 WiFi | IP 대역 변경 가능 | SSH 접속 전 IP 재확인 필수 (§8 시연 체크리스트 참조) |
-| unattended-upgrade 후 재부팅 | IP 변경 가능 (2026-05-02 사례) | 재부팅 후 `ip addr show wlp1s0 | grep inet` 로 IP 재확인 |
-
-**DataCollector DHCP 예약 권장**: MAC 주소 `e4:70:b8:09:4c:ed` 기준으로 시연장 공유기 관리자에게 고정 IP 예약 요청 (장기). 현재는 IP 직접 기재 방식 (soft 고정 기대) 사용 — 연결 실패 시 IP 변경 여부 먼저 확인.
 
 ---
 

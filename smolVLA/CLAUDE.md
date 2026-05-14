@@ -180,8 +180,8 @@ spec 의 모든 todo 를 **자율 처리**. 사용자는 `/observe` 로 read-onl
 
 code-tester `MAJOR_REVISIONS` 시 일반적으론 task-executor 재호출. 단 다음 영역 변경에 대해서는 **자동 재시도 X, 사용자 보고 게이트**.
 
-- `orin/lerobot/`, `dgx/lerobot/` (upstream 옵션 B)
-- `pyproject.toml` 류 (의존성)
+- `orin/lerobot/` (upstream 옵션 B). DGX 는 `docs/reference/lerobot/` editable install 사용 — 자체 사본 없음 (06_dgx_absorbs_datacollector 결정)
+- `pyproject.toml` 류 (의존성). `orin/pyproject.toml` 만 적용 — DGX 는 `dgx/pyproject.toml` 자체가 없음 (upstream 직접 사용)
 - `orin/scripts/setup_env.sh` (Jetson PyTorch 직접 설치)
 - `scripts/deploy_*.sh`
 - `.gitignore` **패턴 추가·변경** (기존 파일 수정) — 해당. 신규 `.gitignore` 파일 **신규 생성** 은 Category C (새 디렉터리 동의) 와 함께 처리되며, 기존 디렉터리에 신규 추가 시 Category B 에 준함.

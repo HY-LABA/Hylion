@@ -56,13 +56,14 @@ BACKLOG #11 자연 우회.
 - `scripts/` — run_teleoperate.sh·push_dataset_hub.sh·check_hardware.sh
 - `tests/` — 단위 테스트
 
-### docs/storage 파일 3건 (prefix 변경 이관)
+### docs/storage 파일 4건 (prefix 변경 이관)
 
 | 원래 위치 | 이관 후 위치 |
 |---|---|
 | `docs/storage/07_datacollector_venv_setting.md` | `docs_storage_07_datacollector_venv_setting.md` |
 | `docs/storage/10_datacollector_structure.md` | `docs_storage_10_datacollector_structure.md` |
 | `docs/storage/15_datacollector_cli_flow.md` | `docs_storage_15_datacollector_cli_flow.md` |
+| `docs/storage/lerobot_upstream_check/05_datacollector_lerobot_diff.md` | `lerobot_upstream_check_05_datacollector_lerobot_diff.md` (2026-05-06 이관, datacollector/lerobot/ 옵션 B 적용 영역 자체가 dead path) |
 
 ### smolVLA/scripts 파일 3건 (prefix 변경 이관)
 

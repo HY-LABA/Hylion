@@ -1,7 +1,7 @@
-# HuggingFace 모델 선택 — SmolVLA 변종 분기점
+# SmolVLA 모델 선정 결정
 
 > 기준: `docs/reference/lerobot/` (v0.5.1-52-g05a52238)
-> 작성일: 2026-04-27
+> 작성일: 2026-04-27 · 이관: 2026-05-12 (`docs/lerobot_study/05_hf_model_selection.md` → 본 위치)
 > 목적: SmolVLA 사전학습 정책 체크포인트 / VLM 백본 / 기타 변종 중 본 프로젝트에 적합한 조합 선정. **결론적으로 변종 선택 여지가 거의 없음** — 본 문서는 "왜 그런지" 의 근거를 정리.
 > 선행 읽기: `docs/lerobot_study/03_smolvla_architecture.md` §B (가중치 출처 분기)
 
@@ -91,7 +91,7 @@ self.vlm = AutoModelForImageTextToText.from_pretrained(
 target_modules = "lm_expert.*.q_proj|v_proj | state_proj | action_in_proj | action_out_proj | action_time_mlp_in/out"
 ```
 
-→ LoRA 적용은 **모델 변종 결정** 이 아니라 **학습 분기** (`03b_smolvla_milestone_config_guide.md §2 06` 의 VRAM 부족 시 fallback). 본 문서 범위 밖.
+→ LoRA 적용은 **모델 변종 결정** 이 아니라 **학습 분기** (VRAM 부족 시 fallback). 본 문서 범위 밖.
 
 ### compile_model (torch.compile)
 
@@ -101,7 +101,7 @@ compile_model: bool = False
 compile_mode: str = "max-autotune"
 ```
 
-→ 추론 속도 최적화 옵션. 모델 자체 변경 아님. 07 배포 시 검토 (`03b_smolvla_milestone_config_guide.md §2 07`).
+→ 추론 속도 최적화 옵션. 모델 자체 변경 아님. 07 배포 시 검토.
 
 ## 5) 종합 권장값 — 모델 변종
 

@@ -28,4 +28,4 @@ dgx/runs/
 
 ## 권장 명령 출처
 
-각 마일스톤의 학습 권장 명령은 [docs/lerobot_study/06_smolvla_finetune_feasibility.md §6](../../docs/lerobot_study/06_smolvla_finetune_feasibility.md) 에 작성돼 있다. 본 디렉터리의 `train*.sh` 는 그 명령을 셸 스크립트로 옮긴 것.
+본 디렉터리의 `train*.sh` 는 각 학습 spec 에서 결정한 명령을 셸 스크립트로 옮긴 것.

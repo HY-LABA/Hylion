@@ -1,5 +1,7 @@
 # 04. DGX lerobot 실행 래퍼 변경 이력
 
+> ⚠️ **이름 주의**: 파일명이 `04_dgx_lerobot_diff.md` 이지만 lerobot 코드 자체 diff 가 **아님**. DGX 는 `docs/reference/lerobot/` editable install — lerobot 코드 diff 는 0. 본 파일은 **DGX 측 wrapper 스크립트 (`dgx/scripts/*.sh`) 변경 이력**. (rename 안 한 이유: history/ 30+ 참조 깨짐 회피)
+
 > 목적: DGX Spark 학습 검증에서 upstream lerobot 동작을 직접 수정하지 않고, `dgx/` 래퍼와 실행 스크립트로 보정한 변경 사항을 누적 기록한다.
 > upstream 기준 commit: `ba27aab79c731a6b503b2dbdd4c601e78e285048` (v0.5.1-42, 2026-04-22 동기화)
 >
@@ -74,7 +76,6 @@ TODO-09b DGX prod 검증에서 `smoke_test.sh` 단독 실행을 완료 조건으
 **후속 기록:**
 
 - `docs/work_flow/context/current_test.md` 개발자 직접 검증 #3/#4에 결과와 중간 보정 원인을 기록했다.
-- `docs/lerobot_study/06_smolvla_finetune_feasibility.md §5.2`에 GB10 smoke test 실측값을 반영했다.
 
 ---
 

@@ -117,8 +117,8 @@ d. `01_implementation.md` 갱신 (overwrite)
 ### Category B — 자동 재시도 X 영역 (신중히)
 
 본 영역 변경은 가능하나 code-tester MAJOR 발급 시 자동 재시도 X (사용자 보고 게이트):
-- `orin/lerobot/`, `dgx/lerobot/` (옵션 B 원칙)
-- `pyproject.toml`, `setup_env.sh`, `scripts/deploy_*.sh`
+- `orin/lerobot/` (옵션 B 원칙). DGX 는 `docs/reference/lerobot/` editable install — 자체 사본 없음
+- `orin/pyproject.toml`, `setup_env.sh`, `scripts/deploy_*.sh` (DGX 는 `dgx/pyproject.toml` 자체가 없음)
 
 본 영역 수정 시 매우 신중히, Coupled File Rules 100% 준수.
 

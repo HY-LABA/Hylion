@@ -66,7 +66,7 @@ EnvTransition   # observation / action / reward / done 묶음
 robots/
 ├── robot.py          ← Robot 추상 클래스 (모든 로봇이 상속)
 ├── config.py         ← RobotConfig 기반 클래스
-├── so_follower/      ← SO-100 / SO-101 follower ★ 우리 것
+├── so_follower/      ← SO-100 / SO-101 follower
 ├── bi_so_follower/   ← SO 양팔 follower
 ├── koch_follower/    ← Koch 로봇
 ├── lekiwi/           ← LeKiwi 모바일 로봇
@@ -80,7 +80,7 @@ leader arm, 키보드, 게임패드 등 "사람이 조종하는 입력 장치"�
 ```
 teleoperators/
 ├── teleoperator.py   ← Teleoperator 추상 클래스
-├── so_leader/        ← SO-100 / SO-101 leader ★ 우리 것
+├── so_leader/        ← SO-100 / SO-101 leader
 ├── bi_so_leader/     ← SO 양팔 leader
 ├── keyboard/         ← 키보드 텔레옵
 ├── gamepad/          ← 게임패드 텔레옵
@@ -93,8 +93,8 @@ robots/teleoperators가 내부적으로 사용. 직접 건드릴 일은 거의 �
 ```
 motors/
 ├── motors_bus.py     ← MotorsBus 추상 클래스 (sync read/write)
-├── dynamixel/        ← Dynamixel 프로토콜 ★ U2D2 사용 시
-├── feetech/          ← Feetech STS3215 ★ SO-101 표준
+├── dynamixel/        ← Dynamixel 프로토콜
+├── feetech/          ← Feetech STS3215 (SO-101 표준)
 ├── damiao/           ← Damiao 모터
 └── robstride/        ← Robstride 모터
 ```
@@ -104,7 +104,7 @@ motors/
 ```
 cameras/
 ├── camera.py         ← Camera 추상 클래스
-├── opencv/           ← USB 카메라 (OpenCV) ★ 우리 것
+├── opencv/           ← USB 카메라 (OpenCV)
 ├── realsense/        ← Intel RealSense 깊이 카메라
 └── zmq/              ← 네트워크로 연결된 원격 카메라
 ```
@@ -118,7 +118,7 @@ cameras/
 policies/
 ├── factory.py        ← 정책 이름으로 인스턴스 생성하는 팩토리
 ├── pretrained.py     ← HuggingFace Hub에서 모델 로드
-├── smolvla/          ← SmolVLA ★ 우리 것
+├── smolvla/          ← SmolVLA
 ├── act/              ← ACT (Action Chunking Transformer)
 ├── diffusion/        ← Diffusion Policy
 ├── pi0/ pi05/        ← π0, π0.5 (Physical Intelligence)
@@ -197,7 +197,7 @@ async_inference/
 | 폴더 | 역할 |
 |------|------|
 | `envs/` | 시뮬레이션 환경 (Libero, MetaWorld). 실물 로봇엔 불필요 |
-| `rl/` | 강화학습. imitation learning인 우리 프로젝트엔 불필요 |
+| `rl/` | 강화학습. imitation learning 워크플로우에는 불필요 |
 | `optim/` | AdamW 등 옵티마이저 래퍼. 학습 코드가 내부적으로 사용 |
 | `model/` | 키네마틱스 계산 유틸 |
 | `transport/` | async_inference의 gRPC 통신 구현체 |
@@ -206,21 +206,20 @@ async_inference/
 
 ---
 
-## 우리 프로젝트 관점 요약
+## SO-ARM + SmolVLA 사용 시 주목할 모듈
 
 ```
-건드릴 것:
-  robots/so_follower/       ← 팔 config (포트, 카메라, 안전 제한)
+config / 코드 진입점:
+  robots/so_follower/       ← follower 팔 config (포트, 카메라, 안전 제한)
   teleoperators/so_leader/  ← leader arm config
-  motors/dynamixel/ or feetech/  ← 실제 모터 종류 확인 후 선택
-  policies/smolvla/         ← 필요 시 파인튜닝 설정 조정
+  motors/feetech/           ← SO-101 표준 모터 드라이버
+  policies/smolvla/         ← 정책 본체
 
-읽을 것:
-  scripts/lerobot_record.py ← 수집 흐름 파악
-  scripts/lerobot_train.py  ← 학습 흐름 파악
+워크플로우 코드:
+  scripts/lerobot_record.py ← 데이터 수집
+  scripts/lerobot_train.py  ← 학습
   examples/tutorial/smolvla/using_smolvla_example.py ← 추론 예시
 
-안 건드려도 되는 것:
+실물 로봇 워크플로우와 무관한 모듈:
   envs/, rl/, transport/, templates/
-  datasets/ (내부 동작 알 필요 없음, CLI로 충분)
 ```

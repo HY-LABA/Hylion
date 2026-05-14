@@ -69,7 +69,7 @@ pip install -e ".[feetech]"    # SO-100/SO-101 표준 (Feetech 모터)
 ```
 docs/source/
 ├── installation.mdx         # 설치 가이드
-├── so100.mdx / so101.mdx    # SO-ARM 하드웨어 가이드 ← 핵심
+├── so100.mdx / so101.mdx    # SO-ARM 하드웨어 가이드
 ├── smolvla.mdx              # smolVLA 가이드
 ├── il_robots.mdx            # Imitation Learning 실물 로봇 가이드
 ├── cameras.mdx              # 카메라 설정
@@ -87,8 +87,7 @@ src/lerobot/
 │   ├── policy_server.py   # 추론 전담 서버 (GPU 머신에서 실행)
 │   └── robot_client.py    # 로봇 제어 클라이언트
 ├── cameras/               # 카메라 드라이버
-│   ├── opencv/            # OpenCV (USB 카메라) ← 우리 것
-│   ├── realsense/         # Intel RealSense
+│   ├── opencv/            # OpenCV (USB 카메라)│   ├── realsense/         # Intel RealSense
 │   └── zmq/               # ZMQ 원격 카메라
 ├── configs/               # 학습/평가/정책 설정 클래스
 ├── datasets/              # 데이터셋 로드·저장·스트리밍
@@ -101,48 +100,28 @@ src/lerobot/
 │   ├── damiao/            # Damiao
 │   └── robstride/         # Robstride
 ├── policies/              # 정책 모델들
-│   ├── smolvla/           # SmolVLA ← 우리 것
-│   ├── act/               # ACT
+│   ├── smolvla/           # SmolVLA│   ├── act/               # ACT
 │   ├── diffusion/         # Diffusion Policy
 │   ├── pi0/ pi05/         # π0, π0.5
 │   └── groot/             # GR00T N1.5
 ├── robots/                # 로봇 config·클래스
-│   ├── so_follower/       # SO-100/101 follower ← 우리 것
-│   └── bi_so_follower/    # 양팔 SO follower
+│   ├── so_follower/       # SO-100/101 follower│   └── bi_so_follower/    # 양팔 SO follower
 ├── scripts/               # CLI 진입점 (위 pyproject.toml 참고)
 ├── teleoperators/         # 텔레옵 인터페이스
-│   ├── so_leader/         # SO-100/101 leader ← 우리 것
-│   ├── bi_so_leader/      # 양팔 SO leader
+│   ├── so_leader/         # SO-100/101 leader│   ├── bi_so_leader/      # 양팔 SO leader
 │   └── keyboard/gamepad/phone/  # 대체 텔레옵
 ├── transport/             # gRPC 통신 (async_inference용)
 └── utils/
 
 examples/
-├── tutorial/smolvla/      # smolVLA 실사용 예제 ← 반드시 읽을 것
+├── tutorial/smolvla/      # smolVLA 실사용 예제
 │   └── using_smolvla_example.py
 └── training/              # 학습 예제
 ```
 
 ---
 
----
-
-## ⚠️ 중요: 모터 종류 불일치 확인 필요
-
-| 항목 | lerobot SO-101 표준 | 우리 기획서 |
-|------|---------------------|------------|
-| 모터 | **Feetech STS3215** | **Dynamixel** (U2D2 사용) |
-| 컨트롤러 | Waveshare 버스 서보 어댑터 | U2D2 (USB-to-Dynamixel) |
-| SDK | `pip install -e ".[feetech]"` | `pip install -e ".[dynamixel]"` |
-| 포트 예시 | `/dev/ttyACM0` | `/dev/ttyUSB0` |
-
-lerobot의 `so_follower`가 Feetech 기준으로 작성돼 있어서,  
-**우리 팔이 Dynamixel이라면 motors/dynamixel/ 드라이버를 써야 하고 로봇 config도 따로 만들어야 함.**  
-→ 실제 팔 부품 확인 후 이 부분을 명확히 해야 한다.
-
----
-
-## 우리 팔에 관련된 핵심 모듈
+## SO-101 관련 주요 모듈
 
 ### 1. 로봇 (Follower) — `robots/so_follower/`
 
@@ -317,16 +296,7 @@ Orin에 직접 lerobot 설치 + SO-ARM USB 연결 → 위 Step 5 코드 그대�
 - `robot_client.py`: 로봇 연결·관찰 전송·액션 수신 담당
 - gRPC로 통신 (`transport/services_pb2_grpc.py`)
 
-우리 구조에서는 **방법 A가 기본** (Orin이 SO-ARM USB도 직접 연결).  
-방법 B는 Orin 부하가 클 때 DGX에서 추론하고 Orin은 로봇 제어만 할 때 유용.
-
----
-
-## 모터 드라이버 — `motors/dynamixel/`
-
-SO-ARM은 Dynamixel 서보 사용. 관련 파일:
-- `dynamixel.py` — 버스 통신, sync read/write
-- `tables.py` — 레지스터 주소 테이블
+방법 A: 단일 머신에서 추론·제어 동시 수행. 방법 B: 추론·제어 노드 분리 (추론 부하 분산 시 유용).
 
 ---
 
@@ -338,7 +308,7 @@ SO-ARM은 Dynamixel 서보 사용. 관련 파일:
 | `policies/diffusion/` | Diffusion Policy |
 | `policies/pi0/` | π0 (Physical Intelligence) |
 | `policies/sarm/` | SARM |
-| `policies/smolvla/` | **SmolVLA ← 우리 것** |
+| `policies/smolvla/` | **SmolVLA** |
 
 ---
 
@@ -346,7 +316,7 @@ SO-ARM은 Dynamixel 서보 사용. 관련 파일:
 
 | 폴더 | 설명 |
 |------|------|
-| `so_leader/` | **SO-ARM leader ← 우리 것** |
+| `so_leader/` | **SO-ARM leader** |
 | `bi_so_leader/` | SO-ARM 양팔 leader |
 | `keyboard/` | 키보드 텔레옵 |
 | `gamepad/` | 게임패드 텔레옵 |

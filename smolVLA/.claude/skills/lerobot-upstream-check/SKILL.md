@@ -1,16 +1,21 @@
 ---
 name: lerobot-upstream-check
-description: lerobot 옵션 B 원칙 (upstream 보존) + Coupled File Rules. orin/lerobot, dgx/lerobot, pyproject.toml 변경 시 동시 갱신 절차. TRIGGER when 워커가 lerobot upstream 영향 영역(Category B)을 작업할 때.
+description: lerobot 옵션 B 원칙 (upstream 보존) + Coupled File Rules. orin/lerobot, orin/pyproject.toml 변경 시 동시 갱신 절차. TRIGGER when 워커가 lerobot upstream 영향 영역(Category B)을 작업할 때.
 ---
 
 # Lerobot Upstream Check
 
-본 스킬은 `orin/lerobot/`, `dgx/lerobot/`, `datacollector/lerobot/`, `pyproject.toml` 같은 **upstream 영향 영역** 변경 시 적용해야 할 룰을 정의. task-executor·code-tester·prod-test-runner 가 본 영역 작업 시 반드시 따라야 함.
+본 스킬은 `orin/lerobot/`, `orin/pyproject.toml` 같은 **upstream 영향 영역** 변경 시 적용해야 할 룰을 정의. task-executor·code-tester·prod-test-runner 가 본 영역 작업 시 반드시 따라야 함.
+
+> **노드별 lerobot 사용 방식 (06_dgx_absorbs_datacollector 결정 이후)**:
+> - **orin**: `orin/lerobot/` curated trim (옵션 B 적용 영역)
+> - **dgx**: `docs/reference/lerobot/` editable install — 자체 사본·`dgx/pyproject.toml` 모두 없음. 본 스킬 적용 영역 X (단 dgx 측 wrapper 스크립트 변경은 `04_dgx_lerobot_diff.md` 에 기록)
+> - **datacollector**: 노드 자체 legacy 이관됨 (06 결정). 본 스킬 적용 영역 X
 
 ## 옵션 B 원칙 (upstream 보존)
 
-`orin/lerobot/`, `dgx/lerobot/`, `datacollector/lerobot/` 의 파일·디렉터리는 **변경하지 않는다** (옵션 B 원칙). 단 upstream 이 노드 환경 (Python 버전·플랫폼 등) 과 비호환 syntax 사용 시 해당 파일만
-  backport 가능 — 이때 노드별 diff 파일 (예: `05_datacollector_lerobot_diff.md`) 에 변경 이력 의무 기록. inference-only 책임 외 모듈은 다음으로만 비활성화:
+`orin/lerobot/` 의 파일·디렉터리는 **변경하지 않는다** (옵션 B 원칙). 단 upstream 이 노드 환경 (Python 버전·플랫폼 등) 과 비호환 syntax 사용 시 해당 파일만
+  backport 가능 — 이때 `03_orin_lerobot_diff.md` 에 변경 이력 의무 기록. inference-only 책임 외 모듈은 다음으로만 비활성화:
 
 1. `__init__.py` 의 import 차단
 2. `pyproject.toml [project.scripts]` 의 entrypoint 등록 해제
@@ -106,18 +111,11 @@ upstream (`lerobot/src/lerobot/`) 대비 변경 이력 누적:
 **inference-only 트리밍 여부**: yes/no (yes 면 사유 + 트리밍된 기능 명시)
 ```
 
-### 3. `dgx/lerobot/` 코드 수정 시 (있으면)
+### 3. `dgx/scripts/*` (lerobot 학습 wrapper) 수정 시
 
-`docs/storage/lerobot_upstream_check/04_dgx_lerobot_diff.md` (해당 시 — 현재 미생성 가능성)
+`docs/storage/lerobot_upstream_check/04_dgx_lerobot_diff.md` 에 wrapper 변경 이력 기록.
 
-### 4. `datacollector/lerobot/` 코드 수정 시 (옵션 B 또는 backport)
-
-`docs/storage/lerobot_upstream_check/05_datacollector_lerobot_diff.md` (해당 시 — 본 사이클 시점 미생성. BACKLOG #11 (c) 진행 시 신규 작성 의무).
-
-특히 PEP 695 syntax (Python 3.12+) backport 시:
-- 5+ 파일 (`utils/io_utils.py`, `datasets/streaming_dataset.py`, `processor/pipeline.py`, `motors/motors_bus.py`) 후보
-- orin 패턴 미러: `def fn[T: ...]` → `TypeVar` + `def fn(... obj: "_T")`, `class C[T]` → `Generic[T]`, `type X = ...` → `Union[...]`
-- 향후 lerobot upstream 동기화 시 매번 backport 갱신 부담 명시 (maintenance burden)
+> 본 파일은 이름과 달리 lerobot 코드 diff 가 아닌 **DGX 측 wrapper 스크립트 변경 이력**. DGX 는 `docs/reference/lerobot/` 를 editable install 하므로 lerobot 코드 자체 diff 는 0 — `setup_train_env.sh`, `smoke_test.sh`, `preflight_check.sh` 등 보정 wrapper 변경만 기록.
 
 ## 변경 시 체크리스트
 
@@ -128,10 +126,10 @@ upstream (`lerobot/src/lerobot/`) 대비 변경 이력 누적:
 
 ## 위반 패턴 (code-tester 가 Critical 마킹할 것)
 
-- ❌ orin/lerobot/, dgx/lerobot/, datacollector/lerobot/ 의 새 파일 추가 — 단 backport 사유 (Python 버전 비호환 등) + 해당 diff 파일 갱신 시 예외
+- ❌ orin/lerobot/ 의 새 파일 추가 — 단 backport 사유 (Python 버전 비호환 등) + `03_orin_lerobot_diff.md` 갱신 시 예외
 - ❌ orin/pyproject.toml 변경하면서 setup_env.sh·02_*.md 미갱신
 - ❌ orin/lerobot/ 코드 수정하면서 03_*.md 미갱신
-- ❌ entrypoint 활성화 (`pyproject.toml [project.scripts]` 에 신규 추가)
+- ❌ entrypoint 활성화 (`orin/pyproject.toml [project.scripts]` 에 신규 추가)
 
 → code-tester 가 발견 시 Critical 분류 → MAJOR_REVISIONS verdict.
 → Category B 영역이라 자동 재시도 X → orchestrator 가 사용자에게 보고.

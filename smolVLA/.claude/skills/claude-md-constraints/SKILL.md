@@ -22,8 +22,8 @@ description: CLAUDE.md Hard Constraints 4 카테고리 체크리스트 + Critica
 본 영역 변경된 todo 가 code-tester `MAJOR_REVISIONS` 받으면 자동 재시도 X (사용자 보고 게이트).
 
 체크리스트:
-- [ ] `orin/lerobot/`, `dgx/lerobot/` (옵션 B 원칙)
-- [ ] `orin/pyproject.toml`, `dgx/pyproject.toml` (의존성)
+- [ ] `orin/lerobot/` (옵션 B 원칙). DGX 는 `docs/reference/lerobot/` editable install — 자체 사본 없음
+- [ ] `orin/pyproject.toml` (의존성). DGX 는 `dgx/pyproject.toml` 자체가 없음 — upstream 직접 사용
 - [ ] `orin/scripts/setup_env.sh` (Jetson PyTorch 직접 설치)
 - [ ] `scripts/deploy_*.sh`
 - [ ] `.gitignore`, `.git/info/exclude`

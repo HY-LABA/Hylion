@@ -45,8 +45,6 @@ DGX 시스템 Python 이 lerobot 호환 (`>=3.10`) 이고 conda 가 미설치이
 - Orin 측 `~/smolvla/orin/.hylion_arm` 와 형제 구조 → 운영 일관성 (활성화 명령 패턴 동일, hidden 컨벤션 동일)
 - Docker 컨테이너 격리는 불필요 — 두 트랙이 다른 PyTorch 버전을 요구할 때만 의미 있음. 현재 Walking RL `torch 2.10.0+cu130` 와 본 프로젝트가 동일 wheel 사용
 
-자세한 venv vs conda vs uv 비교 및 결정 근거: `docs/lerobot_study/06_smolvla_finetune_feasibility.md §2`
-
 - venv 경로: `~/smolvla/dgx/.arm_finetune`
 - Python 버전: `3.12.3` (DGX 시스템 Python)
 - 설치 스크립트: `~/smolvla/dgx/scripts/setup_train_env.sh`
@@ -132,7 +130,7 @@ The current PyTorch install supports CUDA capabilities sm_80 ... sm_120.
 
 DGX 는 학습 전용이라 lerobot 코드 수정은 안 한다는 원칙이지만 **editable** 설치를 채택한 이유:
 
-1. **분석 SHA = 학습 환경 SHA 일치**: 본 프로젝트가 분석한 `docs/lerobot_study/03_smolvla_architecture.md` / `04_lerobot_dataset_structure.md` 의 코드 동작이 학습에 그대로 적용됨. PyPI stable wheel 은 SHA 가 다를 수 있음
+1. **분석 SHA = 학습 환경 SHA 일치**: 본 프로젝트가 분석한 `docs/lerobot_study/03_smolvla_architecture.md` 의 코드 동작이 학습에 그대로 적용됨. PyPI stable wheel 은 SHA 가 다를 수 있음
 2. **디버깅 시 일관성**: 학습 중 발생하는 동작이 분석 문서와 일치 → 디버깅 시간 단축
 3. **submodule SHA 고정**: `git submodule update --remote --merge` 로 의도적으로 갱신할 때만 변경 — 갑작스런 PyPI 업데이트로 인한 호환성 문제 없음
 
@@ -198,7 +196,6 @@ import os, sys, torch
 - 1-step smoke 값은 모델/데이터셋 로드 + 워밍업 영향이 커서 장시간 학습 throughput 을 그대로 대표하지 않음
 - 단순 환산 시 20k step 약 33시간 / 200k step 약 332시간 — 실제 학습 계획에는 batch size 증가, 캐시 워밍업 후 평균 step time, Walking RL 점유 변동 반영해 재측정 필요
 - batch=8 인데 RAM 48 GiB 점유 → batch=64 로 늘리면 추가 점유 가능성. preflight 의 `s1` 임계치 (35 GiB) 재검토 필요
-- 자세한 throughput 분석: `docs/lerobot_study/06_smolvla_finetune_feasibility.md §5.2`
 
 ### Walking RL 동시 점유 환경
 

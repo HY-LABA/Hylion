@@ -45,10 +45,8 @@ smolVLA/
 │   │   ├── 00_lerobot_repo_overview.md
 │   │   ├── 01_lerobot_root_structure.md
 │   │   ├── 02_lerobot_src_structure.md
-│   │   ├── 03_smolvla_architecture.md           # TODO-03: SmolVLA 구조 + config 분기
-│   │   ├── 03b_smolvla_milestone_config_guide.md # TODO-03 보조: 마일스톤별 분기 가이드
-│   │   ├── 04_lerobot_dataset_structure.md      # TODO-04: 데이터셋 구조
-│   │   └── 05_hf_model_selection.md             # TODO-05: HF 모델 선택
+│   │   ├── 03_smolvla_architecture.md           # SmolVLA 구조 + config 분기
+│   │   └── README.md                             # 인덱스
 │   ├── reference/                       # 외부 참조 문서 + 읽기 전용 서브모듈
 │   │   ├── lerobot/                     # HuggingFace lerobot upstream submodule
 │   │   ├── reComputer-Jetson-for-Beginners/ # Seeed Jetson beginner reference submodule

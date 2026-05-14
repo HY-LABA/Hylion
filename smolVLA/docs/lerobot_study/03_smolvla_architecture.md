@@ -116,7 +116,7 @@ target_modules = "lm_expert.*.q_proj|v_proj | state_proj | action_in_proj | acti
 **파인튜닝 과정 차이:**
 - B1: 200k step 권장, loss 빠르게 감소 (수백 step 내 의미 있는 수치)
 - B2: 200k step + 충분한 데이터, 초기 수만 step 거의 학습 안 되는 구간 있음
-- B3: 본 프로젝트에서 사용 안 함
+- B3: 비추 (random init, 데이터 매우 많이 필요)
 
 ### C. 모델 용량
 
@@ -183,9 +183,9 @@ target_modules = "lm_expert.*.q_proj|v_proj | state_proj | action_in_proj | acti
 | `add_image_special_tokens` | False | 이미지 주변 special token | smolvla_base 가 False 학습이므로 유지 |
 | `prefix_length` | -1 | prefix 패딩 길이 (-1 = 패딩 안 함) | torch.compile 사용 시 고정 필요 |
 
-## 4) SO-ARM 단일팔 첫 파인튜닝 권장 조합
+## 4) SO-ARM 단일팔 파인튜닝 기본 조합
 
-`modeling_smolvla.py:30-36` 공식 예시 + 본 프로젝트 상황:
+`modeling_smolvla.py:30-36` 공식 예시:
 
 ```bash
 lerobot-train \
@@ -222,8 +222,8 @@ lerobot-train \
 3. `num_steps` (=10) 동안 `x_t = x_t + dt · v_t(x_t, t)` Euler 적분
 4. 최종 `x_t` 가 action chunk
 
-## 6) 다음 학습 항목으로 이어지는 포인트
+## 6) 후속 검토 포인트
 
-- **데이터셋 구조 (TODO-04)**: `embed_prefix` 가 받는 키(`OBS_LANGUAGE_TOKENS`, `OBS_LANGUAGE_ATTENTION_MASK`, `OBS_STATE`, `image_features`) 와 LeRobotDataset 키 매핑 확인 필요
-- **HF 모델 선택 (TODO-05)**: `vlm_model_name` 기본값 `SmolVLM2-500M-Video-Instruct` 가 적합한지, 또는 더 작은 변종(135M)이 Orin 추론에 유리한지 비교
-- **파인튜닝 가능성 (TODO-06)**: 본 문서의 S1~S4 시나리오 별 DGX VRAM 실측 + 1 step 소요 시간 확인
+- **데이터셋 키 매핑**: `embed_prefix` 가 받는 키(`OBS_LANGUAGE_TOKENS`, `OBS_LANGUAGE_ATTENTION_MASK`, `OBS_STATE`, `image_features`) 와 LeRobotDataset 키 매핑
+- **VLM 백본 선택**: `vlm_model_name` 기본값 `SmolVLM2-500M-Video-Instruct` vs 더 작은 변종(135M) 의 추론 환경 적합성
+- **파인튜닝 자원 추정**: 본 문서의 S1~S4 시나리오 별 VRAM 소요량 + 1 step 시간

@@ -91,7 +91,7 @@ reflection 분석 시 다음 원칙 위반·미반영 발견하면 갱신 제안
 
 - OpenAI: Types → Config → Repo → Service → Runtime → UI 레이어
 - 의존성 방향 + 허용 에지 → 맞춤형 린터·구조 테스트로 강제
-- **현재 우리**: orin/lerobot=inference-only, dgx/lerobot=training-only 같은 invariant 명시 X
+- **현재 우리**: orin/lerobot=inference-only (curated trim), dgx=training-only (`docs/reference/lerobot/` editable) 같은 invariant 명시 X
 - **점검**: 도메인 fitness function 후보 식별 → 자동 검증 가능한가
 
 ### 8. 자체 구현 선호 (지루한 기술)

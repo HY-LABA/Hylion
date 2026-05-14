@@ -98,7 +98,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "FILE=$(jq -r '.tool_input.file_path // \"\"'); if echo \"$FILE\" | grep -qE '/orin/lerobot/|/orin/pyproject\\.toml$|/orin/scripts/setup_env\\.sh$|/dgx/lerobot/|/dgx/pyproject\\.toml$'; then echo '[hook] ⚠️ Coupled File 영역 변경됨: ' \"$FILE\" ' — Coupled File Rules (lerobot-upstream-check 스킬) 따라 02_orin_pyproject_diff.md / 03_orin_lerobot_diff.md / setup_env.sh 동시 갱신 필요' >&2; fi; exit 0"
+            "command": "FILE=$(jq -r '.tool_input.file_path // \"\"'); if echo \"$FILE\" | grep -qE '/orin/lerobot/|/orin/pyproject\\.toml$|/orin/scripts/setup_env\\.sh$'; then echo '[hook] ⚠️ Coupled File 영역 변경됨: ' \"$FILE\" ' — Coupled File Rules (lerobot-upstream-check 스킬) 따라 02_orin_pyproject_diff.md / 03_orin_lerobot_diff.md / setup_env.sh 동시 갱신 필요' >&2; fi; exit 0"
           }
         ]
       }
