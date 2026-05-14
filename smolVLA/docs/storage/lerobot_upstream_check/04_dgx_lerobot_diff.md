@@ -16,7 +16,7 @@ DGX는 upstream lerobot 코드를 복사하거나 수정하지 않는다. `scrip
 | 구분 | upstream lerobot | DGX 보정 위치 |
 |---|---|---|
 | 학습 CLI | `lerobot-train` 기본 동작 | `dgx/scripts/smoke_test.sh`에서 smoke test용 인자와 환경 준비 |
-| 환경 격리 | upstream 외부 책임 | `dgx/scripts/setup_train_env.sh`, `dgx/scripts/preflight_check.sh` |
+| 환경 격리 | upstream 외부 책임 | `dgx/scripts/setup_finetune_env.sh`, `dgx/scripts/preflight_check.sh` |
 | 자원 측정 | upstream 외부 책임 | `dgx/scripts/smoke_test.sh`의 `nvidia-smi`/`free -m` 샘플링 |
 
 ---
@@ -115,7 +115,7 @@ TODO-09b DGX prod 검증에서 `smoke_test.sh` 단독 실행을 완료 조건으
 | 기능 | 영향 |
 |---|---|
 | upstream lerobot 코드 | 변경 없음 (dgx/lerobot/ 미존재 유지) |
-| 기존 02 산출물 (setup_train_env / preflight / smoke / save_dummy_checkpoint) | 변경 없음 — 회귀 없음 확인은 TODO-X3 |
+| 기존 02 산출물 (setup_finetune_env / preflight / smoke / save_dummy_checkpoint) | 변경 없음 — 회귀 없음 확인은 TODO-X3 |
 | Orin inference path | 영향 없음 |
 | DataCollector 인터페이스 | dataset_repos.json placeholder 신설 — 실 운용은 TODO-T1 결정 후 |
 
@@ -129,9 +129,9 @@ TODO-09b DGX prod 검증에서 `smoke_test.sh` 단독 실행을 완료 조건으
 
 ---
 
-### [2026-05-03] `dgx/scripts/setup_train_env.sh` — lerobot extras hardware,feetech 추가 (07 TODO-D5)
+### [2026-05-03] `dgx/scripts/setup_finetune_env.sh` — lerobot extras hardware,feetech 추가 (07 TODO-D5)
 
-**대상 파일:** `dgx/scripts/setup_train_env.sh`
+**대상 파일:** `dgx/scripts/setup_finetune_env.sh`
 
 **변경 내용:**
 
@@ -142,7 +142,7 @@ TODO-09b DGX prod 검증에서 `smoke_test.sh` 단독 실행을 완료 조건으
 
 **변경 이유:**
 
-06_dgx_absorbs_datacollector 결정에서 DGX 가 데이터 수집 책임 흡수 시 `setup_train_env.sh` 의 lerobot extras 갱신이 누락되었다. 06 사이클에서는 `§3-c` 를 별도 추가하여 개별 패키지 pip install 방식으로 처리했으나, editable install extras 에 `hardware,feetech` 가 포함되지 않아 07 TODO-D4 preflight check lerobot-find-port 실행 시 pyserial ImportError 가 발생했다 (07 D4 진단).
+06_dgx_absorbs_datacollector 결정에서 DGX 가 데이터 수집 책임 흡수 시 `setup_finetune_env.sh` 의 lerobot extras 갱신이 누락되었다. 06 사이클에서는 `§3-c` 를 별도 추가하여 개별 패키지 pip install 방식으로 처리했으나, editable install extras 에 `hardware,feetech` 가 포함되지 않아 07 TODO-D4 preflight check lerobot-find-port 실행 시 pyserial ImportError 가 발생했다 (07 D4 진단).
 
 lerobot upstream `pyproject.toml` extras 정의 (직접 인용):
 ```
@@ -156,20 +156,20 @@ hardware = [
 feetech = ["feetech-servo-sdk>=1.0.0,<2.0.0", "lerobot[pyserial-dep]", "lerobot[deepdiff-dep]"]
 ```
 
-Option B 원칙 유지: `dgx/pyproject.toml` 신규 생성 X. `dgx/lerobot/` 변경 X. `setup_train_env.sh` 에서만 extras 관리.
+Option B 원칙 유지: `dgx/pyproject.toml` 신규 생성 X. `dgx/lerobot/` 변경 X. `setup_finetune_env.sh` 에서만 extras 관리.
 
 **영향 범위:**
 
 | 기능 | 영향 |
 |---|---|
 | upstream lerobot 코드 | 변경 없음 (dgx/lerobot/ 미존재 유지) |
-| setup_train_env.sh 재실행 시 | lerobot[hardware,feetech] (pynput, pyserial, deepdiff, feetech-servo-sdk) 자동 설치 |
+| setup_finetune_env.sh 재실행 시 | lerobot[hardware,feetech] (pynput, pyserial, deepdiff, feetech-servo-sdk) 자동 설치 |
 | 07 D4 precheck — lerobot-find-port | pyserial ImportError 해소 (영구 fix) |
 | §3-c 의 개별 pip install | 중복 설치 — pip no-op 으로 처리됨. 제거는 차기 cleanup 사이클 후보 |
 
 **검증:**
 
-- `bash -n dgx/scripts/setup_train_env.sh` PASS
+- `bash -n dgx/scripts/setup_finetune_env.sh` PASS
 - extras 키 `hardware`, `feetech` — lerobot upstream `pyproject.toml` 직접 확인 (line 110, 145)
 
 ---
@@ -178,7 +178,7 @@ Option B 원칙 유지: `dgx/pyproject.toml` 신규 생성 X. `dgx/lerobot/` 변
 
 **대상 파일:** `dgx/interactive_cli/flows/precheck.py`
 
-**변경 내용 (Part II — setup_train_env.sh deepdiff 현황 확인):**
+**변경 내용 (Part II — setup_finetune_env.sh deepdiff 현황 확인):**
 
 lerobot upstream `pyproject.toml` extras 직접 확인:
 ```
@@ -194,10 +194,10 @@ deepdiff-dep = ["deepdiff>=7.0.1,<9.0.0"]
 feetech = ["feetech-servo-sdk>=1.0.0,<2.0.0", "lerobot[pyserial-dep]", "lerobot[deepdiff-dep]"]
 ```
 
-`setup_train_env.sh` §3 현재 extras: `[smolvla,training,hardware,feetech]` → hardware + feetech 모두 `lerobot[deepdiff-dep]` 포함.
+`setup_finetune_env.sh` §3 현재 extras: `[smolvla,training,hardware,feetech]` → hardware + feetech 모두 `lerobot[deepdiff-dep]` 포함.
 §3-c 에도 `deepdiff>=7.0.1,<9.0.0` 명시 개별 설치 중 (D5 cycle 2 에서 추가된 중복 설치).
 
-**D8 Part II 결론**: `setup_train_env.sh` 변경 불필요.
+**D8 Part II 결론**: `setup_finetune_env.sh` 변경 불필요.
 - `[hardware,feetech]` extras 가 deepdiff-dep 을 transitive 포함 (D5 fix 이미 완료).
 - §3-c 의 deepdiff 별도 설치 라인은 중복 (07 BACKLOG #3 — 차기 정리 후보).
 - deepdiff 누락이 reported 된 이유: D5 fix 이전 환경에서 venv 미재설치 시 미적용. 재설치 시 해소.

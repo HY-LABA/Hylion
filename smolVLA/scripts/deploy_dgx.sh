@@ -21,10 +21,14 @@ ssh "${DGX_HOST}" "mkdir -p ${DGX_DEST}/dgx ${DGX_DEST}/docs/reference/lerobot"
 rsync -avz --delete \
     --exclude '.arm_finetune' \
     --exclude 'outputs' \
+    --exclude 'gestures/*/' \
     --exclude '__pycache__' \
     --exclude '*.pyc' \
     --exclude '*.egg-info' \
     "${SMOLVLA_ROOT}/dgx/" "${DGX_HOST}:${DGX_DEST}/dgx/"
+# 참고: 'gestures/*/' — gesture 데이터셋(parquet)은 DGX local-only 자산. repo 는 gestures/README.md
+#       (구조) 만 추적하므로, --delete 가 DGX 의 wave_hello* 데이터셋을 삭제하지 않도록 보호.
+#       .gitignore 의 'dgx/gestures/*/' 패턴과 일치.
 
 echo "[deploy-dgx] docs/reference/lerobot/ → ${DGX_HOST}:${DGX_DEST}/docs/reference/lerobot/"
 echo "[deploy-dgx]   (editable 설치 대상 — 약 수백 MB, 최초 1회는 시간이 걸립니다)"
@@ -39,6 +43,6 @@ rsync -avz --delete \
 echo ""
 echo "[deploy-dgx] 완료. DGX 에서 초기 설치/검증이 필요하면:"
 echo "  ssh dgx"
-echo "  bash ~/smolvla/dgx/scripts/setup_train_env.sh"
+echo "  bash ~/smolvla/dgx/scripts/setup_finetune_env.sh"
 echo "  source ~/smolvla/dgx/.arm_finetune/bin/activate"
 echo "  bash ~/smolvla/dgx/scripts/smoke_test.sh"

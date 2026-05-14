@@ -115,7 +115,7 @@ upstream (`lerobot/src/lerobot/`) 대비 변경 이력 누적:
 
 `docs/storage/lerobot_upstream_check/04_dgx_lerobot_diff.md` 에 wrapper 변경 이력 기록.
 
-> 본 파일은 이름과 달리 lerobot 코드 diff 가 아닌 **DGX 측 wrapper 스크립트 변경 이력**. DGX 는 `docs/reference/lerobot/` 를 editable install 하므로 lerobot 코드 자체 diff 는 0 — `setup_train_env.sh`, `smoke_test.sh`, `preflight_check.sh` 등 보정 wrapper 변경만 기록.
+> 본 파일은 이름과 달리 lerobot 코드 diff 가 아닌 **DGX 측 wrapper 스크립트 변경 이력**. DGX 는 `docs/reference/lerobot/` 를 editable install 하므로 lerobot 코드 자체 diff 는 0 — `setup_finetune_env.sh`, `smoke_test.sh`, `preflight_check.sh` 등 보정 wrapper 변경만 기록.
 
 ## 변경 시 체크리스트
 

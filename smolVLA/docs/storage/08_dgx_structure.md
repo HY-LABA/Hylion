@@ -42,9 +42,9 @@
 dgx/
 ├── README.md                       # 디렉터리 책임 + 운영 가이드 (학습 체크리스트 포함)
 ├── .arm_finetune/                  # 학습 전용 venv (hidden, Python 3.12.3, torch 2.10.0+cu130)
-│                                   # setup_train_env.sh 가 생성. rsync 배포 제외
+│                                   # setup_finetune_env.sh 가 생성. rsync 배포 제외
 ├── scripts/                        # 환경 구축·운영 스크립트
-│   ├── setup_train_env.sh          # venv 생성 + PyTorch + lerobot editable 설치 + 환경변수 자동 적용
+│   ├── setup_finetune_env.sh          # venv 생성 + PyTorch + lerobot editable 설치 + 환경변수 자동 적용
 │   ├── preflight_check.sh          # 학습 전 OOM/Walking RL 보호 게이트 (smoke/s1/s3/lora 시나리오)
 │   ├── smoke_test.sh               # lerobot-train --steps=1 검증 (02 마일스톤 산출물)
 │   └── save_dummy_checkpoint.sh    # dummy 체크포인트 생성 (ckpt 호환성 검증용, 02 산출물)
@@ -72,7 +72,7 @@ dgx/
 ├── README.md                       # 갱신: DataCollector 인터페이스 + 새 디렉터리 안내 추가
 ├── .arm_finetune/                  # 유지 (변경 없음)
 ├── scripts/                        # 유지 (변경 없음)
-│   ├── setup_train_env.sh
+│   ├── setup_finetune_env.sh
 │   ├── preflight_check.sh
 │   ├── smoke_test.sh
 │   └── save_dummy_checkpoint.sh
@@ -97,7 +97,7 @@ dgx/
 
 | 컴포넌트 | 책임 | 04 이후 변경 |
 |---|---|---|
-| `dgx/scripts/setup_train_env.sh` | venv 생성 + PyTorch 2.10.0+cu130 설치 + lerobot editable 설치 + 환경변수 자동 적용 (HF_HOME / PYTORCH_CUDA_ALLOC_CONF / CUDA_VISIBLE_DEVICES). Jetson 제약 없음 (일반 pip wheel 사용 가능) | 유지. 04 에서 변경 없음 |
+| `dgx/scripts/setup_finetune_env.sh` | venv 생성 + PyTorch 2.10.0+cu130 설치 + lerobot editable 설치 + 환경변수 자동 적용 (HF_HOME / PYTORCH_CUDA_ALLOC_CONF / CUDA_VISIBLE_DEVICES). Jetson 제약 없음 (일반 pip wheel 사용 가능) | 유지. 04 에서 변경 없음 |
 | `dgx/scripts/preflight_check.sh` | 학습 시작 전 필수 게이트. 5 항목: venv/환경변수 격리 / 메모리 가용성 (UMA pool) / Walking RL 프로세스 관찰 (kill 금지) / Ollama gemma3 GPU 점유 / 디스크 가용량. 시나리오별 임계치 (smoke/s1/s3/lora) | 유지. 04 에서 변경 없음 |
 | `dgx/scripts/smoke_test.sh` | lerobot-train 1 step 검증. preflight → 1-step 학습 → nvidia-smi + free -m 샘플링. 02 마일스톤 prod 검증 산출물 | 유지. 04 에서 변경 없음 |
 | `dgx/scripts/save_dummy_checkpoint.sh` | dummy ckpt 생성 (DGX→Orin 전송 검증용). --save_checkpoint=true, steps=1, output_dir=outputs/train/dummy_ckpt | 유지. 04 에서 변경 없음 |
@@ -115,7 +115,7 @@ dgx/
 
 | 컴포넌트 | 00_orin_setting | 01_teleoptest | 02_dgx_setting | 03_smolvla_test_on_orin | 04_infra_setup | 05_leftarmVLA | 06_biarm_teleop | 07_biarm_VLA | 08_biarm_deploy |
 |---|---|---|---|---|---|---|---|---|---|
-| `scripts/setup_train_env.sh` | - | - | ✏️ | - | - | ✓ (재실행) | - | ✓ (재실행) | - |
+| `scripts/setup_finetune_env.sh` | - | - | ✏️ | - | - | ✓ (재실행) | - | ✓ (재실행) | - |
 | `scripts/preflight_check.sh` | - | - | ✏️ | - | - | ✓ | ✓ | ✓ | ✓ |
 | `scripts/smoke_test.sh` | - | - | ✏️ | - | ✓ (TODO-X3) | ✓ (학습 전 검증) | - | ✓ | - |
 | `scripts/save_dummy_checkpoint.sh` | - | - | ✏️ | ✓ (TODO-10b) | ✓ (TODO-X3) | - | - | - | - |
@@ -218,13 +218,13 @@ DGX 는 팀 공용 머신. SmolVLA 학습은 Walking RL 잔여 자원만 사용:
 
 | 항목 | 현재 위치 | 사유 |
 |---|---|---|
-| `dgx/scripts/setup_train_env.sh` | `dgx/scripts/` | 02 산출물. 학습 환경 셋업 핵심. 변경 시 회귀 위험 높음. 동작 이상 없음 |
+| `dgx/scripts/setup_finetune_env.sh` | `dgx/scripts/` | 02 산출물. 학습 환경 셋업 핵심. 변경 시 회귀 위험 높음. 동작 이상 없음 |
 | `dgx/scripts/preflight_check.sh` | `dgx/scripts/` | 02 산출물. Walking RL 보호 + OOM 방어 게이트. 변경 시 보호 정책 훼손 위험 |
 | `dgx/scripts/smoke_test.sh` | `dgx/scripts/` | 02 산출물. 1-step 검증 + 자원 샘플링. 04 TODO-X3 에서 재사용 |
 | `dgx/scripts/save_dummy_checkpoint.sh` | `dgx/scripts/` | 02 산출물. DGX→Orin ckpt 전송 검증용. 04 TODO-X3 에서 재사용 |
 | `dgx/runs/README.md` | `dgx/runs/` | YAGNI. 05 진입 시 runs/ 하위 채움 |
 | `dgx/README.md` | `dgx/` | 갱신만 (§4-4 참조) |
-| `dgx/.arm_finetune/` | `dgx/` | venv. gitignore. 재생성 시 setup_train_env.sh 재실행 |
+| `dgx/.arm_finetune/` | `dgx/` | venv. gitignore. 재생성 시 setup_finetune_env.sh 재실행 |
 
 ### 5-2) 이관 (out)
 
@@ -294,4 +294,4 @@ DGX 에서 사용하지 않는 entrypoint (DataCollector 또는 Orin 의 책임)
 | 날짜 | 변경 |
 |---|---|
 | 2026-05-01 | 초안 작성 — 04 TODO-X1 산출물. 4-노드 분리 아키텍처에서 DGX 학습 전용 책임 명확화. run_teleoperate.sh DataCollector 이관 결정 (후보 a 채택). 5개 마이그레이션 카테고리 정의. DataCollector ↔ DGX 인터페이스는 TODO-T1 awaits_user 답에 따라 §5-3 config/ 스키마 갱신 필요 명시 |
-| 2026-05-02 | `dgx/scripts/setup_train_env.sh` §3-c 블록 추가 — 06_dgx_absorbs_datacollector TODO-X5. record·hardware·feetech extras (torchcodec cu130 인덱스 별도 + 9개 PyPI 패키지) 설치 step 삽입. Option B 채택 (dgx/pyproject.toml 미변경). |
+| 2026-05-02 | `dgx/scripts/setup_finetune_env.sh` §3-c 블록 추가 — 06_dgx_absorbs_datacollector TODO-X5. record·hardware·feetech extras (torchcodec cu130 인덱스 별도 + 9개 PyPI 패키지) 설치 step 삽입. Option B 채택 (dgx/pyproject.toml 미변경). |

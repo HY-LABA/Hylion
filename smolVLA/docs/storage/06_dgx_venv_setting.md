@@ -23,7 +23,7 @@
 └── dgx/                        # 학습 (본 문서)
     ├── .arm_finetune/          # ← venv (hidden, Python 3.12, torch 2.10.0+cu130)
     ├── scripts/
-    │   ├── setup_train_env.sh
+    │   ├── setup_finetune_env.sh
     │   ├── preflight_check.sh
     │   └── smoke_test.sh        # + check_hardware·run_teleoperate·push_dataset_hub 등
     └── outputs/                # 학습 출력 (배포 제외, hidden 아님)
@@ -47,7 +47,7 @@ DGX 시스템 Python 이 lerobot 호환 (`>=3.10`) 이고 conda 가 미설치이
 
 - venv 경로: `~/smolvla/dgx/.arm_finetune`
 - Python 버전: `3.12.3` (DGX 시스템 Python)
-- 설치 스크립트: `~/smolvla/dgx/scripts/setup_train_env.sh`
+- 설치 스크립트: `~/smolvla/dgx/scripts/setup_finetune_env.sh`
 
 ### 실측 설치 패키지 (2026-04-28 기준)
 
@@ -66,7 +66,7 @@ TODO-09b prod 검증 완료 시점:
 
 ### 환경변수 자동 적용
 
-`setup_train_env.sh` 가 venv 의 `bin/activate` 끝에 자동 export 추가:
+`setup_finetune_env.sh` 가 venv 의 `bin/activate` 끝에 자동 export 추가:
 
 | 변수 | 값 | 의미 |
 |---|---|---|
@@ -98,7 +98,7 @@ The current PyTorch install supports CUDA capabilities sm_80 ... sm_120.
 
 → TODO-09b 검증에서 동작 확인. 무시 가능.
 
-### 설치 순서 (`setup_train_env.sh` 기준)
+### 설치 순서 (`setup_finetune_env.sh` 기준)
 
 1. DGX 시스템 Python 3.12 식별 (`python3.12` 우선, 미탐지 시 `python3` fallback)
 2. venv 생성: `python -m venv ~/smolvla/dgx/.arm_finetune`
@@ -120,7 +120,7 @@ The current PyTorch install supports CUDA capabilities sm_80 ... sm_120.
 | lerobot | editable submodule (학습 전용, 코드 수정 X) | curated `orin/lerobot/` (추론 전용, 트리밍 적용) |
 | Python 버전 차이의 영향 | safetensors 직렬화는 Python 마이너 버전 독립적 — 호환 가능 (TODO-10b 검증 예정) |
 
-## 4) `setup_train_env.sh` 구성 세팅
+## 4) `setup_finetune_env.sh` 구성 세팅
 
 ### 시스템 의존 패키지
 
@@ -136,7 +136,7 @@ DGX 는 학습 전용이라 lerobot 코드 수정은 안 한다는 원칙이지�
 
 ### 환경변수 자동 적용 (venv activate 시)
 
-`setup_train_env.sh` 의 §4 가 venv `bin/activate` 끝에 export 추가:
+`setup_finetune_env.sh` 의 §4 가 venv `bin/activate` 끝에 export 추가:
 
 ```bash
 # === smolVLA dgx env vars ===
@@ -147,7 +147,7 @@ export CUDA_VISIBLE_DEVICES="0"
 
 마커 `# === smolVLA dgx env vars ===` 로 멱등성 보장 — 재실행 시 중복 추가 방지.
 
-### 설치 검증 (`setup_train_env.sh §5`)
+### 설치 검증 (`setup_finetune_env.sh §5`)
 
 ```python
 import os, sys, torch

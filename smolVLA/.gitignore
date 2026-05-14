@@ -4,6 +4,10 @@
 orin/.hylion_arm/
 dgx/.arm_finetune/
 
+# ── DGX 런타임/데이터 (repo 비추적) ───────────────────────────────────────────
+dgx/outputs/          # 학습 산출물 (체크포인트·wandb·로그) — 런타임 생성
+dgx/gestures/*/       # gesture 데이터셋 (parquet) — 구조(README)만 추적, 데이터 제외
+
 # ── Python 공통 ────────────────────────────────────────────────────────────────
 __pycache__/
 *.pyc

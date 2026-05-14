@@ -1,6 +1,6 @@
 #!/bin/bash
 # DGX Spark (GB10, UMA, CUDA 13.0) SmolVLA 학습 환경 구성 스크립트
-# 실행 위치: DGX (~/smolvla/dgx/scripts/setup_train_env.sh)
+# 실행 위치: DGX (~/smolvla/dgx/scripts/setup_finetune_env.sh)
 #
 # 결정 근거: docs/work_flow/specs/02_dgx_setting.md TODO-08 / docs/lerobot_study/06_smolvla_finetune_feasibility.md §2
 #   - Python: 시스템 3.12.3 (Walking RL 동일)
@@ -72,7 +72,7 @@ pip install \
 # 06_dgx_absorbs_datacollector 결정 후행 (영구 fix) + 07 TODO-D5:
 #   06 사이클에서 DGX 가 데이터 수집 책임 흡수 — hardware·feetech extras 필수.
 #   07 D4 precheck 시 lerobot-find-port → pyserial ImportError 차단 원인.
-#   Option B 원칙 (dgx/pyproject.toml 신규 생성 X) 유지 — setup_train_env.sh 에서만 관리.
+#   Option B 원칙 (dgx/pyproject.toml 신규 생성 X) 유지 — setup_finetune_env.sh 에서만 관리.
 echo "[setup] lerobot[smolvla,training,hardware,feetech] editable 설치 중..."
 pip install -e "${LEROBOT_SRC}[smolvla,training,hardware,feetech]" --quiet
 

@@ -39,7 +39,7 @@ model: sonnet
 spec 작성 시점에 *언급된 파일·경로* 가 실제 존재하는지 검증. *역사적 신호* (06_dgx_absorbs_datacollector wrap reflection 도출):
 
 - spec 본문의 "구현 대상", "참조" 섹션에서 언급된 파일·디렉터리 경로 추출
-- `ls` 또는 `Read` 로 *실 존재 여부* 검증. 발견된 불일치 (예: `setup_env.sh` vs 실제 `setup_train_env.sh`) 는 plan §확신 가정 절에 *오기재 정정 메모* 기록 + 해당 todo 의 task-executor 가 정확한 경로로 작업하도록 명시
+- `ls` 또는 `Read` 로 *실 존재 여부* 검증. 발견된 불일치 (예: `setup_env.sh` vs 실제 `setup_finetune_env.sh`) 는 plan §확신 가정 절에 *오기재 정정 메모* 기록 + 해당 todo 의 task-executor 가 정확한 경로로 작업하도록 명시
 - 미존재 파일 (신규 작성 대상) 은 `(신규)` 표기 — 검증 X 정상
 
 목적: spec Phase 1 작성 시 사용자·메인이 가정한 파일명이 *실제 코드베이스* 와 어긋나는 경우, 자동화 도중 task-executor 가 발견하면 늦은 오류 감지. planner 단계에서 사전 차단.

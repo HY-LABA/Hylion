@@ -13,7 +13,7 @@
 | `01_compatibility_check.md` | 2026-04-22 (03_smolvla_test_on_orin) | lerobot upstream 의존성 충돌 점검 기록. Python 3.10 / CUDA 12.6 / aarch64 Orin 환경 고정값 대비 upstream 요구사항 비교. `check_update_diff.sh` 연계. |
 | `02_orin_pyproject_diff.md` | 2026-04-22 (03_smolvla_test_on_orin) | `orin/pyproject.toml` vs upstream 차이 이력. `requires-python` 완화 (`>=3.12` → `>=3.10`), torch/torchvision 의존성 제거 등 Coupled File Rule 의무 기록 대상. |
 | `03_orin_lerobot_diff.md` | 2026-04-23 (03_smolvla_test_on_orin) | `orin/lerobot/` vs upstream 코드 변경 이력. Python 3.10 호환 backport 패치 (PEP 695 generic→TypeVar, type alias→Union 등) 기록. Coupled File Rule 의무 기록 대상. |
-| `04_dgx_lerobot_diff.md` | 2026-04-28 (02_dgx_setting) | ⚠️ **이름 주의** — lerobot 코드 diff 가 아닌 **DGX wrapper 스크립트 변경 이력**. DGX 는 `docs/reference/lerobot/` editable install 이라 lerobot 코드 diff 0; `dgx/scripts/*.sh` (setup_train_env·smoke_test·preflight_check 등) 보정만 기록. (rename 안 한 이유: history/ 30+ 참조 깨짐 회피) |
+| `04_dgx_lerobot_diff.md` | 2026-04-28 (02_dgx_setting) | ⚠️ **이름 주의** — lerobot 코드 diff 가 아닌 **DGX wrapper 스크립트 변경 이력**. DGX 는 `docs/reference/lerobot/` editable install 이라 lerobot 코드 diff 0; `dgx/scripts/*.sh` (setup_finetune_env·smoke_test·preflight_check 등) 보정만 기록. (rename 안 한 이유: history/ 30+ 참조 깨짐 회피) |
 | `check_update_diff.sh` | 2026-04-22 (03_smolvla_test_on_orin) | upstream lerobot diff 점검 보조 스크립트. `01_compatibility_check.md` 연계. |
 | `99_lerobot_upstream_Tracking.md` (본 파일) | 2026-04-22 (03_smolvla_test_on_orin) | 색인 역할 대행 + upstream 동기화 이력 누적. |
 

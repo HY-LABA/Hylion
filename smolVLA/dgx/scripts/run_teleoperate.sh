@@ -24,8 +24,10 @@ set -euo pipefail
 
 # Confirmed by lerobot-find-port (20260427): follower=serial 5B42138563, leader=serial 5B42138566
 # 시연장 이동 시 lerobot-find-port 로 재확인 필요 (USB 순서 변동 가능)
-FOLLOWER_PORT="/dev/ttyACM1"
-LEADER_PORT="/dev/ttyACM0"
+# 2026-05-14: env override 활성화 (이전엔 hardcoded 라 우측 팔 작업 시 좌측 팔 잡히는 버그).
+#             /dev/ttyACMx 는 부팅마다 swap 가능 → /dev/serial/by-id/ 권장.
+FOLLOWER_PORT="${FOLLOWER_PORT:-/dev/ttyACM1}"
+LEADER_PORT="${LEADER_PORT:-/dev/ttyACM0}"
 # C0d: 환경변수 우선, hardcoded fallback (calibration.json 미존재 시)
 # teleop.py flow3_teleoperate 가 calibration.json 로드 후 FOLLOWER_ID / LEADER_ID 주입.
 # lerobot calibration 파일명 = robot.id → ID 정합이 calibration 정합.

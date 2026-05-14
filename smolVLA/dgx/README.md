@@ -19,10 +19,10 @@
 
 ### lerobot 설치 방법
 
-`setup_train_env.sh` 가 `docs/reference/lerobot/` 를 editable install 로 설치한다. `dgx/lerobot/` curated 디렉터리는 존재하지 않으며 도입 계획도 없다 (upstream 무수정 원칙).
+`setup_finetune_env.sh` 가 `docs/reference/lerobot/` 를 editable install 로 설치한다. `dgx/lerobot/` curated 디렉터리는 존재하지 않으며 도입 계획도 없다 (upstream 무수정 원칙).
 
 ```bash
-# setup_train_env.sh 가 수행하는 lerobot 설치
+# setup_finetune_env.sh 가 수행하는 lerobot 설치
 pip install -e ~/smolvla/docs/reference/lerobot[smolvla]
 ```
 
@@ -33,9 +33,9 @@ pip install -e ~/smolvla/docs/reference/lerobot[smolvla]
 ```text
 dgx/
 ├── README.md
-├── .arm_finetune/           # dgx 학습 전용 venv (hidden, orin/.hylion_arm 과 격리). setup_train_env.sh 가 생성. rsync 배포 제외
+├── .arm_finetune/           # dgx 학습 전용 venv (hidden, orin/.hylion_arm 과 격리). setup_finetune_env.sh 가 생성. rsync 배포 제외
 ├── scripts/                 # 환경 구축·운영 스크립트 (마일스톤 무관, 변경 거의 없음)
-│   ├── setup_train_env.sh   # venv 생성 + PyTorch + lerobot editable 설치 + 환경변수 자동 적용
+│   ├── setup_finetune_env.sh   # venv 생성 + PyTorch + lerobot editable 설치 + 환경변수 자동 적용
 │   ├── preflight_check.sh   # 학습 전 OOM/Walking RL 보호 게이트
 │   └── smoke_test.sh        # lerobot-train --steps=1 검증 (svla_so100_pickplace)
 └── outputs/                 # 학습 출력 (체크포인트, 로그) — 자동 생성. rsync 배포 제외
@@ -77,7 +77,7 @@ dgx/
 
 ```bash
 ssh dgx
-bash ~/smolvla/dgx/scripts/setup_train_env.sh
+bash ~/smolvla/dgx/scripts/setup_finetune_env.sh
 ```
 
 → `/home/laba/smolvla/dgx/.arm_finetune/` 에 venv 생성, PyTorch 2.10.0+cu130 + lerobot editable 설치, 환경변수 자동 적용.
@@ -152,7 +152,7 @@ lerobot-train \
 
 ## 환경변수 (자동 적용)
 
-`setup_train_env.sh` 가 venv activate 시 다음 변수 자동 적용:
+`setup_finetune_env.sh` 가 venv activate 시 다음 변수 자동 적용:
 
 | 변수 | 값 | 의미 |
 |---|---|---|
