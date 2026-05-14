@@ -41,7 +41,9 @@ def cmd_record(args, base, record):
     if not (1 <= args.task <= len(tasks)):
         opts_s = " / ".join(f"{i+1}={t['instruction']}" for i, t in enumerate(tasks))
         die(f"--task 는 1~{len(tasks)} (현재: {args.task}).  {opts_s}")
-    instruction = tasks[args.task - 1]["instruction"]
+    task = tasks[args.task - 1]
+    instruction = task["instruction"]
+    target_episodes = task["target_episodes"]   # 수집 목표 (표시용 — 실 수집은 --episodes 차수별)
 
     # ── 사전 점검: 캘리브레이션 파일 존재 ──
     check_calibration(base)
@@ -78,7 +80,7 @@ def cmd_record(args, base, record):
     # ── 요약 출력 ──
     print(f"{TAG} dataset  : {hf_repo_id}")
     print(f"{TAG} task {args.task}   : {instruction}")
-    print(f"{TAG} episodes : {args.episodes}  (이번 차수 추가분 — 누적 아님)")
+    print(f"{TAG} episodes : {args.episodes}  (이번 차수 추가분 — 목표 {target_episodes} 중, 누적 아님)")
     print(f"{TAG} mode     : {'RESUME (기존 dataset 발견)' if resume else 'FRESH (신규 생성)'}")
     print(f"{TAG} follower : {summary['follower_port']}  [config hardware.follower_port]")
     print(f"{TAG} leader   : {summary['leader_port']}  [config hardware.leader_port]")

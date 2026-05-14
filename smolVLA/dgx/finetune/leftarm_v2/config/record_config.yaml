@@ -15,12 +15,17 @@ dataset:                          # → lerobot-record --dataset.*
 
 record_opts:                      # → lerobot-record 최상위 인자 (--dataset.* 아님)
   display_data: true              # Rerun viewer 표시 (수집/텔레옵 중 영상 확인)
-  play_sounds: true               # 녹화 시작/종료 오디오 큐
+  play_sounds: false              # 녹화 시작/종료 오디오 큐
 
 # 멀티태스크 — 단일 leftarm_v2 dataset 에 instruction 별 수집.
 # instruction 은 카메라로 보이는 속성(색)으로 grounding (leftarm_v1 의 "left/right" 모호성 사고 회피).
+#
+# ⚠️ target_episodes = task 별 수집 *목표* 총량 (기록·참조용). run_record.py 가 이 값으로
+#    한꺼번에 수집하지 않는다. 실제 수집은 차수(batch)별로:
+#      python run_record.py record --task N --episodes M   ← M = 이번 차수 분량
+#    (lerobot num_episodes 시맨틱 = 이번 세션 추가분, 누적 아님. 예: 20×5 차수 → 100)
 tasks:
   - instruction: "Pick up the blue and yellow doll and place it in the yellow plastic box"
-    episodes: 100
+    target_episodes: 100
   - instruction: "Pick up the yellow can and place it in the yellow plastic box"
-    episodes: 100
+    target_episodes: 100
