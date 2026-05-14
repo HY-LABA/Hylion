@@ -22,6 +22,7 @@ rsync -avz --delete \
     --exclude '.arm_finetune' \
     --exclude 'outputs' \
     --exclude 'gestures/*/' \
+    --exclude 'finetune/*/config/base_config.yaml' \
     --exclude '__pycache__' \
     --exclude '*.pyc' \
     --exclude '*.egg-info' \
@@ -29,6 +30,10 @@ rsync -avz --delete \
 # 참고: 'gestures/*/' — gesture 데이터셋(parquet)은 DGX local-only 자산. repo 는 gestures/README.md
 #       (구조) 만 추적하므로, --delete 가 DGX 의 wave_hello* 데이터셋을 삭제하지 않도록 보호.
 #       .gitignore 의 'dgx/gestures/*/' 패턴과 일치.
+# 참고: 'finetune/*/config/base_config.yaml' — base_config 의 hardware 섹션(포트·카메라
+#       인덱스)은 DGX 세션마다 직접 갱신하는 로컬 값. --delete rsync 가 repo 의 null
+#       템플릿으로 덮어쓰지 않도록 제외. 안정값 필드(robot/teleop/cameras/calibration/
+#       paths/accounts) 변경 시엔 해당 파일만 수동 rsync 필요. (사용자 결정 2026-05-14)
 
 echo "[deploy-dgx] docs/reference/lerobot/ → ${DGX_HOST}:${DGX_DEST}/docs/reference/lerobot/"
 echo "[deploy-dgx]   (editable 설치 대상 — 약 수백 MB, 최초 1회는 시간이 걸립니다)"

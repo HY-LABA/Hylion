@@ -39,6 +39,8 @@ dgx/finetune/
 
 > ⚠️ `hardware` 는 env 변수 메커니즘도 fallback 도 아니다. `check_port_and_camera_index.py` 로 확인한 값을 매 세션 `base_config.yaml` 에 직접 갱신한다. `null` = 미확인 → 에러 (잘못된 값으로 조용히 실행되는 사고 방지).
 
+> 📌 **`base_config.yaml` 은 `deploy_dgx.sh` 동기화 대상에서 제외**된다 (hardware 섹션이 DGX 로컬 세션값이라 repo 의 `null` 템플릿이 덮어쓰지 않도록). DGX 에서 직접 갱신한 값은 배포에도 보존된다. 반대로 안정값 필드(`robot`/`teleop`/`cameras`/`calibration`/`paths`/`accounts`)를 repo 에서 고쳤다면 그 파일만 수동 rsync 해야 DGX 에 반영된다.
+
 ## 워크플로우 (leftarm_v2)
 
 ```
