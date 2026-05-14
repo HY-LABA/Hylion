@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
+import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
 from time import sleep
@@ -16,6 +18,16 @@ CHAT_STANDBY_COOLDOWN_SEC = 1.2
 # parameter: number of recent (user, assistant) turn pairs kept in the LLM context.
 # Increase for longer memory at the cost of more tokens / latency per request.
 MAX_HISTORY_TURNS = 4
+
+# Gesture replay wrapper (Jetson side). A `chat` turn whose action carries a
+# non-"none" gesture_name triggers this script on the right SO-ARM follower.
+# Env-overridable so a relocated repo doesn't need a code change.
+PLAY_GESTURE_SCRIPT = os.getenv(
+	"PLAY_GESTURE_SCRIPT", "/home/laba/smolvla/orin/scripts/play_gesture.sh"
+)
+# wave gestures are ~7-10s of replay; allow generous headroom for venv activate
+# + pre-check before declaring the subprocess hung.
+GESTURE_TIMEOUT_SEC = 60.0
 
 from jetson.core.llm import build_llm_backend
 from jetson.core.network import is_online
@@ -64,6 +76,7 @@ def _build_standby_action(session_id: str, reason: str = "task_completed") -> di
 		"requires_smolvla": False,
 		"requires_bhl": False,
 		"gait_cmd": "none",
+		"gesture_name": "none",
 		"state_current": "IDLE",
 		"safety_allowed": True,
 		"fallback_policy": reason,
@@ -125,6 +138,64 @@ def _route_action(action_json: dict) -> None:
 	sleep(0.2)
 
 
+def _play_gesture_if_any(action_json: dict) -> None:
+	"""Replay a gesture on the right arm if this turn's action carries one.
+
+	gesture_name is a harness-derived field (keyword detection in prompt.py)
+	that is only ever non-"none" on a `chat` turn — gestures are a side-effect
+	of conversation, not a standalone intent, so this runs inside the chat
+	branch and the chat loop continues afterwards.
+
+	This is the coordinator's first real (non-mock) executor. play_gesture.sh
+	owns all hardware concerns (venv, port, calib, the cosmetic disconnect-
+	overload case) and reports a single exit code: 0 = success (incl. cosmetic),
+	non-zero = a real failure we just log. The call is blocking and the loop is
+	single-threaded, so there is no USB contention to guard against.
+	"""
+	gesture_name = str(action_json.get("gesture_name", "none")).strip()
+	if not gesture_name or gesture_name == "none":
+		return
+
+	if not Path(PLAY_GESTURE_SCRIPT).is_file():
+		print(f"[Gesture] {gesture_name} -> play_gesture.sh 없음: {PLAY_GESTURE_SCRIPT}; skip")
+		return
+
+	print(f"[Gesture] {gesture_name} -> play_gesture.sh 실행")
+	# play_gesture.sh self-activates its own venv (JETSON_VENV), but its guard
+	# only fires when VIRTUAL_ENV is *unset*. A stale or foreign VIRTUAL_ENV
+	# inherited from the coordinator's launch env makes it skip activation and
+	# fail with rc=3 (lerobot-replay not found). Strip it so the wrapper always
+	# picks its own venv regardless of how the coordinator was started.
+	gesture_env = {k: v for k, v in os.environ.items() if k != "VIRTUAL_ENV"}
+	try:
+		result = subprocess.run(
+			["bash", PLAY_GESTURE_SCRIPT, gesture_name],
+			capture_output=True,
+			text=True,
+			timeout=GESTURE_TIMEOUT_SEC,
+			env=gesture_env,
+		)
+	except subprocess.TimeoutExpired:
+		print(f"[Gesture] {gesture_name} -> TIMEOUT ({GESTURE_TIMEOUT_SEC:.0f}s)")
+		return
+	except Exception as exc:
+		print(f"[Gesture] {gesture_name} -> 실행 실패: {exc}")
+		return
+
+	# play_gesture.sh stdout ends with a one-line summary; surface that.
+	summary = ""
+	if result.stdout.strip():
+		summary = result.stdout.strip().splitlines()[-1]
+	if result.returncode == 0:
+		print(f"[Gesture] {gesture_name} -> 성공  {summary}")
+	else:
+		# 2=인자 3=환경 4=데이터/캘리브 5=포트 1=재생실패 — all just logged; a
+		# failed gesture must never break the conversation loop.
+		print(f"[Gesture] {gesture_name} -> 실패 (rc={result.returncode})  {summary}")
+		if result.stderr.strip():
+			print(f"[Gesture] stderr: {result.stderr.strip()}")
+
+
 def _speak_reply_if_any(action_json: dict, stage: str, tts_backend, mouth_servo=None) -> None:
 	reply_text = str(action_json.get("reply_text", "")).strip()
 	if not reply_text:
@@ -166,6 +237,7 @@ def _build_greeting_action(session_id: str) -> dict:
 		"requires_smolvla": False,
 		"requires_bhl": False,
 		"gait_cmd": "none",
+		"gesture_name": "none",
 		"state_current": "IDLE",
 		"safety_allowed": True,
 		"fallback_policy": "greeting",
@@ -263,6 +335,9 @@ def run_live_pipeline(
 			_speak_reply_if_any(action_json, stage=f"before_{intent}", tts_backend=tts_backend, mouth_servo=mouth_servo)
 
 			if intent in {"chat", "unknown"}:
+				# A chat turn may carry a gesture (keyword-detected): play it on
+				# the right arm after speaking the reply, then keep chatting.
+				_play_gesture_if_any(action_json)
 				# Chat (or unknown — re-prompt the user) continues; listen for next utterance
 				print(f"[Mode] {intent} -> chat loop continues. Listening for next utterance.")
 				continue

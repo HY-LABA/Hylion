@@ -45,7 +45,7 @@ def test_build_action_success_validates_and_normalizes_standby():
     mock_post.assert_called_once()
     call_path, call_body = mock_post.call_args[0]
     assert call_path == "/api/chat"
-    assert call_body["model"] == "exaone3.5:2.4b"
+    assert call_body["model"] == "qwen2.5:1.5b-instruct"
     assert call_body["format"] == "json"
     assert call_body["stream"] is False
     assert call_body["messages"][0]["role"] == "system"
@@ -101,7 +101,7 @@ def test_build_action_falls_back_when_request_fails():
     assert action["intent"] == "unknown"
     assert action["network_online"] is False
     assert action["fallback_policy"] == "ollama_request_failed"
-    assert "안전 대기" in action["reply_text"]
+    assert action["reply_text"]  # offline fallback always carries a spoken reply
 
 
 def test_build_action_falls_back_when_content_is_invalid_json():
@@ -118,7 +118,7 @@ def test_build_action_falls_back_when_content_is_invalid_json():
         )
 
     assert action["intent"] == "unknown"
-    assert action["fallback_policy"] == "ollama_invalid_schema"
+    assert action["fallback_policy"] == "ollama_parse_fail"
 
 
 def test_build_action_falls_back_when_message_missing():
@@ -143,7 +143,7 @@ def test_factory_returns_ollama_when_offline():
 
     backend = build_llm_backend(online=False)
     assert isinstance(backend, OllamaLLMBackend)
-    assert backend.name == "ollama-exaone3.5:2.4b"
+    assert backend.name == "ollama-qwen2.5:1.5b-instruct"
 
 
 def test_factory_returns_groq_when_online():

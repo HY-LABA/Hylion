@@ -957,3 +957,71 @@
   - BHL `configs/` 가 비어있어 정책 학습 명령 범위 yaml 확인 불가. 0.5 보수값.
   - `velocity_y` 와 `velocity_yaw` 의 부호 (gamepad.py 기준 +X=좌측/좌회전으로 가정).
   - Jetson coordinator 측 TCP 클라이언트 코드 — 아직 없음, 다음 단계.
+
+### 2026-05-14 (Coordinator LLM 프롬프트 — 하네스 엔지니어링 적용)
+
+- 한 줄 요약:
+  - 프롬프트를 "더 좋은 문장 쓰기"가 아니라 모델을 감싸는 하네스 전체 설계로 접근.
+    LLM 출력 계약을 4필드로 축소하고 나머지는 코드가 derive/주입, eval 하네스로
+    프롬프트를 숫자로 측정하며 3회 반복(69.2% → 76.9% → 80.8%).
+- 실행한 검증 명령:
+  - `python -m pytest tests/3_interface/ -q` → 28 passed
+  - `python -m jetson.core.llm.eval.run_eval --backend offline` → 21/26 (80.8%)
+- 핵심 설계 (하네스 책임 맵):
+  - LLM 판단 = `intent, target_object, reply_text, gait_cmd` 4필드만.
+  - 코드 derive = `requires_smolvla/requires_bhl/state_current/safety_allowed`.
+  - 코드 주입 = `action_id/timestamp/session_id/schema_version/source/`
+    `network_online/fallback_policy`.
+- 수정한 파일:
+  - `jetson/core/llm/prompt.py` — 전면 재작성. `extract_core`(LLM JSON→4필드),
+    `derive_full_action`(4필드→15필드 스키마 객체), `apply_hard_overrides`
+    (키워드 규칙을 프롬프트→코드로 이동, longest-match-wins), `assemble_action`
+    (두 백엔드 공통 진입점), 레이어드 `ONLINE/OFFLINE_SYSTEM_PROMPT`.
+    낡은 `LocalLLMClient`/`build_action_json_from_stt`/`_apply_conversation_policy`
+    경로 제거.
+  - `jetson/core/llm/groq_llm.py` `ollama_llm.py` — 둘 다 `assemble_action`
+    공통 경로로 통합. `OLLAMA_SLIM_SYSTEM_PROMPT` 삭제(→`OFFLINE_SYSTEM_PROMPT`).
+  - `jetson/core/llm/factory.py` — docstring 모델명 정정(exaone→qwen2.5:1.5b).
+  - `jetson/core/llm/eval/` — 신규. `cases.jsonl`(26 케이스), `run_eval.py`
+    (intent/target/gait 정확도 측정), `__init__.py`.
+  - `tests/3_interface/test_groq_api.py` — 신규 API(extract_core/apply_hard_
+    overrides/derive_full_action/assemble_action) 기준 재작성.
+  - `tests/3_interface/test_ollama_llm.py` — staleness 정정(모델명, fallback_policy
+    문자열).
+- 구현 중 발견·수정한 버그:
+  - `_INTENT_DEFAULT_STATE`가 스키마에 없는 `"PICKING"` 사용 → `MANIPULATING`으로.
+  - 오프라인 프롬프트가 스키마에 없는 `walk_back/turn_right` 제시 → 제거.
+  - `apply_hard_overrides`의 "그만"이 "그만하자"를 먼저 잡아 standby→stop 오분류
+    → longest-match-wins로 수정.
+- eval 측정 결과 (오프라인 qwen2.5:1.5b, 26 케이스):
+  - 최종 80.8%. stop 4/4·standby 5/5는 `apply_hard_overrides`가 코드로 보장하므로
+    모델 정확도와 무관하게 안전. pick_place 4/4.
+  - 남은 실패는 chat↔unknown 혼동, 좌/우 방향 혼동 — 1.5B 모델 능력 한계.
+    derive 레이어가 스키마 유효성은 100% 보장하므로 잘못돼도 안전한 액션만 방출.
+- 남은 할 일:
+  - `--backend online`(Groq) eval 측정 — `GROQ_API_KEY` 필요.
+  - cases.jsonl 케이스 확충(현재 26개, 작아서 run별 변동 있음).
+  - action.schema.json의 gait enum에 `walk_back/turn_right` 추가 여부는
+    BHL 속도 범위 확정 후 결정(BHL_Bridge_Handoff.md §11).
+
+### 2026-05-14 (Gesture 실행기 + README 실행법 문서화)
+
+- 한 줄 요약:
+  - chat 턴이 키워드 감지된 gesture를 실어오면 coordinator가 우측 SO-ARM에서
+    재생하도록 첫 실제 executor 연결. README에 `run_coordinator.sh` 실행법 추가.
+- 수정/추가한 파일:
+  - `jetson/core/gesture_registry.py` — 신규. 유효 gesture 이름의 single source
+    of truth. `~/smolvla/orin/gestures/<name>/meta/info.json` 디렉토리 스캔으로
+    발견, 프로세스 캐시. prompt.py 프롬프트 enum과 coordinator 실행 경로가
+    드리프트하지 않도록 둘 다 여기서 조회. `ORIN_GESTURES_ROOT` env override.
+  - `jetson/core/coordinator.py` — `_play_gesture_if_any` 추가. chat 분기에서
+    `gesture_name != "none"` 이면 `play_gesture.sh` 를 blocking subprocess 로
+    실행(`PLAY_GESTURE_SCRIPT` env override, 60s timeout). 상속된 `VIRTUAL_ENV`
+    를 strip 해서 wrapper 가 자기 venv 를 잡도록 함. gesture 실패는 로그만,
+    대화 루프는 절대 안 끊김. mock action 빌더들에 `gesture_name: "none"` 추가.
+  - `configs/schemas/action.schema.json` — `gesture_name` 필드 추가(required).
+  - `jetson/core/network.py` — `is_online` 에 오프라인 강제 테스트용 주석 라인
+    보존(`# return False`).
+  - `README.md` — "실행 방법" 섹션 추가. `scripts/run_coordinator.sh`(venv +
+    LD_LIBRARY_PATH + coordinator 한 줄 실행)와 `scripts/live_monitor.sh` 안내.
+  - `scripts/live_monitor.sh` — 신규 추적. RAM/GPU/프로세스/데몬 상태 1초 갱신.

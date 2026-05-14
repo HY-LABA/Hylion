@@ -22,6 +22,9 @@ def _probe_target(host: str, port: int, timeout_sec: float) -> bool:
 
 def is_online(timeout_sec: float = 1.5, targets: Iterable[tuple[str, int]] = DEFAULT_PROBE_TARGETS) -> bool:
     """Return True when at least one lightweight outbound connectivity probe succeeds."""
+    # 오프라인 테스트 주석
+    # return False
+
     for host, port in targets:
         if _probe_target(host, port, timeout_sec):
             return True

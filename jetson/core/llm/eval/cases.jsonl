@@ -1,0 +1,30 @@
+{"text": "자기소개 해봐", "expect_intent": "chat"}
+{"text": "넌 누구야?", "expect_intent": "chat"}
+{"text": "안녕 하이리온", "expect_intent": "chat"}
+{"text": "오늘 기분이 어때?", "expect_intent": "chat"}
+{"text": "한양대에서 뭐 해?", "expect_intent": "chat"}
+{"text": "노래 한 곡 불러줄래?", "expect_intent": "chat"}
+{"text": "나 오늘 좀 슬퍼", "expect_intent": "chat"}
+{"text": "빨간 컵 집어줘", "expect_intent": "pick_place", "expect_target": "빨간 컵"}
+{"text": "저기 펜 좀 들어줘", "expect_intent": "pick_place", "expect_target": "펜"}
+{"text": "파란색 블록 잡아", "expect_intent": "pick_place", "expect_target": "파란색 블록"}
+{"text": "물병 좀 집어줄래", "expect_intent": "pick_place", "expect_target": "물병"}
+{"text": "앞으로 걸어가", "expect_intent": "move", "expect_gait": "walk_forward"}
+{"text": "앞으로 가", "expect_intent": "move", "expect_gait": "walk_forward"}
+{"text": "왼쪽으로 돌아", "expect_intent": "move", "expect_gait": "turn_left"}
+{"text": "왼쪽으로 걸어가", "expect_intent": "move", "expect_gait": "turn_left"}
+{"text": "멈춰", "expect_intent": "stop", "expect_gait": "stop"}
+{"text": "그만", "expect_intent": "stop", "expect_gait": "stop"}
+{"text": "하이리온 정지", "expect_intent": "stop", "expect_gait": "stop"}
+{"text": "이제 그만 멈춰줘", "expect_intent": "stop", "expect_gait": "stop"}
+{"text": "이제 쉬어", "expect_intent": "standby"}
+{"text": "오늘 수고했어", "expect_intent": "standby"}
+{"text": "그만하자", "expect_intent": "standby"}
+{"text": "이제 휴식해", "expect_intent": "standby"}
+{"text": "고마워 잘가", "expect_intent": "standby"}
+{"text": "어쩌고 저쩌고 우당탕", "expect_intent": "unknown"}
+{"text": "끼룩끼룩 삐約", "expect_intent": "unknown"}
+{"text": "손 흔들어줘", "expect_intent": "chat", "expect_gesture": "wave_hello"}
+{"text": "나한테 손 흔들어", "expect_intent": "chat", "expect_gesture": "wave_hello"}
+{"text": "인사해줘", "expect_intent": "chat", "expect_gesture": "wave_hello"}
+{"text": "안녕 하이리온 반가워", "expect_intent": "chat", "expect_gesture": "none"}

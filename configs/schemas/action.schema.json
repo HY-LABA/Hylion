@@ -16,6 +16,7 @@
     "requires_smolvla",
     "requires_bhl",
     "gait_cmd",
+    "gesture_name",
     "state_current",
     "safety_allowed",
     "fallback_policy"
@@ -33,6 +34,7 @@
     "requires_smolvla": { "type": "boolean" },
     "requires_bhl": { "type": "boolean" },
     "gait_cmd": { "type": "string", "enum": ["walk_forward", "turn_left", "stop", "none"] },
+    "gesture_name": { "type": "string", "minLength": 1 },
     "state_current": { "type": "string", "enum": ["IDLE", "TALKING", "MANIPULATING", "WALKING", "EMERGENCY"] },
     "safety_allowed": { "type": "boolean" },
     "fallback_policy": { "type": "string" }

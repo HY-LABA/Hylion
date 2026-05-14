@@ -9,7 +9,7 @@ def build_llm_backend(online: bool) -> LLMBackend:
 	"""Pick LLM backend based on network state.
 
 	online → Groq llama-3.1-8b-instant (cloud, free tier).
-	offline → Ollama exaone3.5:2.4b (LG Korean-native, ~1.5GB Q4_K_M, on-device).
+	offline → Ollama qwen2.5:1.5b-instruct (on-device, JSON-mode constrained).
 	"""
 	if online:
 		return GroqLLMBackend()

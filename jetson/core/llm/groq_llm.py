@@ -5,7 +5,11 @@ import time
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
 
-from jetson.core.llm.prompt import build_action_json_from_stt
+from jetson.core.llm.prompt import (
+	ONLINE_SYSTEM_PROMPT,
+	assemble_action,
+	offline_action_json,
+)
 
 
 @dataclass(frozen=True)
@@ -112,10 +116,19 @@ class GroqLLMBackend:
 		history: List[Dict[str, str]],
 		in_chat_mode: bool,
 	) -> Dict[str, Any]:
-		return build_action_json_from_stt(
-			client=self._client,
+		call = self._client.request_chat_completion(
+			system_prompt=ONLINE_SYSTEM_PROMPT,
+			user_text=stt_text,
+			model=self._model,
+			json_mode=True,
+			history=history,
+		)
+		if not call.ok:
+			return offline_action_json(session_id, f"groq_call_fail:{call.error}", network_online=True)
+		return assemble_action(
+			call.content,
 			stt_text=stt_text,
 			session_id=session_id,
-			history=history,
-			in_chat_mode=in_chat_mode,
+			network_online=True,
+			fallback_policy="groq",
 		)
