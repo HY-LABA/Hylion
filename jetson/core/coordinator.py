@@ -2,8 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
-import subprocess
+import re
 from datetime import datetime, timezone
 from pathlib import Path
 from time import sleep
@@ -18,22 +17,45 @@ CHAT_STANDBY_COOLDOWN_SEC = 1.2
 # parameter: number of recent (user, assistant) turn pairs kept in the LLM context.
 # Increase for longer memory at the cost of more tokens / latency per request.
 MAX_HISTORY_TURNS = 4
+# parameter: silence gate. A recorded turn whose loudest 30ms frame RMS stays
+# below this is treated as "no speech" -> Whisper is skipped and the turn is
+# handled as `unknown` (Whisper hallucinates fixed filler phrases on silence).
+# Lower it if real speech keeps falling through to unknown; raise it if silence
+# still leaks past the gate.
+SPEECH_RMS_THRESHOLD = 400
+# parameter: no-speech escalation in chat mode. The first SILENT_QUIET_TURNS
+# silent turns just listen again in silence; the next one (turn
+# SILENT_QUIET_TURNS + 1) speaks a single re-prompt; a silent turn after that
+# ends chat mode and returns to wake-word standby.
+SILENT_QUIET_TURNS = 0
+# parameter: Whisper hallucination filter. A noise-only clip can clear the RMS
+# gate yet carry no real speech; Whisper then fills it with one of a small set
+# of fixed filler phrases ("감사합니다." 등) instead of an empty string. Those
+# phrases are not user input — a turn whose ENTIRE transcript normalizes to one
+# of them is treated exactly like a silent turn (-> unknown, never sent to the
+# LLM). Matching is exact on the normalized transcript, never substring, so real
+# speech that merely contains one of these words is left untouched. Add a phrase
+# here (lowercase, no surrounding punctuation) if a new hallucination shows up.
+WHISPER_HALLUCINATION_PHRASES = frozenset({
+	"감사합니다",
+	"고맙습니다",
+	"시청해주셔서 감사합니다",
+	"시청해 주셔서 감사합니다",
+	"오늘도 시청해주셔서 감사합니다",
+	"구독과 좋아요 부탁드립니다",
+	"구독 부탁드립니다",
+	"구독과 좋아요 알림설정 부탁드립니다",
+	"다음 영상에서 만나요",
+	"다음 시간에 만나요",
+	"이 영상은 유료광고를 포함하고 있습니다",
+})
 
-# Gesture replay wrapper (Jetson side). A `chat` turn whose action carries a
-# non-"none" gesture_name triggers this script on the right SO-ARM follower.
-# Env-overridable so a relocated repo doesn't need a code change.
-PLAY_GESTURE_SCRIPT = os.getenv(
-	"PLAY_GESTURE_SCRIPT", "/home/laba/smolvla/orin/scripts/play_gesture.sh"
-)
-# wave gestures are ~7-10s of replay; allow generous headroom for venv activate
-# + pre-check before declaring the subprocess hung.
-GESTURE_TIMEOUT_SEC = 60.0
-
+from jetson.core.gesture_client import start_gesture_daemon
 from jetson.core.llm import build_llm_backend
 from jetson.core.network import is_online
 from jetson.core.stt import build_input_event, build_stt_backend
 from jetson.core.stt.local_whisper import warm_up as warm_up_local_whisper
-from jetson.expression.microphone import record_to_wav
+from jetson.expression.microphone import record_to_wav, wav_has_speech
 from jetson.expression.mouth_servo import cleanup_gpio, MouthServoController
 from jetson.expression.speaker import DEFAULT_CLOVA_SPEAKER, build_tts_backend
 from jetson.expression.wake_word import build_wake_word_listener
@@ -45,6 +67,29 @@ def _print_block(title: str, payload: dict) -> None:
 	print(title)
 	print("=" * 72)
 	print(json.dumps(payload, ensure_ascii=False, indent=2))
+
+
+_WHITESPACE_RE = re.compile(r"\s+")
+
+
+def _normalize_transcript(text: str) -> str:
+	"""Normalize a transcript for hallucination matching.
+
+	Strips surrounding whitespace/quotes/punctuation, collapses internal runs of
+	whitespace to a single space, and lowercases — so "시청해  주셔서 감사합니다."
+	and "시청해 주셔서 감사합니다" compare equal against WHISPER_HALLUCINATION_PHRASES.
+	"""
+	cleaned = text.strip().strip(".!?…。\"'` ").strip()
+	return _WHITESPACE_RE.sub(" ", cleaned).lower()
+
+
+def _is_whisper_hallucination(text: str) -> bool:
+	"""True iff the whole transcript is a known Whisper silence-hallucination.
+
+	Exact match on the normalized transcript only — a real utterance that merely
+	contains one of these phrases as a substring is NOT flagged.
+	"""
+	return _normalize_transcript(text) in WHISPER_HALLUCINATION_PHRASES
 
 
 def _append_session_log(session_id: str, entry: dict) -> None:
@@ -73,6 +118,39 @@ def _build_standby_action(session_id: str, reason: str = "task_completed") -> di
 		"intent": "standby",
 		"target_object": "none",
 		"reply_text": "작업을 마쳤고, 다음 지시를 기다릴게요.",
+		"requires_smolvla": False,
+		"requires_bhl": False,
+		"gait_cmd": "none",
+		"gesture_name": "none",
+		"state_current": "IDLE",
+		"safety_allowed": True,
+		"fallback_policy": reason,
+	}
+
+
+def _build_unknown_action(session_id: str, reason: str = "no_speech", reply_text: str = "") -> dict:
+	"""Action for a turn that carried no usable speech.
+
+	A silent recording must never reach the LLM — Whisper hallucinates fixed
+	filler phrases ("감사합니다." 등) on silence, which would otherwise become a
+	bogus chat turn. We synthesize an `unknown` action directly: intent=unknown
+	keeps the chat loop alive (run_live_pipeline treats chat/unknown alike).
+
+	reply_text is empty by default so the robot stays quiet on a silent turn;
+	the caller passes a non-empty re-prompt only on the escalation turn (see
+	SILENT_QUIET_TURNS), so the robot asks the user to repeat exactly once
+	instead of nagging every silent turn.
+	"""
+	return {
+		"action_id": str(uuid4()),
+		"timestamp": datetime.now(timezone.utc).isoformat(),
+		"session_id": session_id,
+		"schema_version": "1.0",
+		"source": "stt",
+		"network_online": True,
+		"intent": "unknown",
+		"target_object": "none",
+		"reply_text": reply_text,
 		"requires_smolvla": False,
 		"requires_bhl": False,
 		"gait_cmd": "none",
@@ -138,62 +216,30 @@ def _route_action(action_json: dict) -> None:
 	sleep(0.2)
 
 
-def _play_gesture_if_any(action_json: dict) -> None:
+def _play_gesture_if_any(action_json: dict, gesture_daemon) -> None:
 	"""Replay a gesture on the right arm if this turn's action carries one.
 
 	gesture_name is a harness-derived field (keyword detection in prompt.py)
 	that is only ever non-"none" on a `chat` turn — gestures are a side-effect
-	of conversation, not a standalone intent, so this runs inside the chat
-	branch and the chat loop continues afterwards.
+	of conversation, not a standalone intent.
 
-	This is the coordinator's first real (non-mock) executor. play_gesture.sh
-	owns all hardware concerns (venv, port, calib, the cosmetic disconnect-
-	overload case) and reports a single exit code: 0 = success (incl. cosmetic),
-	non-zero = a real failure we just log. The call is blocking and the loop is
-	single-threaded, so there is no USB contention to guard against.
+	The call is non-blocking: gesture_daemon.play() hands the gesture name to
+	the persistent daemon (which holds lerobot + the arm connection warm) and
+	returns on the daemon's immediate ACK. The arm then replays on the daemon's
+	worker thread, concurrently with this turn's TTS reply + mouth servo. A
+	failed or unavailable gesture is only logged — it must never break the chat
+	loop.
 	"""
 	gesture_name = str(action_json.get("gesture_name", "none")).strip()
 	if not gesture_name or gesture_name == "none":
 		return
 
-	if not Path(PLAY_GESTURE_SCRIPT).is_file():
-		print(f"[Gesture] {gesture_name} -> play_gesture.sh 없음: {PLAY_GESTURE_SCRIPT}; skip")
-		return
-
-	print(f"[Gesture] {gesture_name} -> play_gesture.sh 실행")
-	# play_gesture.sh self-activates its own venv (JETSON_VENV), but its guard
-	# only fires when VIRTUAL_ENV is *unset*. A stale or foreign VIRTUAL_ENV
-	# inherited from the coordinator's launch env makes it skip activation and
-	# fail with rc=3 (lerobot-replay not found). Strip it so the wrapper always
-	# picks its own venv regardless of how the coordinator was started.
-	gesture_env = {k: v for k, v in os.environ.items() if k != "VIRTUAL_ENV"}
-	try:
-		result = subprocess.run(
-			["bash", PLAY_GESTURE_SCRIPT, gesture_name],
-			capture_output=True,
-			text=True,
-			timeout=GESTURE_TIMEOUT_SEC,
-			env=gesture_env,
-		)
-	except subprocess.TimeoutExpired:
-		print(f"[Gesture] {gesture_name} -> TIMEOUT ({GESTURE_TIMEOUT_SEC:.0f}s)")
-		return
-	except Exception as exc:
-		print(f"[Gesture] {gesture_name} -> 실행 실패: {exc}")
-		return
-
-	# play_gesture.sh stdout ends with a one-line summary; surface that.
-	summary = ""
-	if result.stdout.strip():
-		summary = result.stdout.strip().splitlines()[-1]
-	if result.returncode == 0:
-		print(f"[Gesture] {gesture_name} -> 성공  {summary}")
+	ok, msg = gesture_daemon.play(gesture_name)
+	if ok:
+		print(f"[Gesture] {gesture_name} -> 데몬 수락 ({msg})")
 	else:
-		# 2=인자 3=환경 4=데이터/캘리브 5=포트 1=재생실패 — all just logged; a
-		# failed gesture must never break the conversation loop.
-		print(f"[Gesture] {gesture_name} -> 실패 (rc={result.returncode})  {summary}")
-		if result.stderr.strip():
-			print(f"[Gesture] stderr: {result.stderr.strip()}")
+		# 데몬 미가동/미준비/큐가득/데이터오류 — 전부 로그만, 대화 루프는 유지.
+		print(f"[Gesture] {gesture_name} -> 재생 불가: {msg}")
 
 
 def _speak_reply_if_any(action_json: dict, stage: str, tts_backend, mouth_servo=None) -> None:
@@ -250,6 +296,7 @@ def run_live_pipeline(
 	whisper_model_size: str,
 	whisper_language: str,
 	wakeword_listener,
+	gesture_daemon,
 ) -> None:
 	session_id = f"sess-live-{uuid4().hex[:8]}"
 	# Conversation memory persists across wake-word re-activations within a single
@@ -288,6 +335,10 @@ def run_live_pipeline(
 		_append_session_log(session_id, {"event": "wake_activation", "label": activation.label, "score": activation.score})
 
 		in_chat_mode = True
+		# Consecutive no-speech turns in this chat session. Reset on every turn
+		# that carries real speech; drives the SILENT_QUIET_TURNS escalation
+		# (quiet -> single re-prompt -> wake-word standby).
+		silent_turns = 0
 
 		# Chat mode loop: keep listening without waiting for wake word again
 		while in_chat_mode:
@@ -301,11 +352,66 @@ def run_live_pipeline(
 			)
 			print("[Mic] STOP recording")
 
-			stt_result = stt_backend.transcribe(recorded_path)
+			# 무음 게이트: 발화가 없는 녹음은 STT/LLM 으로 보내지 않는다. Whisper 는
+			# 무음 클립에 "감사합니다." 같은 고정 환각 문구를 만들어내고, 그게
+			# 그대로 LLM 입력이 되어 가짜 턴이 된다. 발화가 있을 때만 전사하고,
+			# 빈 전사도 같은 무음 턴으로 취급한다.
+			has_speech, peak_rms = wav_has_speech(recorded_path, rms_threshold=SPEECH_RMS_THRESHOLD)
+			stt_result = stt_backend.transcribe(recorded_path) if has_speech else None
 
-			if not stt_result.text.strip():
-				print("[STT] Empty transcription. Keeping current mode.")
+			transcript = stt_result.text.strip() if stt_result is not None else ""
+			# 무음 클립이 RMS 게이트를 통과해 STT 까지 가면 Whisper 는 빈 문자열
+			# 대신 고정 환각 문구를 채워 넣는다. 전사 전체가 그 문구면 사용자
+			# 입력이 아니므로 무음 턴과 똑같이 처리한다 (LLM 입력으로 보내지 않음).
+			is_hallucination = bool(transcript) and _is_whisper_hallucination(transcript)
+
+			if not transcript or is_hallucination:
+				# 무음 턴 escalation: 처음 SILENT_QUIET_TURNS 회는 조용히 다시
+				# 듣고, 그 다음 1회는 한 번 되묻고, 그래도 무음이면 채팅 모드를
+				# 끝내고 wake-word 대기로 복귀한다.
+				silent_turns += 1
+				if not has_speech:
+					reason = "no_speech"
+					print(f"[STT] 발화 없음 (peak_rms={peak_rms} < {SPEECH_RMS_THRESHOLD}) -> 무음 턴 {silent_turns}")
+				elif is_hallucination:
+					reason = "whisper_hallucination"
+					print(f"[STT] Whisper 환각 문구 무시: {transcript!r} -> 무음 턴 {silent_turns}")
+				else:
+					reason = "empty_transcription"
+					print(f"[STT] 빈 전사 -> 무음 턴 {silent_turns}")
+
+				if silent_turns > SILENT_QUIET_TURNS + 1:
+					print("[Mode] 무음이 계속됨 -> wake-word 대기로 복귀.")
+					_append_session_log(session_id, {"event": "silent_standby", "silent_turns": silent_turns})
+					if CHAT_STANDBY_COOLDOWN_SEC > 0:
+						print(f"[Mode] chat-standby cooldown for {CHAT_STANDBY_COOLDOWN_SEC:.1f}s before re-arming wake word.")
+						sleep(CHAT_STANDBY_COOLDOWN_SEC)
+					in_chat_mode = False
+					continue
+
+				if silent_turns == SILENT_QUIET_TURNS + 1:
+					# 마지막 1회: 사용자에게 한 번 되묻는다.
+					unknown_action = _build_unknown_action(
+						session_id,
+						reason=f"{reason}_reprompt",
+						reply_text="무슨 말인지 잘 모르겠어요. 다시 말씀해 주시겠어요?",
+					)
+				else:
+					# 조용히 다시 듣는다 (reply_text 비어 있음 -> TTS skip).
+					unknown_action = _build_unknown_action(session_id, reason=reason)
+
+				_print_block("ACTION_JSON (UNKNOWN)", unknown_action)
+				_speak_reply_if_any(unknown_action, stage="unknown", tts_backend=tts_backend, mouth_servo=mouth_servo)
+				_append_session_log(session_id, {
+					"event": "turn",
+					"intent": "unknown",
+					"user_text": "",
+					"assistant_text": unknown_action["reply_text"],
+				})
 				continue
+
+			# 발화가 있는 정상 턴 -> 무음 카운터 리셋.
+			silent_turns = 0
 
 			input_event = build_input_event(stt_result=stt_result, session_id=session_id, source="stt")
 			_print_block("INPUT_JSON", input_event)
@@ -332,12 +438,16 @@ def run_live_pipeline(
 				"assistant_text": reply_text,
 			})
 
+			# A chat turn may carry a keyword-detected gesture. Fire it BEFORE
+			# speaking so the arm moves concurrently with the TTS reply + mouth
+			# servo — gesture_daemon.play() is non-blocking (the daemon ACKs and
+			# replays on its own worker thread). gesture_name is forced "none"
+			# for non-chat turns upstream, so this safely no-ops outside chat.
+			_play_gesture_if_any(action_json, gesture_daemon)
+
 			_speak_reply_if_any(action_json, stage=f"before_{intent}", tts_backend=tts_backend, mouth_servo=mouth_servo)
 
 			if intent in {"chat", "unknown"}:
-				# A chat turn may carry a gesture (keyword-detected): play it on
-				# the right arm after speaking the reply, then keep chatting.
-				_play_gesture_if_any(action_json)
 				# Chat (or unknown — re-prompt the user) continues; listen for next utterance
 				print(f"[Mode] {intent} -> chat loop continues. Listening for next utterance.")
 				continue
@@ -417,19 +527,32 @@ def _startup_warm_up(args: argparse.Namespace) -> None:
 def main() -> None:
 	args = _parse_args()
 	wakeword_listener = None
+	# Spawn the gesture daemon first so its ~8-10s warm-up (torch import + arm
+	# connect, in the .hylion_arm venv) overlaps with model warm-up below.
+	# Failure is non-fatal — start_gesture_daemon() returns a disabled handle.
+	gesture_daemon = start_gesture_daemon()
 	try:
 		wakeword_listener = build_wake_word_listener()
 		_startup_warm_up(args)
+		if gesture_daemon.wait_ready(timeout=15.0):
+			print("[Warm-up] Gesture daemon ... OK")
+		else:
+			print("[Warm-up] Gesture daemon ... 미준비 (gesture 비활성 상태로 계속)")
 		run_live_pipeline(
 			record_sec=args.record_sec,
 			preferred_keyword=args.preferred_keyword,
 			whisper_model_size=args.whisper_model_size,
 			whisper_language=args.whisper_language,
 			wakeword_listener=wakeword_listener,
+			gesture_daemon=gesture_daemon,
 		)
 	except KeyboardInterrupt:
 		print("Coordinator stopped by user.")
 	finally:
+		try:
+			gesture_daemon.stop()
+		except Exception as exc:
+			print(f"[Cleanup] gesture daemon stop failed: {exc}")
 		if wakeword_listener is not None:
 			try:
 				wakeword_listener.close()

@@ -236,3 +236,38 @@ def detect_speech_segments(
 		segments.append((start_sec, end_sec))
 
 	return segments
+
+
+def wav_has_speech(
+	wav_path: str,
+	rms_threshold: int = 400,
+	min_speech_ms: int = 250,
+) -> Tuple[bool, int]:
+	"""Return (has_speech, peak_rms) for a recorded WAV.
+
+	has_speech is True iff detect_speech_segments finds at least one stretch of
+	sustained energy above rms_threshold. Used to gate Whisper: a silent
+	recording makes Whisper hallucinate fixed filler phrases ("감사합니다." 등),
+	so a no-speech clip must never reach STT. peak_rms is the loudest 30ms-frame
+	RMS in the clip, returned purely for threshold tuning / logging.
+
+	An unreadable or malformed WAV is treated as no speech -> (False, 0).
+	"""
+	try:
+		pcm_mono16, sample_rate = read_wav_mono16(wav_path)
+	except (OSError, ValueError, wave.Error):
+		return False, 0
+
+	frame_bytes = int(sample_rate * 30 / 1000) * DEFAULT_SAMPLE_WIDTH_BYTES
+	peak_rms = 0
+	if frame_bytes > 0:
+		for i in range(0, len(pcm_mono16) - frame_bytes + 1, frame_bytes):
+			peak_rms = max(peak_rms, _rms_pcm16(pcm_mono16[i : i + frame_bytes]))
+
+	segments = detect_speech_segments(
+		pcm_mono16,
+		sample_rate,
+		rms_threshold=rms_threshold,
+		min_speech_ms=min_speech_ms,
+	)
+	return (len(segments) > 0, peak_rms)
