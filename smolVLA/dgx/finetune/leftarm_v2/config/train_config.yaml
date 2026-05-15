@@ -17,7 +17,10 @@ batch_size: 16                       # v1 동일 — 2B 에서 증가 시도 가
 steps: 20000                         # ~5.3 epoch on 100ep (60k frames, batch 16 → 1 epoch ≈ 3,750 step)
 num_workers: 8                       # Walking RL 미가동 가정 (가동 시 4 로 낮춤)
 save_freq: 1000                      # checkpoint 저장 step 주기
+log_freq: 50                         # wandb/console 로그 step 주기 (default 200, v1 동일)
 wandb_enable: true                   # entity·project 는 base_config.accounts (BaboGaeguri / leftarm_v2)
+device: cuda                         # auto-select 비의존 — DGX GB10 명시
+push_to_hub: false                   # 체크포인트 자동 Hub push X (DGX→Orin 수동 전송 흐름)
 
 # 2A dataset subset — run_train.py 가 episode index 리스트로 expand 해 --dataset.episodes 로 전달.
 # P 방식 (100ep balanced): task1 [0..49] + task2 [50..99] = ep 0~99 연속.

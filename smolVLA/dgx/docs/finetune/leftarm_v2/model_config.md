@@ -81,10 +81,16 @@ fine-tune 시 어느 part 를 *얼마나* 학습시킬지가 핵심 결정.
 | `steps` | `20,000` | **2A 의 핵심 변수**. 100ep × 600 frames ≈ 60k frames, batch 16 → 1 epoch ≈ 3,750 step → 5.3 epoch. v1 의 0.13 epoch (500 step) 의 미수렴을 명확히 회피. vision policy fine-tune 일반 적정 (3–10 epoch). |
 | `num_workers` | `8` | Walking RL 미가동 가정. 가동 시 `4` 로 낮춤 (lerobot dataloader 가 CPU·USB 점유). |
 | `save_freq` | `1000` | step 20,000 / save 1000 = 20 체크포인트. 디스크 부담·분해능 균형. v1 의 `250` 보다 sparse — 100ep 학습은 v1 보다 길어서. |
+| `log_freq` | `50` | wandb·console 로그 step 주기. v1 동일. default 200 보다 ↑ 분해능. |
 | `wandb_enable` | `true` | v1 동일. entity·project 는 `base_config.accounts` (BaboGaeguri / leftarm_v2). |
-| `optimizer` / `lr` | lerobot smolvla 기본 | 2A 변수 최소화. lerobot 의 sane default 신뢰. 2B 에서 필요 시 조정. |
+| `device` | `cuda` | DGX GB10 명시. auto-select 의존 회피 (v1 동일). |
+| `push_to_hub` | `false` | 체크포인트 자동 Hub push 차단 — DGX→Orin 수동 전송 흐름 (v1 동일). |
+| `rename_map` | 자동 생성 | `base_config.cameras` 키 순서로 `{top:camera1, wrist:camera2}` 매핑. smolvla 가 `observation.images.cameraN` 키를 기대 — 누락 시 `Key not found` 에러 (v1 의 dgx/docs/finetune/training.md §7 트러블슈팅 확인). |
+| `optimizer` / `lr` | lerobot smolvla 기본 | `use_policy_training_preset=true` (default) — smolvla 의 preset optimizer/scheduler 자동 사용. 2A 변수 최소화. 2B 에서 필요 시 조정. |
 
-> ⚠️ **2A 에서 변경한 것**: v1 대비 `steps` 만 (500 → 20,000) + dataset (40ep 단일 task → 100ep 멀티태스크 balanced subset). 다른 모든 hyperparameter 는 v1 그대로 — 결과 해석을 깔끔하게 한다.
+> ⚠️ **2A 에서 변경한 것**: v1 대비 `steps` 만 (5000 → 20,000) + dataset (40ep 단일 task → 100ep 멀티태스크 balanced subset). 다른 모든 hyperparameter 는 v1 그대로 — 결과 해석을 깔끔하게 한다.
+
+> 📌 **PEFT 활성화 시 smolvla 자동 동작 (lerobot v1 검증 확인)**: `--peft.*` 인자가 주어지면 smolvla policy 의 `tune_llm` / `tune_visual` / `tune_projector` / `tune_diffusion_model` 인자는 *무시되고* base model 전체가 자동 frozen + `target_modules` 에만 LoRA adapter 부착. 즉 `--peft.target_modules=all-linear` 가 우리 A2 의도 (VLM+expert 둘 다 LoRA, base 다 frozen) 와 정확히 일치. smolvla 자체 인자 `--policy.lora_*` 는 별도 경로 — 본 v2 는 v1 검증된 `--peft.*` 경로 사용.
 
 ---
 

@@ -24,9 +24,9 @@
 
 ## Todo
 
-### [ ] TODO-01: 2A 학습 구성 확정 + 100ep balanced 서브셋 정의
+### [x] TODO-01: 2A 학습 구성 확정 + 100ep balanced 서브셋 정의 — **완료 (2026-05-15)**
 
-> **결정 완료 (2026-05-15)**: 사용자와 Phase 1 대화로 학습 방법·subset·subset 지정 방법 확정. `train_config.yaml` 갱신·`model_config.md` 신규 작성 완료. `run_train.py` 작성만 남음 → TODO-02 학습 실행 직전에 작업.
+> **완료 (2026-05-15)**: 사용자와 Phase 1 대화로 학습 방법·subset·subset 지정 방법 확정. `train_config.yaml` 갱신·`model_config.md` 신규 작성·`run_train.py` 신규 작성·dry-run 정합 검증 완료 (v1 lerobot-train 명령과 인자 정합, `--peft.*`/`--rename_map`/`--policy.{device,push_to_hub}` 모두 v1 패턴 일치).
 
 - DOD:
   - (a) **2A 학습 구성 결정** — **완료**: A2 (LoRA all-linear, r=16) / batch 16 / steps 20,000 / save_freq 1000 / wandb enable / smolvla 기본 lr·optimizer. 4축 매트릭스 [LoRA/Full FT] × [VLM frozen/trainable] 분석 후 A2 채택 (v1 검증값 + step 만 0.13 → 5.3 epoch 로 ↑). 상세·근거: [`dgx/docs/finetune/leftarm_v2/model_config.md`](../../../dgx/docs/finetune/leftarm_v2/model_config.md).
