@@ -64,6 +64,22 @@
 - **결정 포인트 (M1)**: dev 수집환경 ↔ 시연장 정합 → **"최소 파라미터만 기록" 으로 결정 (2026-05-14)**. 카메라·조명·작업영역 핵심값만 기록하고 dev 환경 그대로 수집.
 - **DOD**: leftarm_v2 200 episodes (2 task × 100) 수집 완료 + HF Hub push + 검증 통과 → DGX 학습 입력으로 사용 가능.
 
+### [ ] M1.5 — 데이터셋 학습 호환성 정비 (video decode 회피)  (spec `02_prereq`)
+
+- **목표**: M2 학습 진입을 가능하게 — lerobot 의 video dataset 학습 시 pyav 의 video decode 자체 buffer leak 으로 인한 system-wide OOM 을 회피.
+- **배경 (2026-05-15 발견)**: leftarm_v2 의 2A 학습 시도 1·2 가 둘 다 ~28분 후 global OOM (system 95GB 증발, 5GB/min 누수). wandb·dmesg 진단 결과:
+  - main lerobot-train process 는 3.4 GB 안정 (안 자람)
+  - leak 의 진짜 원인은 **lerobot 의 video dataset 학습 시 pyav 의 frame buffer 누적** — codec (h264 단일 확인) / num_workers (8→2 → 누수 30% 만 감소) / batch_size 와 모두 무관
+  - 대안 backend 모두 막힘: `torchcodec` (aarch64 wheel 들이 PyTorch 2.10 + FFmpeg 6 와 ABI 미스매치 — DGX 의 PyTorch 2.10 + GB10 12.1 + FFmpeg 6 조합이 너무 신규), `video_reader` (torchvision 소스 빌드 + `ffmpeg<4.3` 필요 — 불가)
+- **주요 작업**:
+  - lerobot dataset API (image vs video format) 분석
+  - video → image dataset 변환 스크립트 작성
+  - 원본 `leftarm_v2` 보존 + 새 `leftarm_v2_image` dataset 생성
+  - 변환된 dataset 의 lerobot-train 호환성 검증 (학습 진입 + 첫 ckpt 도달)
+- **결정 포인트 (M1.5)**: lerobot video decode leak 회피 방식 → **"image dataset 변환" 으로 결정 (2026-05-15)**. (대안: torchcodec 활성화, FFmpeg 업그레이드, lerobot upstream patch — 모두 DGX 환경상 비현실적이라 image 변환 채택.)
+- **DOD**: `leftarm_v2_image` dataset 으로 `lerobot-train` 이 100ep subset 학습 진입 → OOM 없이 첫 ckpt (save_freq=1000 step) 도달. 그 이상의 학습 완주·성능은 M2 의 책임.
+- **재사용성 노트**: 본 변환 스크립트는 향후 rightarm 등 다른 lerobot dataset 에 같은 문제 발생 시 그대로 적용 가능. DGX 환경이 PyTorch/FFmpeg 호환 정비될 때까지의 *우회 인프라*.
+
 ### [ ] M2 — 학습 (DGX)  (spec `02`)
 
 - **목표**: leftarm_v2 dataset 으로 SmolVLA 멀티태스크 정책을 fine-tune 한다 (1 모델 / 2 task).
@@ -102,7 +118,8 @@
 | 결정 포인트 | 배치 | 구 출처 | 상태 |
 |---|---|---|---|
 | dev 수집환경 ↔ 시연장 환경 정합 방식 | M1 | 구 09_demo_site_mirroring | ✅ "최소 파라미터만 기록" 으로 결정 (2026-05-14) |
-| 모델 구성 (체크포인트·LoRA·하이퍼파라미터) | M2 | 구 11_smolvla_model_decision | 미결 — M2 spec 작성 시 질문 |
+| lerobot video decode 호환성 (pyav leak 회피 방식) | M1.5 | — (2026-05-15 발견) | ✅ "image dataset 변환" 으로 결정 (2026-05-15) |
+| 모델 구성 (체크포인트·LoRA·하이퍼파라미터) | M2 | 구 11_smolvla_model_decision | ⚙️ 2A 학습 방법 (A2: LoRA all-linear) + subset (P) 결정 (2026-05-15). 정밀 hyperparameter 는 2B 시점 |
 | `orin/config/*.json` git 추적 정책 | M3 | 구 10_orin_config_policy | 미결 — M3 spec 작성 시 질문 |
 
 ---
@@ -119,3 +136,5 @@ DGX 머신 `~/smolvla/dgx/docs/` 에 수집·학습 운영 상세 문서가 존�
 |---|---|
 | 2026-05-14 | 초안 작성 — fresh start 로드맵. 단일팔 / 기한 없음 / 인프라 00~08 완료 전제. |
 | 2026-05-14 | 정정 — 최종 목표를 "재현성 검증" → **"실제 성능 확보 (+ 재현성)"** 로 수정. M1 을 현실 반영: task 확정 (leftarm_v2 = 2 task: 인형→상자, 캔→상자), 에피소드 100/task = 200, leftarm_v1(40ep) 은 동결 별개 체크포인트. M2 멀티태스크 1 모델 명시. M1 결정 포인트(환경 정합) "최소 파라미터만 기록" 으로 해소. DGX 운영 문서 참조 섹션 추가. |
+| 2026-05-15 | M1 진행 중 task 정의 재정의 (인형→테이블 왼쪽 spatial reference, 캔→사람에게 hand-over) — top view 가동범위 제약 + task 다양성 확보 차원에서 "노란 플라스틱 상자" 폐기. 110ep (task1:50/task2:60) 시점에 M2-A (100ep balanced subset) 시도 진입. |
+| 2026-05-15 | **M1.5 신설** — 데이터셋 학습 호환성 정비. M2-A 학습 시도 1·2 가 둘 다 ~28분 후 system-wide OOM. 진단 결과 lerobot 의 video dataset 학습 시 pyav 의 buffer leak (codec/workers 무관). DGX 의 PyTorch 2.10 + GB10 + FFmpeg 6 환경에서 torchcodec/video_reader 빌드 호환 불가 → **image dataset 변환** 을 정공법으로 채택. spec `02_prereq` 신규. M2 학습은 본 milestone 완료 후 재진입. |

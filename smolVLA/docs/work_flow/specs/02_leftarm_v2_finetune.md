@@ -19,6 +19,7 @@
 - **결정 포인트 (M2 작성 시)**: 모델 구성 — `smolvla_base` 기반 / LoRA 적용 여부·rank / 하이퍼파라미터 / 학습 step 수. v1 의 LoRA 구성을 출발점으로, 2A 의 안정성·수렴 관찰 후 2B 재튜닝.
 - **DGX 학습 산출 위치** — `~/smolvla/dgx/outputs/<run>/` flat 컨벤션 (`dgx/docs/finetune/leftarm_v1/training.md`, `leftarm_v1/data_collection.md` 기준; 옛 `outputs/train/` 혼재 정리됨).
 - **DGX→Orin 체크포인트 전송 절차** — `docs/storage/06_dgx_venv_setting.md` §9.
+- **🚧 2026-05-15 진행 정지 — M1.5 (`02_prereq`) 신설 후 학습 재진입**: M2-A 시도 1·2 가 둘 다 system-wide OOM (lerobot 의 video dataset 학습 시 pyav buffer leak, codec/workers 무관). 상세 [`dgx/docs/finetune/leftarm_v2/training_log.md`](../../../dgx/docs/finetune/leftarm_v2/training_log.md). 해결책: video → image dataset 변환 ([`02_prereq_dataset_video_to_image.md`](02_prereq_dataset_video_to_image.md)). 본 spec 의 TODO-02 (2A 학습 실행) 는 M1.5 완료 후 진입.
 
 ---
 
