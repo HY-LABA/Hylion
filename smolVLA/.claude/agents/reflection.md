@@ -85,6 +85,19 @@ model: sonnet
 - 룰 보강 여지 있나?
 - 새 룰 추가 필요?
 
+### 5.5. 네비게이터·참조 정합성 점검 (M1.5 reflection 도출, 2026-05-15)
+
+본 사이클에서 발생한 *디렉터리 구조 변경·새 파일 추가·기능 이동* 에 대해, 영향받는 navigator·README·`*_structure.md` 가 정합 갱신됐는지 점검:
+
+- **변경된 영역** (예: `dgx/finetune/<era>/`, `docs/storage/`, `docs/work_flow/specs/`) 의 README/index 가 새 파일·삭제 파일 반영?
+- **`*_structure.md` 류** 가 본문 정정 없이 ⚠️ 박스로만 정정한 *drift 패턴* 있는지? (07/08_*_structure.md 의 04 시점 본문 그대로 + 정정 박스 누적 = 명시적 drift)
+- **realplaying.md 결정 포인트 표** 가 사이클의 새 결정 (예: M1.5 신설, M2 의 hyperparameter 결정 등) 반영?
+- **누락된 navigator** — 새 디렉터리 (예: `dgx/docs/finetune/<era>/`) 에 README 가 *부재*하면 신설 권고
+
+사이클 중 누락된 부분은 §6 갱신 제안에 포함 (대상: 본 사이클 변경된 navigator 영역).
+
+→ 메인은 본 점검 결과를 BACKLOG 등록 또는 다음 사이클 진입 전 처리.
+
 ### 6. 갱신 제안 도출
 
 각 제안마다:
@@ -129,6 +142,16 @@ model: sonnet
 - **제안 위치**: 갱신 제안 #1, #2
 
 ### 패턴 2: ...
+
+## 네비게이터·참조 정합성 점검
+
+| 영역 | 변경 사항 | navigator 갱신? | 갱신 필요 |
+|---|---|---|---|
+| `dgx/finetune/leftarm_v2/` | 새 파일 X 개 | 부분 (`leftarm_v2/README.md` 부재) | ✅ 신설 |
+| `docs/storage/` | NN_XX 추가 | ✓ README 갱신됨 | — |
+| `*_structure.md` | 디렉터리 일부 변경 | ⚠️ 박스만, 본문 drift | ✅ 본문 정정 |
+
+→ 갱신 제안 §에 navigator 갱신 항목 포함.
 
 ## 갱신 제안 (사용자 승인 필요)
 

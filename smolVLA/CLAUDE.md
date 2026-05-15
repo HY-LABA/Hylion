@@ -134,6 +134,7 @@ spec 의 모든 todo 를 **자율 처리**. 사용자는 `/observe` 로 read-onl
 | 4 | **code-tester** | `.claude/agents/code-tester.md` | 단위 검증 + verdict (READY/MINOR/MAJOR) |
 | 5 | **prod-test-runner** | `.claude/agents/prod-test-runner.md` | 배포·비대화형 검증 (verdict: AUTOMATED_PASS/NEEDS_USER_VERIFICATION/FAIL) |
 | 6 | **reflection** | `.claude/agents/reflection.md` | 사이클 회고·갱신 제안 (`/wrap-spec` 시 호출) |
+| 7 | **researcher** | `.claude/agents/researcher.md` | 문제 진단·해결책 탐색 (WebSearch/WebFetch + 환경 진단) 보고서. spec 진입 시 또는 큰 가설 변경 시 메인이 호출. 코드 작성 X. |
 
 ### 스킬 (`.claude/skills/`)
 
@@ -240,6 +241,15 @@ skill·hook·CLAUDE.md 갱신 시 (reflection 결과):
 
 4. 해당 reflection 보고서 (`docs/storage/workflow_reflections/<날짜>_<spec명>.md`) 의 **사용자 승인 결과** 섹션 채움.
 5. git commit message 에 변경 이유 명시.
+
+디렉터리 구조 변경 시 (파일 추가·삭제·이동) 함께 갱신 — *M1.5 reflection 도출 (2026-05-15)*:
+
+6. **영향 영역의 `README.md` / `*_structure.md` / navigator** — 새 파일 등록·삭제 항목 정정·구조 본문 갱신. ⚠️ 박스로 *정정만 누적* 하는 drift 패턴 회피 — 본문 자체 정정 필수. 매핑 예:
+   - `dgx/finetune/<era>/` 또는 `dgx/docs/finetune/<era>/` 파일 추가 → era README 신설 또는 상위 README 에 등록
+   - `docs/storage/NN_*.md` 추가·삭제 → `docs/storage/README.md` 표 갱신
+   - `docs/work_flow/specs/NN_*.md` 추가 → 필요 시 specs/README 갱신
+   - `*_structure.md` 본문이 가리키는 디렉터리 구조 변경 → 본문 직접 정정 (⚠️ 박스만 누적 X)
+   - `realplaying.md` milestone 추가·결정 변경 → 본문 + 결정 포인트 표 + 변경 이력 entry 동시 갱신
 
 ## Current Working Agreements
 

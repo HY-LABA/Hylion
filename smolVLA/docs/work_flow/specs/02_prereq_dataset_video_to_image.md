@@ -38,12 +38,20 @@ lerobot 지원 backend 3 종 (`docs/reference/lerobot/src/lerobot/datasets/video
 
 → DGX 의 PyTorch 2.10 + GB10 (cuda capability 12.1) + FFmpeg 6 조합이 *PyTorch 생태계 최신 stable 보다 앞서있어* video decoder 정비 불가.
 
-### 결정 (2026-05-15)
+### 결정 (잠정, 2026-05-15)
 
-**video decode 자체를 회피 — image dataset 변환** (사용자 결정).
+**video decode 자체를 회피 — image dataset 변환** (사용자 결정, 잠정).
 - 원본 `leftarm_v2` 는 보존 (M1 수집 잔여 90ep 계속 진행 가능)
 - 학습 전용 새 `leftarm_v2_image` 생성
-- 변환 스크립트는 향후 rightarm 등 다른 dataset 에 같은 문제 발생 시 재사용
+
+### ⚠️ 결정 *검증 필요* — TODO-01 의 researcher 보고서가 선결
+
+**본 결정 (image 변환) 은 cleanup 강화·lerobot patch·chunk 재인코딩·streaming 등 *대안을 미탐색* 한 상태에서 내려졌다.** 메인 + 사용자 검토 후 사용자 지적 (2026-05-15) — 큰 작업이 정말 최선인지 *체계적 진단 + 외부 사례 검색 + 해결책 비교* 가 선행되어야. 따라서 TODO-01 을 `researcher` 에이전트 호출로 재정의 — 보고서 verdict 에 따라 TODO-02·03 의 작업 내용이 *유지·재정의·폐기* 될 수 있다.
+
+### 재사용성
+
+- 변환 스크립트 채택 시: 향후 rightarm 등 다른 dataset 에 같은 문제 발생 시 재사용
+- 다른 해결책 채택 시: 그 해결책의 적용 절차가 본 spec 의 산출물
 
 ### 미해결 차원 (Backlog)
 
@@ -55,18 +63,40 @@ lerobot 지원 backend 3 종 (`docs/reference/lerobot/src/lerobot/datasets/video
 
 ## Todo
 
-### [ ] TODO-01: lerobot dataset API 분석 + 변환 전략 확정
+### [ ] TODO-01: 문제 명확화 + 해결책 비교 연구 보고서 (researcher 호출)
+
+> 본 todo 는 `researcher` 에이전트 (`.claude/agents/researcher.md`, 2026-05-15 신설) 가 수행. **코드 작성 0**. 산출은 보고서. M2-A OOM 사고의 *진짜 원인* 과 *최선의 해결책* 을 직접 증거 기반으로 정리해 TODO-02 (실행) 의 입력으로 제공.
 
 - DOD:
-  - (a) lerobot 의 image vs video dataset format 의 정확한 차이 명세 — `meta/info.json` features 의 `dtype` 차이, parquet 의 image 컬럼 저장 방식 (binary 인지 path 인지), 디스크 구조 (`videos/` vs `images/` 또는 다른 형태).
-  - (b) 변환 전략 결정 — image binary in parquet vs 디스크 png 파일 + path 참조.
-  - (c) 변환 스크립트 인터페이스 설계 — 입력 dataset path, 출력 dataset path, episode 범위 (전체 / subset), 병렬 처리 옵션.
-- 구현 대상: 분석 메모 (본 spec 본문 또는 `docs/storage/02_prereq_dataset_format_analysis.md` 신규). 코드 작성 X.
-- 테스트: lerobot 의 image dataset 예제 (예: `lerobot/pusht_image`) 또는 코드 검증.
-- 제약: `docs/reference/` 수정 금지.
-- 잔여 리스크: image dataset 의 디스크 사용량 예상 — 현 video dataset 278MB → image 추출 후 ~15-25GB (60k frames × 2 카메라, png 압축). DGX `/home` 3.3T 가용이라 충분.
+  - (a) **문제 명확화**: v1 (40ep, libsvtav1) 완주 vs v2 (110ep, h264) OOM 의 *변수 분리* — 데이터셋 크기 / codec / 환경 점유 (VSCode·Firefox·Claude Code agent) 중 결정타 식별. pyav leak 가설 *직접 증명 또는 부정*:
+    - lerobot `src/lerobot/datasets/video_utils.py` 의 pyav 호출 패턴 코드 review (close/free 명시 여부, random-access keyframe 디코딩 로직)
+    - lerobot upstream commit history 에서 video decode 메모리 개선 patch 검색
+    - `num_workers=0` 실측 실험 *제안* (실행은 사용자 또는 task-executor)
+  - (b) **외부 사례 검색**: HuggingFace forum, lerobot GitHub issues (`huggingface/lerobot`), pyav GitHub issues (`PyAV-Org/PyAV`), DGX Spark + lerobot 학습 사례, PyTorch 2.10 + GB10 (capability 12.1) 환경의 호환성 보고. 각 발견 사례를 우리 환경과의 정합성 (관련/부분/무관) 으로 평가.
+  - (c) **해결책 비교 표**: 적어도 다음 6 옵션 비교 — 비용·위험·효과 가능성·Cat 분류·후속 영향:
+    1. image dataset 변환 (현 잠정 결정)
+    2. **환경 cleanup 강화** (VSCode/Firefox/agent 완전 종료 후 재시도) — *가장 가벼움, 미시도*
+    3. lerobot `video_utils.py` 의 pyav 사용 패턴 수정 (fork 또는 monkey-patch)
+    4. mp4 chunk size 조정 후 재인코딩 (per-decode buffer ↓)
+    5. `--dataset.streaming=true` 시도 (lerobot streaming dataset)
+    6. DGX 환경 다운그레이드 (PyTorch 2.9 또는 FFmpeg 7) — torchcodec 활성화
+  - (d) **추천 + 근거**: 단일 추천 또는 다중 옵션 (사용자 결정 받기 위함). *최소 비용 검증* 제안 (큰 작업 전 작은 실험으로 가설 줄임 — 예: cleanup 강화 후 시도 3 만으로 OOM 안 나면 image 변환 불요).
+- 구현 대상:
+  - 보고서 → `docs/work_flow/context/research/m1.5_video_decode_oom.md` (researcher 가 Write)
+  - 코드 변경 0
+- 테스트: 보고서 §3 외부 검색 결과의 *원본 링크* 검증 (출처 명확), §4 비교 표 정합성 (Cat 분류 정확), §5 추천 근거가 §1~§4 의 증거에 기반.
+- 제약: 코드 작성 0. WebSearch/WebFetch + read-only Bash (`git log`, `ls`, `grep`, `find`, `cat`) + Grep/Glob/Read 만. 활성 파일 수정 X.
+- 잔여 리스크: 본 보고서가 *대안 추천* 시 TODO-02·03 의 작업 내용이 *재정의* 가능 (변환 스크립트 아닐 수 있음).
+
+> **researcher verdict 분기** (마지막 줄):
+> - `NO_BLOCKER` → image 변환 결정 valid, TODO-02 그대로 진행
+> - `RECOMMENDS_ALTERNATIVE` → 다른 해결책 추천, TODO-02 재정의 필요 (메인이 사용자 결정 받음)
+> - `AMBIGUOUS` → 사용자 결정 (메인이 AskUserQuestion)
+> - `NEEDS_INVESTIGATION` → 메인이 추가 실험 (cleanup 강화 등 최소 비용 검증) 또는 사용자 결정
 
 ### [ ] TODO-02: video → image 변환 스크립트 작성 + DGX 실행
+
+> **선결 의존**: TODO-01 의 researcher 보고서 verdict 가 `NO_BLOCKER` 또는 `RECOMMENDS_ALTERNATIVE` 에서 *image 변환 채택* 일 때만 본 todo 그대로 진행. 다른 해결책 (cleanup·patch·streaming 등) 추천 시 본 todo 는 *재정의* 또는 *폐기* — 메인이 사용자와 함께 spec 갱신.
 
 - DOD:
   - (a) `dgx/finetune/leftarm_v2/convert_to_image.py` 신규 — pyav 또는 ffmpeg 로 원본 mp4 frame 추출, parquet 재작성, meta/info.json 갱신. lerobot 의 `_keep_episodes_from_video_with_av` (line 576) + `convert_image_to_video_dataset` (line 1648) 패턴 참조.
