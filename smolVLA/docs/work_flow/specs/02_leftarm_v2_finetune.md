@@ -26,17 +26,19 @@
 
 ### [ ] TODO-01: 2A 학습 구성 확정 + 100ep balanced 서브셋 정의
 
+> **결정 완료 (2026-05-15)**: 사용자와 Phase 1 대화로 학습 방법·subset·subset 지정 방법 확정. `train_config.yaml` 갱신·`model_config.md` 신규 작성 완료. `run_train.py` 작성만 남음 → TODO-02 학습 실행 직전에 작업.
+
 - DOD:
-  - (a) **2A 학습 구성 결정** — base ckpt / LoRA 적용·rank / steps / batch / lr / optimizer / save_freq / wandb 설정. v1 LoRA 구성을 출발점으로 Phase 1 에서 사용자와 확정.
-  - (b) **100ep balanced 서브셋 정의** — task 1 ep 0~49 (전부) + task 2 의 50 개. task 2 의 어느 50 개를 쓸지 결정 (front-치우침 수용 [ep 50~99: 4·5·6차 front 40 + 7차 일부 back 10] vs front/back 균형 [front 25 + back 25] vs 차수 단위 [4·5·6차 = 40ep + 7차 일부 10ep]).
-  - (c) **lerobot-train episode subset 지정 방법 확정** — draccus `--dataset.episodes` 류 인자 존재 여부 확인. 없으면 별도 subset dataset 생성 절차 결정 (Hub repo 분기 vs 로컬-only).
+  - (a) **2A 학습 구성 결정** — **완료**: A2 (LoRA all-linear, r=16) / batch 16 / steps 20,000 / save_freq 1000 / wandb enable / smolvla 기본 lr·optimizer. 4축 매트릭스 [LoRA/Full FT] × [VLM frozen/trainable] 분석 후 A2 채택 (v1 검증값 + step 만 0.13 → 5.3 epoch 로 ↑). 상세·근거: [`dgx/docs/finetune/leftarm_v2/model_config.md`](../../../dgx/docs/finetune/leftarm_v2/model_config.md).
+  - (b) **100ep balanced 서브셋 정의** — **완료**: **P 방식** — task 1 ep [0..49] + task 2 ep [50..99] = ep 0~99 연속. 양 task 모두 front:back = 30:20 (6:4 동일 편향, task 간 비교 깔끔). 진짜 균형(25:25) 은 task 2 back 5ep 부족이라 추가 수집 필요 → 2A 는 P 로 진행, 2B 에서 자연히 균형.
+  - (c) **lerobot-train episode subset 지정 방법** — **완료**: `docs/reference/lerobot/src/lerobot/configs/default.py:33` 의 `episodes: list[int] | None` 사용. `--dataset.episodes='[0,1,...,99]'` draccus 인자로 직접 전달. 별도 subset dataset 생성 불필요.
 - 구현 대상:
-  - `dgx/finetune/leftarm_v2/config/train_config.yaml` — `[TBD-M2]` skeleton 을 2A 값으로 채움.
-  - `dgx/finetune/leftarm_v2/run_train.py` 신규 — `config/{base,train}_config.yaml` 읽어 `lerobot-train` 명령 구성·실행. `run_record.py`·`run_teleop.py` 패턴 (공용 헬퍼는 `_lib.py`).
-  - lerobot-train CLI 인자 정합 검토 (`docs/reference/lerobot/` `--help` 대조).
-- 테스트: config YAML 파싱 + `run_train.py --dry-run` 으로 명령이 `lerobot-train --help` 와 정합한지 검토. 실 DGX 검증은 TODO-02.
-- 제약: `docs/reference/` 수정 금지. lerobot-train draccus 인자 준수. 학습 산출 `outputs/<run>/` flat (옛 `outputs/train/` 금지). base_config.yaml hardware/accounts 그대로 활용.
-- 잔여 리스크: episode subset 미지원 시 별도 subset dataset 생성 필요 — 운영 부담 + Hub 정책 결정. 사용자 결정 사항.
+  - `dgx/finetune/leftarm_v2/config/train_config.yaml` — **갱신 완료** (2A 값 + dataset_subset_2a range).
+  - `dgx/finetune/leftarm_v2/run_train.py` — **미작성**: config 읽어 `lerobot-train` 명령 구성·실행. `run_record.py`·`run_teleop.py` 패턴 (`_lib.py` 헬퍼). `dataset_subset_2a.episode_ranges_inclusive` 를 list 로 expand 해 `--dataset.episodes` 로 전달. lerobot-train draccus 인자 경로 (`--policy.*`/`--training.*`/`--wandb.*`/`--output_dir`) 정합 검토 후 작성.
+  - `dgx/docs/finetune/leftarm_v2/model_config.md` — **신규 완료** (4축 분석·A2 결정 근거·hyperparameter 상세·subset P 근거·2B 튜닝 계획·실행 기록 §).
+- 테스트: `run_train.py --dry-run` 으로 구성된 lerobot-train 명령이 `--help` 와 정합한지 검토. 실 DGX 검증은 TODO-02.
+- 제약: `docs/reference/` 수정 금지. lerobot-train draccus 인자 준수. 학습 산출 `outputs/<run>/` flat. base_config.yaml hardware/accounts 활용.
+- 잔여 리스크: lerobot-train 의 정확한 draccus 인자 경로 (`--training.steps` 인지 `--steps` 인지 등) 는 `run_train.py` 작성 시 코드 조사 후 확정.
 
 ### [ ] TODO-02: 2A 학습 실행 + 체크포인트 smoke
 

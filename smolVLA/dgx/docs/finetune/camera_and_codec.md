@@ -101,14 +101,16 @@ fine-tune 워크플로우에선 이 두 값은 사전학습 모델에 묶인 상
 
 NVENC 은 GPU 의 별도 전용 인코딩 블록이라, **Walking RL 학습이 가동 중이어도 tensor 코어 throughput 에 거의 영향 없음**. CLAUDE.md 의 "Walking RL 가동 시 GPU 코덱 회피" 는 보수적 규칙 — 실제 영향은 작지만 규칙 자체는 존중.
 
-### 의사결정 (leftarm_v2)
+### 의사결정 (leftarm_v2) — 2026-05-15 실측 후 갱신
 
 | 상황 | 권장 코덱 |
 |---|---|
-| **Walking RL 미가동** (현재) | **`h264_nvenc`** — CPU 병목 해소, record loop 30fps 안정. `av1_nvenc` 도 가능 (AV1 품질 + GPU 속도) |
+| **Walking RL 미가동** (현재) | **`h264_nvenc`** — CPU 부하 분리(인코딩이 GPU NVENC ASIC 으로 빠짐, Grace CPU 는 record loop · MJPG 디코딩 · display_data 에 집중) + **학습 단계 디코딩 효율**(h.264 디코더가 av1 보다 가벼움 — PyAV/decord 경로). `av1_nvenc` 은 디코딩 부담 ↑ |
 | Walking RL 가동 중 | `libsvtav1` (CLAUDE.md 원칙 준수) |
 
 설정 위치: [record_config.yaml](../../finetune/leftarm_v2/config/record_config.yaml) 의 `dataset.vcodec`.
+
+> ⚠️ **실측 정정 (2026-05-15, [collection_log.md 발견된 이슈 §](leftarm_v2/collection_log.md))**: 원래 NVENC 채택 동기는 "30fps 회복" (libsvtav1 CPU 병목 가설) 이었으나, h264_nvenc 1·2·3차 수집 결과 record loop sub-30Hz 가 동일하게 지속 → **인코더가 병목이 아님** 이 확인됨. 진짜 원인은 입력단 (USB topology / display_data / Corrupt JPEG) 추정. 단 **dataset 의 timestamp 는 `frame_index/fps` 로 이상값 저장되어 무결성 유지** (전수 분석 std 0.00ms, gap 0) → **학습 영향 경미, polish 격하**. NVENC 의 가치는 위 표의 두 가지 (CPU 부하 분리 + 학습 디코딩 효율) 로 재정립.
 
 ### 주의
 
@@ -124,4 +126,4 @@ NVENC 은 GPU 의 별도 전용 인코딩 블록이라, **Walking RL 학습이 �
 |---|---|---|
 | 1 | 카메라 해상도 ↔ 화각 | ⚠️ **미해결** — 다운스케일/크롭 여부 ffmpeg 테스트로 확정 필요. 수집 시작 전 권장 |
 | 2 | `resize_imgs_with_padding` / `input_features` | ✅ **확정** — 사전학습 모델에 묶인 상수. fine-tune 시 변경 금지 |
-| 3 | 비디오 코덱 | ⚙️ **권장 보류** — Walking RL 미가동 시 `h264_nvenc` 권장. record_config.yaml 의 vcodec 변경 여부 사용자 확정 대기 |
+| 3 | 비디오 코덱 | ✅ **확정 (2026-05-15)** — Walking RL 미가동 → `h264_nvenc` 채택 (record_config.yaml `dataset.vcodec`). 권장 이유: 30fps 회복 가설 반박됨 (실측), **CPU 부하 분리 + 학습 디코딩 효율**로 재정립 |
