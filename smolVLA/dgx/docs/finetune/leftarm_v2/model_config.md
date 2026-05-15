@@ -79,7 +79,7 @@ fine-tune 시 어느 part 를 *얼마나* 학습시킬지가 핵심 결정.
 | `lora.r` | `16` | v1 검증값. 2B 에서 r=32 시도 가치. |
 | `batch_size` | `16` | v1 동일. 변수 최소화. DGX 메모리 여유는 있으나 2A 는 v1 대비 변수 1개 조정 원칙. |
 | `steps` | `20,000` | **2A 의 핵심 변수**. 100ep × 600 frames ≈ 60k frames, batch 16 → 1 epoch ≈ 3,750 step → 5.3 epoch. v1 의 0.13 epoch (500 step) 의 미수렴을 명확히 회피. vision policy fine-tune 일반 적정 (3–10 epoch). |
-| `num_workers` | `8` | Walking RL 미가동 가정. 가동 시 `4` 로 낮춤 (lerobot dataloader 가 CPU·USB 점유). |
+| `num_workers` | `2` (시도 1: 8) | **시도 1 OOM 후 8→2 축소** (training_log.md §시도1). wandb 증거상 GPU 12W idle → 보존할 활용도 없음. workers 가 메모리 누수 주범. Walking RL 가동 시 더 낮춤. |
 | `save_freq` | `1000` | step 20,000 / save 1000 = 20 체크포인트. 디스크 부담·분해능 균형. v1 의 `250` 보다 sparse — 100ep 학습은 v1 보다 길어서. |
 | `log_freq` | `50` | wandb·console 로그 step 주기. v1 동일. default 200 보다 ↑ 분해능. |
 | `wandb_enable` | `true` | v1 동일. entity·project 는 `base_config.accounts` (BaboGaeguri / leftarm_v2). |
@@ -88,12 +88,12 @@ fine-tune 시 어느 part 를 *얼마나* 학습시킬지가 핵심 결정.
 | `rename_map` | 자동 생성 | `base_config.cameras` 키 순서로 `{top:camera1, wrist:camera2}` 매핑. smolvla 가 `observation.images.cameraN` 키를 기대 — 누락 시 `Key not found` 에러 (v1 의 [`../leftarm_v1/training.md`](../leftarm_v1/training.md) §7 트러블슈팅 확인). |
 | `optimizer` / `lr` | lerobot smolvla 기본 | `use_policy_training_preset=true` (default) — smolvla 의 preset optimizer/scheduler 자동 사용. 2A 변수 최소화. 2B 에서 필요 시 조정. |
 | `dataset_return_uint8` | `true` | **DGX UMA 메모리 안정**. float32 → uint8 (IPC·prefetch buffer 메모리 1/4). lerobot 이 GPU 에서 float 변환 → 정확도 영향 0. v1 default (false) 에서 변경. |
-| `prefetch_factor` | `2` | default 4 → 2. prefetch buffer (`num_workers × prefetch`) 절반. throughput 영향 미세 (학습이 dataloader 따라잡으면 무영향). |
-| `persistent_workers` | `false` | default true → false. epoch 사이 워커 재시작 — 5h+ 장시간 학습의 메모리 leak 차단. epoch 경계 ~1초 오버헤드. |
+| `prefetch_factor` | `1` (시도 1: 2) | 시도 1 OOM 후 추가 축소. `num_workers × prefetch = 2 × 1 = 2 batch` buffer (X' 의 1/8). |
+| `persistent_workers` | `false` | default true → false. epoch 사이 워커 재시작. **시도 1 단일 epoch 내 OOM 이라 효과 없었음** — 무해 유지. |
 
-> ⚠️ **2A 에서 변경한 것**: v1 대비 `steps` (5000→20,000) + dataset (40ep 단일 task → 100ep 멀티태스크 balanced subset) + **메모리 안정 3 인자** (return_uint8 / prefetch_factor / persistent_workers). 메모리 옵션은 정확도 영향 0 이라 변수 통제와 충돌하지 않음 — *결과 해석*은 여전히 steps + dataset 차원으로 깔끔.
+> ⚠️ **2A 에서 변경한 것**: v1 대비 `steps` (5000→20,000) + dataset (40ep 단일 task → 100ep 멀티태스크 balanced subset) + **메모리 안정 4 인자** (return_uint8 / prefetch_factor / persistent_workers / num_workers). 메모리 옵션은 정확도 영향 0 이라 변수 통제와 충돌하지 않음 — *결과 해석*은 여전히 steps + dataset 차원으로 깔끔.
 
-> 💾 **DGX UMA 메모리 전략 (X' 균형 패키지)**: DGX 는 UMA 128GB (CPU/GPU/X server 공유) + swap 0 구조라 dataloader 인코딩 메모리가 GUI 까지 압박 — v1 GUI 멈춤 사고의 핵심 원인. 본 2A 는 **데이터 메모리 v1 대비 ~1/8 절감** (uint8 ×1/4 + prefetch ×1/2) + epoch 메모리 leak 차단. `num_workers=8` 은 v1 유지 — GPU 활용도 보존 (`docs/storage/02_hardware.md` §4 GB10 20 코어 CPU 활용). 학습 중 wandb 의 `data_load_time` / `system/memory` peak 관측 후 다음 run 에서 조정.
+> 💾 **DGX UMA 메모리 전략 — 시도 2 패키지 (시도 1 OOM 후 갱신)**: DGX 는 UMA 128GB (CPU/GPU/X server 공유) + swap 0 구조라 dataloader 인코딩 메모리가 GUI 까지 압박 — v1 GUI 멈춤 사고의 핵심 원인. **시도 1 (X', workers=8 / prefetch=2)** 가 step 368 에서 system OOM (5GB/min 누수, [`training_log.md §시도1`](training_log.md)). wandb 증거상 main process 3.4GB 안정 / system 95GB 증발 / GPU 12W idle → DataLoader workers 가 주범, GPU 활용도 보존 명분 사라짐. **시도 2** 는 buffer = `2 workers × 1 prefetch = 2 batch` (X' 의 1/8, v1 default 의 1/16). 학습 중 wandb 의 `data_load_time` / `system/memory` peak 관측 후 다음 run 에서 조정.
 
 > 📌 **PEFT 활성화 시 smolvla 자동 동작 (lerobot v1 검증 확인)**: `--peft.*` 인자가 주어지면 smolvla policy 의 `tune_llm` / `tune_visual` / `tune_projector` / `tune_diffusion_model` 인자는 *무시되고* base model 전체가 자동 frozen + `target_modules` 에만 LoRA adapter 부착. 즉 `--peft.target_modules=all-linear` 가 우리 A2 의도 (VLM+expert 둘 다 LoRA, base 다 frozen) 와 정확히 일치. smolvla 자체 인자 `--policy.lora_*` 는 별도 경로 — 본 v2 는 v1 검증된 `--peft.*` 경로 사용.
 

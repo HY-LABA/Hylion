@@ -15,19 +15,21 @@ lora:
   r: 16                              # rank — v1 검증값
 batch_size: 16                       # v1 동일 — 2B 에서 증가 시도 가능
 steps: 20000                         # ~5.3 epoch on 100ep (60k frames, batch 16 → 1 epoch ≈ 3,750 step)
-num_workers: 8                       # v1 동일 (GPU 활용도 보존). Walking RL 가동 시 4 로 낮춤
+num_workers: 2                       # 시도 1 OOM 분석 (training_log.md §시도1) 후 8→2 축소.
+                                     # wandb 증거상 GPU 12W idle 이라 throughput 손해 X — workers 축소가 메모리 누수 직접 타격.
 save_freq: 1000                      # checkpoint 저장 step 주기
 log_freq: 50                         # wandb/console 로그 step 주기 (default 200, v1 동일)
 wandb_enable: true                   # entity·project 는 base_config.accounts (BaboGaeguri / leftarm_v2)
 device: cuda                         # auto-select 비의존 — DGX GB10 명시
 push_to_hub: false                   # 체크포인트 자동 Hub push X (DGX→Orin 수동 전송 흐름)
 
-# DGX UMA 128GB 메모리 안정 옵션 (v1 GUI 멈춤 사고 대응 — X' 균형 패키지).
-# 데이터 메모리 v1 대비 ~1/8 절감 (uint8 ×1/4 + prefetch ×1/2). GPU 활용도는 num_workers=8 로 보존.
-# 학습 중 wandb data_load_time / system memory 보고 다음 run 또는 2B 시점에 조정.
-dataset_return_uint8: true           # float32→uint8 (1/4 메모리, GPU 에서 변환되어 정확도 영향 0)
-prefetch_factor: 2                   # default 4 → 2. prefetch buffer (num_workers × prefetch) 1/2
-persistent_workers: false            # epoch 사이 워커 재시작 — 장시간 학습의 메모리 leak 차단
+# DGX UMA 128GB 메모리 안정 옵션 — 시도 2 패키지 (training_log.md §시도1 OOM 분석 반영).
+# X' (시도 1: workers=8, prefetch=2) 가 step 368 에서 system OOM (5GB/min 누수). wandb 증거상
+# main process 3.4GB 안정 / system 95GB 증발 / GPU 12W idle → DataLoader workers 가 주범.
+# 시도 2 buffer = workers 2 × prefetch 1 = 2 batch (X' 의 1/8, v1 default 의 1/16).
+dataset_return_uint8: true           # float32→uint8 (IPC 1/4 메모리, GPU 변환 — 정확도 영향 0)
+prefetch_factor: 1                   # 2 → 1. prefetch buffer 추가 축소 (workers × prefetch = 2)
+persistent_workers: false            # 무해 유지 (시도 1 OOM 은 단일 epoch 내라 효과 없었음)
 
 # 2A dataset subset — run_train.py 가 episode index 리스트로 expand 해 --dataset.episodes 로 전달.
 # P 방식 (100ep balanced): task1 [0..49] + task2 [50..99] = ep 0~99 연속.
