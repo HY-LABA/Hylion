@@ -85,7 +85,7 @@ fine-tune 시 어느 part 를 *얼마나* 학습시킬지가 핵심 결정.
 | `wandb_enable` | `true` | v1 동일. entity·project 는 `base_config.accounts` (BaboGaeguri / leftarm_v2). |
 | `device` | `cuda` | DGX GB10 명시. auto-select 의존 회피 (v1 동일). |
 | `push_to_hub` | `false` | 체크포인트 자동 Hub push 차단 — DGX→Orin 수동 전송 흐름 (v1 동일). |
-| `rename_map` | 자동 생성 | `base_config.cameras` 키 순서로 `{top:camera1, wrist:camera2}` 매핑. smolvla 가 `observation.images.cameraN` 키를 기대 — 누락 시 `Key not found` 에러 (v1 의 dgx/docs/finetune/training.md §7 트러블슈팅 확인). |
+| `rename_map` | 자동 생성 | `base_config.cameras` 키 순서로 `{top:camera1, wrist:camera2}` 매핑. smolvla 가 `observation.images.cameraN` 키를 기대 — 누락 시 `Key not found` 에러 (v1 의 [`../leftarm_v1/training.md`](../leftarm_v1/training.md) §7 트러블슈팅 확인). |
 | `optimizer` / `lr` | lerobot smolvla 기본 | `use_policy_training_preset=true` (default) — smolvla 의 preset optimizer/scheduler 자동 사용. 2A 변수 최소화. 2B 에서 필요 시 조정. |
 
 > ⚠️ **2A 에서 변경한 것**: v1 대비 `steps` 만 (5000 → 20,000) + dataset (40ep 단일 task → 100ep 멀티태스크 balanced subset). 다른 모든 hyperparameter 는 v1 그대로 — 결과 해석을 깔끔하게 한다.

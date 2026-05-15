@@ -6,7 +6,7 @@
 # 2B (200ep 완성 후) 에서 hyperparameter 정밀 튜닝 — 본 파일은 그때 갱신.
 #
 # 참고 (leftarm_v1 실행값): LoRA all-linear r=16 / batch 16 / 5000 steps (500 조기중단).
-# 상세: dgx/docs/finetune/training.md, status.md §4.
+# 상세: dgx/docs/finetune/leftarm_v1/training.md, status.md §4.
 
 policy_path: lerobot/smolvla_base    # 사전학습 체크포인트 (v1 동일)
 method: lora                         # A2: VLM + expert 양쪽에 LoRA adapter (base frozen, adapter trainable)

@@ -17,7 +17,7 @@
   - **2B — 200ep second pass**: M1 완성 (task1: 100 / task2: 100) 후 재학습 → 재추론. M2 최종 산출.
 - **v1 학습 이력** — `lerobot/smolvla_base` + LoRA (`r=16`, `all-linear`), batch 16, 의도 5000 step 중 500 step 조기 중단, adapter 46MB (run `leftarm_v1_explore_2026-05-11_17-04-20`). 2A 출발점.
 - **결정 포인트 (M2 작성 시)**: 모델 구성 — `smolvla_base` 기반 / LoRA 적용 여부·rank / 하이퍼파라미터 / 학습 step 수. v1 의 LoRA 구성을 출발점으로, 2A 의 안정성·수렴 관찰 후 2B 재튜닝.
-- **DGX 학습 산출 위치** — `~/smolvla/dgx/outputs/<run>/` flat 컨벤션 (`dgx/docs/finetune/training.md`, `data_collection.md` 기준; 옛 `outputs/train/` 혼재 정리됨).
+- **DGX 학습 산출 위치** — `~/smolvla/dgx/outputs/<run>/` flat 컨벤션 (`dgx/docs/finetune/leftarm_v1/training.md`, `leftarm_v1/data_collection.md` 기준; 옛 `outputs/train/` 혼재 정리됨).
 - **DGX→Orin 체크포인트 전송 절차** — `docs/storage/06_dgx_venv_setting.md` §9.
 
 ---
