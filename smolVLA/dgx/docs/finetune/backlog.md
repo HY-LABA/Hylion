@@ -25,6 +25,19 @@
 - **영향**: venv 재구축 시 PEFT 자동 설치되어 LoRA 학습 즉시 가능. 현재 venv 에서는 이미 수동 설치 완료 (`pip install -e ~/smolvla/docs/reference/lerobot[peft]`)
 - **검증**: 새 venv 만든 뒤 `python -c "import peft; print(peft.__version__)"` 가 동작
 
+### 🔥 [ ] run_train.py preflight — DGX UMA system memory 가드레일 + dataloader 누수 대응
+
+- **발견**: 2026-05-15, leftarm_v2 2A 시도 1, step 368 에서 global OOM (system-wide, CONSTRAINT_NONE). 학습 프로세스 외에 VSCode server 2개도 같이 OOM-killed
+- **트리거 (wandb 증거 반영)**: ~5 GB/min 속도로 system memory 가 선형 누적. wandb 의 main process memory 는 3.4GB 안정 → **누수의 정체는 DataLoader workers 8개 + shmem + 동시 점유 프로세스의 합** (main 프로세스 외부). UMA 128GB 단일 풀이라 GPU 요청까지 같이 막힘 (NVRM Out of memory 가 oom-killer 전에 등장)
+- **조치**:
+  1. run_train.py 시작 시 `MemAvailable` 검사 — < 80 GB 이면 경고, < 60 GB 이면 `--force` 없이 거부
+  2. **권장 cleanup 명령 출력** (`pkill -f rerun` + IDE 창 최소화 안내). cleanup 후 다시 `free -h` 출력해 사용자가 효과 확인 가능
+  3. `PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True` 기본 export (우선순위는 낮음 — main 프로세스 안 자랐던 게 wandb 로 확인됨)
+  4. train_config.yaml 의 `num_workers` default 를 8 → 4 로 낮추고 주석에 wandb 증거 링크
+  5. (검증 가치) video backend 선택지 — torchcodec 시도, 또는 dataset codec h264_nvenc 통일 후 비교
+- **영향**: 다음 학습 시도 시 사전에 위험 인지 + 재발 차단. leftarm_v2/training_log.md "시도 1" 사고 entry 참조
+- **연관**: leftarm_v2/training_log.md, leftarm_v1/training.md §troubleshoot ("SIGKILL → OOM killer" 항목)
+
 ### ⚙️ [ ] v4l2-utils 사전 설치 확인 / check_hardware.sh 안내 강화
 
 - **발견**: 2026-05-11, data_collection.md §2 카메라 노드 매핑 시 `v4l2-ctl --list-devices` 사용

@@ -21,7 +21,10 @@ paths:
 accounts:
   hf_user: BaboGaeguri          # HF Hub 로그인 ✓ (hf auth whoami).
                                 # ⚠️ HF_USER env 는 venv 가 자동 export 안 함 — 래퍼가 주입 또는 수동 export 필요.
-  wandb_entity: BaboGaeguri     # wandb 인증 ✓ (~/.netrc). entity 는 --wandb.entity 로 전달.
+  wandb_entity: babogaeguri-hanyang-university  # wandb 인증 ✓ (~/.netrc). entity 는 --wandb.entity 로 전달.
+                                # ⚠️ HF 계정 (BaboGaeguri) 과 다름. wandb username `babogaeguri` 는 개인 namespace
+                                # 가 비활성 — viewer.teams = ['babogaeguri-hanyang-university'] 만 write 가능.
+                                # leftarm_v1 도 본 team entity 로 push 됨 (일관성 유지).
   wandb_project: leftarm_v2
 
 # ── 물리 셋업 (robot·teleop·cameras — record·teleop 공용, train 미사용. → lerobot --robot.* / --teleop.*) ──
