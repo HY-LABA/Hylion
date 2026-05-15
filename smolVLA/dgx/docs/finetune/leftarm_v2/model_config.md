@@ -87,8 +87,13 @@ fine-tune 시 어느 part 를 *얼마나* 학습시킬지가 핵심 결정.
 | `push_to_hub` | `false` | 체크포인트 자동 Hub push 차단 — DGX→Orin 수동 전송 흐름 (v1 동일). |
 | `rename_map` | 자동 생성 | `base_config.cameras` 키 순서로 `{top:camera1, wrist:camera2}` 매핑. smolvla 가 `observation.images.cameraN` 키를 기대 — 누락 시 `Key not found` 에러 (v1 의 [`../leftarm_v1/training.md`](../leftarm_v1/training.md) §7 트러블슈팅 확인). |
 | `optimizer` / `lr` | lerobot smolvla 기본 | `use_policy_training_preset=true` (default) — smolvla 의 preset optimizer/scheduler 자동 사용. 2A 변수 최소화. 2B 에서 필요 시 조정. |
+| `dataset_return_uint8` | `true` | **DGX UMA 메모리 안정**. float32 → uint8 (IPC·prefetch buffer 메모리 1/4). lerobot 이 GPU 에서 float 변환 → 정확도 영향 0. v1 default (false) 에서 변경. |
+| `prefetch_factor` | `2` | default 4 → 2. prefetch buffer (`num_workers × prefetch`) 절반. throughput 영향 미세 (학습이 dataloader 따라잡으면 무영향). |
+| `persistent_workers` | `false` | default true → false. epoch 사이 워커 재시작 — 5h+ 장시간 학습의 메모리 leak 차단. epoch 경계 ~1초 오버헤드. |
 
-> ⚠️ **2A 에서 변경한 것**: v1 대비 `steps` 만 (5000 → 20,000) + dataset (40ep 단일 task → 100ep 멀티태스크 balanced subset). 다른 모든 hyperparameter 는 v1 그대로 — 결과 해석을 깔끔하게 한다.
+> ⚠️ **2A 에서 변경한 것**: v1 대비 `steps` (5000→20,000) + dataset (40ep 단일 task → 100ep 멀티태스크 balanced subset) + **메모리 안정 3 인자** (return_uint8 / prefetch_factor / persistent_workers). 메모리 옵션은 정확도 영향 0 이라 변수 통제와 충돌하지 않음 — *결과 해석*은 여전히 steps + dataset 차원으로 깔끔.
+
+> 💾 **DGX UMA 메모리 전략 (X' 균형 패키지)**: DGX 는 UMA 128GB (CPU/GPU/X server 공유) + swap 0 구조라 dataloader 인코딩 메모리가 GUI 까지 압박 — v1 GUI 멈춤 사고의 핵심 원인. 본 2A 는 **데이터 메모리 v1 대비 ~1/8 절감** (uint8 ×1/4 + prefetch ×1/2) + epoch 메모리 leak 차단. `num_workers=8` 은 v1 유지 — GPU 활용도 보존 (`docs/storage/02_hardware.md` §4 GB10 20 코어 CPU 활용). 학습 중 wandb 의 `data_load_time` / `system/memory` peak 관측 후 다음 run 에서 조정.
 
 > 📌 **PEFT 활성화 시 smolvla 자동 동작 (lerobot v1 검증 확인)**: `--peft.*` 인자가 주어지면 smolvla policy 의 `tune_llm` / `tune_visual` / `tune_projector` / `tune_diffusion_model` 인자는 *무시되고* base model 전체가 자동 frozen + `target_modules` 에만 LoRA adapter 부착. 즉 `--peft.target_modules=all-linear` 가 우리 A2 의도 (VLM+expert 둘 다 LoRA, base 다 frozen) 와 정확히 일치. smolvla 자체 인자 `--policy.lora_*` 는 별도 경로 — 본 v2 는 v1 검증된 `--peft.*` 경로 사용.
 
@@ -117,13 +122,27 @@ task 2 back 이 현재 20ep 뿐이라 진짜 50:50 (25:25) 을 만들려면 추�
 
 ## 6) 2B 시점 튜닝 계획 (미확정)
 
-2A 추론 (spec 02 TODO-03) 결과 보고 결정. 현재 시점 candidate:
+2A 추론 (spec 02 TODO-03) 결과 + **2A 학습 wandb 관찰값** 보고 결정.
 
-- A2 그대로 + r=32 (LoRA 표현력 ↑)
-- A2 그대로 + steps 40,000 (더 긴 학습)
-- B1 시도 (Full FT on expert, VLM frozen) — A2 와 비교
-- B2 시도 (전체 Full FT) — 200ep 라 가능 영역
-- batch 32 (DGX 메모리 활용)
+### wandb 에서 관찰할 핵심 메트릭 (2A 학습 중)
+
+| 메트릭 | 해석 | 조치 후보 |
+|---|---|---|
+| `data_load_time` vs `step_time` | data > step 이면 CPU dataloader bottleneck → GPU idle | `num_workers` ↑ (8→16) 또는 `prefetch_factor` ↑ (2→4) |
+| `system/memory` peak | UMA 헤드룸 (총 121GB 중) | peak < 80% → batch ↑ (16→32) 또는 prefetch ↑ 여지 |
+| `system/gpu.process.memory` | Blackwell 메모리 점유 | bf16 활용 여지 판단 |
+| `system/gpu.utilization` | Blackwell 활용도 | 낮으면 dataloader bottleneck 또는 batch 너무 작음 |
+| `step_time` variance | 디코딩·USB I/O 변동 신호 | 큰 변동 → `Corrupt JPEG` 류 입력단 점검 |
+
+### 2B candidate 조정 옵션
+
+- A2 그대로 + `r=32` (LoRA 표현력 ↑)
+- A2 그대로 + `steps 40,000` (더 긴 학습, 200ep × ~600 frames ≈ 120k frames → 1 epoch ≈ 7,500 step → 5.3 epoch)
+- **B1 시도** (Full FT on expert, VLM frozen) — A2 와 표현력 비교
+- B2 시도 (전체 Full FT) — 200ep 라 가능 영역, system memory headroom 보고
+- **batch 32 / 64** (DGX UMA 헤드룸 활용) — 2A wandb memory peak 보고 결정
+- **num_workers 16** (20 코어 CPU 활용) — `data_load_time` 이 bottleneck 일 때만
+- **bf16** (`policy.use_bf16=true`) — 학습 메모리 ↓ + 속도 ↑ (정확도 영향 검증 필요)
 
 → 2A 결과 entry (§7) 채워진 후 갱신.
 
@@ -138,7 +157,7 @@ task 2 back 이 현재 20ep 뿐이라 진짜 50:50 (25:25) 을 만들려면 추�
 - run name: `leftarm_v2_2a_<timestamp>` (예정)
 - 명령: `python run_train.py train --pass 2a` 또는 동등 (run_train.py 작성 시 확정 — spec 02 TODO-01)
 - 산출물 경로: `~/smolvla/dgx/outputs/leftarm_v2_2a_<timestamp>/`
-- 결과 (학습 완료 후 기입): steps · 최종 loss · wandb run URL · ckpt size · throughput · 이슈
+- 결과 (학습 완료 후 기입): steps · 최종 loss · wandb run URL · ckpt size · throughput · **system memory peak (UMA / MemAvailable 비율)** · **data_load_time vs step_time 비율** · **GPU utilization** · 이슈
 - Orin smoke 추론 결과 (spec 02 TODO-03 후 기입): task 1·2 각각 정성 메모
 
 ### 2B — 미실행 (M1 완성 후 진입)

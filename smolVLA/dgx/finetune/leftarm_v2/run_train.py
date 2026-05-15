@@ -84,7 +84,8 @@ def cmd_train(args, base, train):
     # ── 필수 train 필드 검증 ──
     required = ("policy_path", "method", "batch_size", "steps",
                 "num_workers", "save_freq", "log_freq", "wandb_enable",
-                "device", "push_to_hub")
+                "device", "push_to_hub",
+                "dataset_return_uint8", "prefetch_factor", "persistent_workers")
     for k in required:
         if train.get(k) is None:
             die(f"train_config.yaml.{k} 미설정")
@@ -108,11 +109,14 @@ def cmd_train(args, base, train):
         f"--batch_size={train['batch_size']}",
         f"--steps={train['steps']}",
         f"--num_workers={train['num_workers']}",
+        f"--prefetch_factor={train['prefetch_factor']}",
+        f"--persistent_workers={b(train['persistent_workers'])}",
         f"--save_freq={train['save_freq']}",
         f"--log_freq={train['log_freq']}",
         f"--output_dir={output_dir}",
         f"--job_name={run_name}",
         f"--rename_map={rename_map_str}",
+        f"--dataset.return_uint8={b(train['dataset_return_uint8'])}",
         f"--wandb.enable={b(train['wandb_enable'])}",
     ]
     if accounts.get("wandb_project"):
