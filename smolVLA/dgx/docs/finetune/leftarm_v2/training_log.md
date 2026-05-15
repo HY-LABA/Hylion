@@ -129,6 +129,89 @@ wandb 증거 반영 후 우선순위 갱신 — **dataloader workers 가 주범�
 
 ---
 
+### 시도 2 — 2026-05-15 18:13 · 2A first pass (재시도) · **⚠️ 진행 중, OOM 예측 — 19:00~05 부근 사망 예상**
+
+> 시도 1 의 조치 표 (workers 8→2, prefetch 2→1) 적용해 재시도. wandb 메트릭으로 steady-state 누수 측정 후, **시도 1 과 동일 메커니즘으로 사망 예상** (확실성 ~85%). 실제 사망 시 본 entry 사후 갱신.
+
+**명령**: `python run_train.py train --pass 2a`
+
+| 항목 | 값 |
+|---|---|
+| run name | `leftarm_v2_2a_2026-05-15_18-13-05` |
+| wandb run | `wandb.ai/babogaeguri-hanyang-university/leftarm_v2/runs/x8xuv596` |
+| 시작 | 2026-05-15 18:13:14 |
+| 도달 step (분석 시점 t=1471s) | 50 / 20,000 (0.25%) ← 시도 1 의 동시점은 step 250 |
+| 종료 모드 | (예측) 시도 1 과 동일한 OOM SIGKILL |
+| checkpoint 저장 | (예측) ❌ 없음 — save_freq=1000 도달 못함 |
+
+**시도 1 대비 설정 변경**:
+
+| 파라미터 | 시도 1 | 시도 2 | 변경 이유 |
+|---|---|---|---|
+| num_workers | 8 | **2** | DataLoader 메모리 footprint 1/4 |
+| prefetch_factor | 2 | **1** | prefetch 큐 16 → 2 |
+| batch_size | 16 | 16 | 변경 안 함 (main 메모리는 주범 아님) |
+| 그 외 | 동일 | 동일 | LoRA r=16 / all-linear / dataset 동일 |
+
+**관찰 (현재까지)**:
+
+- step time **8.5 s/step** (update 2.6s + dataloading 5.9s). 시도 1 의 2.7s 대비 3배 느림 — workers 2개로는 dataloader 가 bottleneck
+- main process RSS **2.84 GB 안정** (시도 1 과 동일 패턴)
+- loss 0.7456 (step 50, 정상 학습)
+- GPU power 4.97 W / util 7% — 시도 1 의 12W/95% 보다도 낮음 (workers 부족으로 GPU 더 idle)
+
+**wandb 분위별 누수율 — 시도 1 사망 패턴 재현 검증**:
+
+| 분위 | 시도 1 (OOM 까지) | 시도 2 (진행 중) | 비고 |
+|---|---|---|---|
+| Q1 (warmup) | 12,430 MB/min | 3,981 MB/min | workers 영향: 시도 2 가 1/3 |
+| Q2 | 3,875 | 1,212 | |
+| Q3 | 3,246 | 1,257 | |
+| Q4 (steady-state) | **1,805** | **1,254** | 30% 만 감소 |
+
+→ **Q2/Q3/Q4 가 시도 2 에서 1,212→1,257→1,254 로 사실상 일정** (oscillation 수준). saturation 곡선이 아니라 **고정 누수율로 안착**. 시도 1 도 같은 패턴이었고 결과는 OOM.
+
+**OOM 예측 (확실성 ~85%)**:
+
+```
+현재 (t=1471s) availMB ≈ 36,776 MB
+steady-state 누수 ≈ 1,254 MB/min  (Q4 기준)
+→ avail 5 GB (OOM zone) 도달: 약 25분 후 (≈ 19:00 KST)
+→ avail 0 도달:                약 29분 후 (≈ 19:05 KST)
+```
+
+확실성 100% 가 아닌 이유:
+- 누수율이 진짜 saturation 으로 감속할 가능성 (현 데이터는 부정, 하지만 미래는 모름)
+- OOM-killer 가 학습이 아닌 다른 프로세스 (VSCode 등) 만 죽이고 학습은 살아남을 시나리오 (시도 1 사례 보면 결국 학습도 죽음)
+- 사용자가 사전 중단할 가능성
+
+**가설 검증 결과 (workers × pyav leak)**:
+
+- 가설 1 (시도 1 진단 시): "DataLoader workers × pyav video decode 누수"
+- 시도 2 검증: workers 1/4 로 줄임 → steady-state 누수 1,805 → 1,254 MB/min (**30% 감소만**)
+- 결론: **가설 1 의 80% 가 부정**. workers 자체보다 **시간 비례 누수 메커니즘** 이 주범. workers 는 baseline/warmup 부담만 결정
+- 새 가설 후보: shmem leak / pyav-libsvtav1 디코더 자체 누수 (worker 수와 무관) / page cache 누적 / UMA GPU memory growth
+
+**시도 3 후보 (시도 2 죽으면)**:
+
+| 가설 | 조치 |
+|---|---|
+| **🔥 pyav video decoder 자체 누수** (가장 유력) | `video_backend=torchcodec` 으로 전환. workers 와 무관한 시간 비례 누수와 일관 |
+| shmem 누수 | `num_workers=0` (single-process) 시도 — leak 가 정말 시간 비례면 0 명에서도 발생 (가설 확정) |
+| codec 혼재 영향 | leftarm_v2 의 차수 1~4 (libsvtav1) + 차수 5~7 (h264_nvenc) 혼재 — codec 통일 후 재시도 |
+| UMA GPU memory growth | `nvidia-smi --query-gpu=memory.used` 시간별 캡처 — GPU 47.9GB 가 자라는지 확인 |
+
+**사후 갱신 (실제 사망 시)**:
+
+- [ ] 실제 사망 step / 시각 기재
+- [ ] dmesg 사망 시점 메모리 통계
+- [ ] 예측 vs 실측 차이 (오차 분 단위)
+- [ ] 시도 3 진행 방향 결정
+
+> 학습이 살아남거나 더 늦게 죽으면 본 entry 의 "예측" 부분을 갱신.
+
+---
+
 ## 발견된 이슈 / 후속
 
 ### 🔥 [ ] DGX UMA 환경에서 system-wide OOM 재현 — 메모리 가드레일 표준화
