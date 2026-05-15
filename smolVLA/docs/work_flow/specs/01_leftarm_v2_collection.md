@@ -14,12 +14,13 @@
 
 - **leftarm_v1** (40 episodes, task `"Pick up the doll and reach forward"`) 은 **동결** — 개념적 체크포인트로 보존. 본 spec 에서 끌어오지 않음.
 - **leftarm_v2** = 본 spec 작업 대상. 신규 **2 task 멀티태스크** dataset:
-  - ① 인형(doll) 을 집어 상자에 넣기
-  - ② 캔(can) 을 집어 상자에 넣기
+  - ① 파랑+노랑 인형을 테이블 왼쪽에 놓기 — `Pick up the blue and yellow doll and place it on the left side of the table`
+  - ② 노란 캔을 사람에게 건네기 (hand-over) — `Hand the yellow can to the person`
+  - (옛 "노란 플라스틱 상자" pick-and-place 설계는 top view 가동범위 제약 + task 다양성 확보 차원에서 2026-05-15 폐기. 상세 `docs/storage/01_collection_scenario.md` §2c.)
 - 한 SmolVLA 모델이 instruction 으로 두 task 를 구분해 수행 (학습은 M2 / spec 02).
 - 에피소드: **task 당 100, 총 200** (fresh 수집).
 - 환경 정합 결정 포인트: **"최소 파라미터만 기록"** (2026-05-14) — 카메라·조명·작업영역 핵심값만 기록하고 dev 환경 그대로 수집. 시연장 정합은 본 로드맵 이후.
-- DGX 측 수집 운영 상세: `~/smolvla/dgx/docs/data_collection.md`, 진행 현황: `~/smolvla/dgx/docs/status.md`.
+- DGX 측 수집 운영 상세: `~/smolvla/dgx/docs/data_collection.md`, 진행 현황: `~/smolvla/dgx/docs/status.md`. 차수별 실 수집 로그: `~/smolvla/dgx/docs/finetune/leftarm_v2/collection_log.md`.
 
 ---
 

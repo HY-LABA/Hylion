@@ -1,0 +1,83 @@
+# 02_leftarm_v2_finetune
+
+> 목표: leftarm_v2 dataset 으로 SmolVLA 멀티태스크 정책을 fine-tune. **2 패스 구조** — 2A (현재 110ep 중 task 50:50 = 100ep balanced) → 추론 smoke → M1 잔여 수집 → 2B (200ep 완성) → 추론 smoke.
+> 환경: DGX Spark 학습 (venv `~/smolvla/dgx/.arm_finetune`) + Orin 추론 smoke (venv `~/smolvla/orin/.hylion_arm`)
+> 접근: devPC → `ssh dgx` / `ssh orin`
+> 코드 경로: DGX `~/smolvla/dgx/finetune/leftarm_v2/`, Orin `~/smolvla/orin/`
+> 로드맵: `realplaying.md` M2
+> 작성: 2026-05-15
+
+---
+
+## 배경
+
+- **M1 (spec 01) 진행 중** — leftarm_v2 dataset 200ep 목표 수집 중. **2026-05-15 현재 110ep** (task1: 50 / task2: 60). 차수 로그: [`dgx/docs/finetune/leftarm_v2/collection_log.md`](../../../dgx/docs/finetune/leftarm_v2/collection_log.md).
+- **M2 = 두 패스로 분할**:
+  - **2A — 100ep first pass**: 현재 dataset 에서 **task1: 50ep + task2: 50ep = balanced 100ep** 로 학습 1회 → 체크포인트 → Orin smoke 추론. 목적: **사이클 검증 + 조기 성능 관찰** → 200ep 추가 수집 가치 판단.
+  - **2B — 200ep second pass**: M1 완성 (task1: 100 / task2: 100) 후 재학습 → 재추론. M2 최종 산출.
+- **v1 학습 이력** — `lerobot/smolvla_base` + LoRA (`r=16`, `all-linear`), batch 16, 의도 5000 step 중 500 step 조기 중단, adapter 46MB (run `leftarm_v1_explore_2026-05-11_17-04-20`). 2A 출발점.
+- **결정 포인트 (M2 작성 시)**: 모델 구성 — `smolvla_base` 기반 / LoRA 적용 여부·rank / 하이퍼파라미터 / 학습 step 수. v1 의 LoRA 구성을 출발점으로, 2A 의 안정성·수렴 관찰 후 2B 재튜닝.
+- **DGX 학습 산출 위치** — `~/smolvla/dgx/outputs/<run>/` flat 컨벤션 (`dgx/docs/finetune/training.md`, `data_collection.md` 기준; 옛 `outputs/train/` 혼재 정리됨).
+- **DGX→Orin 체크포인트 전송 절차** — `docs/storage/06_dgx_venv_setting.md` §9.
+
+---
+
+## Todo
+
+### [ ] TODO-01: 2A 학습 구성 확정 + 100ep balanced 서브셋 정의
+
+- DOD:
+  - (a) **2A 학습 구성 결정** — base ckpt / LoRA 적용·rank / steps / batch / lr / optimizer / save_freq / wandb 설정. v1 LoRA 구성을 출발점으로 Phase 1 에서 사용자와 확정.
+  - (b) **100ep balanced 서브셋 정의** — task 1 ep 0~49 (전부) + task 2 의 50 개. task 2 의 어느 50 개를 쓸지 결정 (front-치우침 수용 [ep 50~99: 4·5·6차 front 40 + 7차 일부 back 10] vs front/back 균형 [front 25 + back 25] vs 차수 단위 [4·5·6차 = 40ep + 7차 일부 10ep]).
+  - (c) **lerobot-train episode subset 지정 방법 확정** — draccus `--dataset.episodes` 류 인자 존재 여부 확인. 없으면 별도 subset dataset 생성 절차 결정 (Hub repo 분기 vs 로컬-only).
+- 구현 대상:
+  - `dgx/finetune/leftarm_v2/config/train_config.yaml` — `[TBD-M2]` skeleton 을 2A 값으로 채움.
+  - `dgx/finetune/leftarm_v2/run_train.py` 신규 — `config/{base,train}_config.yaml` 읽어 `lerobot-train` 명령 구성·실행. `run_record.py`·`run_teleop.py` 패턴 (공용 헬퍼는 `_lib.py`).
+  - lerobot-train CLI 인자 정합 검토 (`docs/reference/lerobot/` `--help` 대조).
+- 테스트: config YAML 파싱 + `run_train.py --dry-run` 으로 명령이 `lerobot-train --help` 와 정합한지 검토. 실 DGX 검증은 TODO-02.
+- 제약: `docs/reference/` 수정 금지. lerobot-train draccus 인자 준수. 학습 산출 `outputs/<run>/` flat (옛 `outputs/train/` 금지). base_config.yaml hardware/accounts 그대로 활용.
+- 잔여 리스크: episode subset 미지원 시 별도 subset dataset 생성 필요 — 운영 부담 + Hub 정책 결정. 사용자 결정 사항.
+
+### [ ] TODO-02: 2A 학습 실행 + 체크포인트 smoke
+
+- DOD: 2A 학습 완료. 학습 곡선·loss 메트릭 정상 (조기 발산 X). 체크포인트가 lerobot CLI (`--policy.path` 등) 로 로드 가능 (smoke).
+- 구현 대상: `run_train.py` (TODO-01 산출물) 실행. wandb 로 학습 곡선 추적. 학습 후 체크포인트 로드 smoke (간단 import 또는 명령).
+- 테스트: DGX 학습 실행 모니터링 (PHYS_REQUIRED — 장시간). 학습 첫 100 step 내 loss · throughput · 메모리 점검 (v1 의 500 step 조기 중단 / disconnect 이력 회피). wandb run · `outputs/<run>/` 산출물 확인. ckpt 로드 smoke.
+- 제약: Walking RL GPU 점유 가능성 모니터링. DGX 시연장 이동 일정과 충돌 회피. 학습 산출은 `outputs/<run>/` flat.
+- 잔여 리스크: disconnect / OOM / NaN — 학습 중간 정기 점검 필수. v1 의 push 크래시 같은 부수 이력도 재발 가능.
+
+### [ ] TODO-03: 2A 체크포인트 Orin smoke 추론
+
+- DOD: 2A 체크포인트가 Orin 으로 전송됨. Orin venv 에서 lerobot CLI 로 **두 task instruction 각각** 정책 실행 — 정책이 의도된 형태로 모터 명령을 내는지 시각적 확인 (정성 평가). "task 를 시도는 한다 / 두 task 구분이 보인다" 정성 관찰.
+- 구현 대상: DGX→Orin 체크포인트 전송 (`docs/storage/06_dgx_venv_setting.md` §9 절차). Orin 추론 명령 (lerobot-record eval 모드 또는 동등).
+- 테스트: PHYS_REQUIRED — 사용자가 실 Orin + 좌측 SO-101 으로 두 task instruction 별도 시도. 결과 정성 메모.
+- 제약: Orin 메모리 (실 device) · 추론 fps 제약. 본 todo 는 *smoke* 라 성능 평가 목적 아님 (M3 본격 배포 영역).
+- 잔여 리스크: 100ep 데이터로 두 task 다 약할 수 있음 — 본 todo 의 목적이 "사이클이 끝까지 도는가 + 데이터 추가 가치 판단" 임을 잊지 말 것. 결과로 200ep 추가 수집 의사결정.
+
+> 본 todo 완료 후 → **M1 spec (01) 의 잔여 수집**: task 1 +50ep (front+20 / back+30), task 2 +40ep (인혁이형 back / 새 사람 C 등). `collection_log.md` §다음 차수 계획. **M2 spec 의 todo 아님** — M1 의 TODO-03 연장.
+
+### [ ] TODO-04: 2B 학습 구성 갱신 + 200ep 학습 실행
+
+- DOD: 2A 추론 관찰 결과 반영해 2B 학습 구성 갱신 (필요 시 LoRA rank · steps · lr · batch 조정). 200ep 전체 (task1: 100 + task2: 100) 학습 실행 → 체크포인트 산출 + smoke.
+- 구현 대상: `train_config.yaml` 2B 값으로 갱신. `run_train.py` 실행 (subset 인자 없이 전체 dataset).
+- 테스트: TODO-02 동일 절차 (loss · throughput · 메모리 · ckpt 로드 smoke). 데이터량 ↑ 로 학습 시간 ↑ — wall-clock 모니터링.
+- 제약: TODO-02 동일.
+- 잔여 리스크: 학습 시간 ↑ → 시연장 이동 일정 충돌 위험. wandb 로 진행 추적 필수.
+
+### [ ] TODO-05: 2B 체크포인트 Orin 추론 — M2 최종
+
+- DOD: 2B 체크포인트 Orin 배포 + 두 task instruction 추론. **2A 대비 개선 정성 비교** (수렴 품질). 두 task 모두 의미있는 수렴 관찰 — `realplaying.md` M2 DOD 충족.
+- 구현 대상: 체크포인트 전송 + Orin 추론 (TODO-03 절차).
+- 테스트: PHYS_REQUIRED — 사용자. 2A 와 **동일 조건** (인혁이형 / 성래 / orientation front·back 별) 추론 시도 → 2A vs 2B 비교 메모.
+- 제약: TODO-03 동일.
+- 잔여 리스크: 2A 대비 개선이 미미하면 데이터·하이퍼파라미터·추론 환경 어디가 병목인지 판단 필요 — M3 (배포) 진입 전 재정렬 가능성. BACKLOG 누적.
+
+---
+
+## Backlog
+
+> 본 spec 진행 중 발견된 추후 과제.
+
+| # | 항목 | 발견 출처 | 우선순위 |
+|---|------|-----------|----------|
+| 1 | (진행 중 누적) | — | — |
