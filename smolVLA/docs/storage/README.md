@@ -21,6 +21,12 @@
 
 > 2026-05-14 삭제: `09_demo_site_mirroring.md` (시연장 미러링 가이드 + §7 실측), `10_orin_config_policy.md` (orin/config git 추적 정책), `11_smolvla_model_decision.md` (SmolVLA 모델 선정 근거). 새 계획 수립 시 관련 내용 재검토 예정. git 히스토리에서 복구 가능.
 
+### 비-번호 (주제별)
+
+| 파일 | 내용 |
+|---|---|
+| [prof_train_setting.md](prof_train_setting.md) | **일반 GPU 환경** (Colab Pro / 클라우드 / 로컬 PC) 에서 SmolVLA 학습 셋업 가이드. DGX Spark 의 aarch64 한계 (torchcodec 부재 → pyav leak) 우회를 위한 표준 path — 다음 M2 spec 재작성의 baseline (2026-05-16) |
+
 ---
 
 ## Legacy 이관 항목
