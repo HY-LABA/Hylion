@@ -14,6 +14,11 @@ dgx/finetune/
     ├── check_port_and_camera_index.py # ① 포트·카메라 인덱스 찾기 (lerobot-find-port/cameras)
     ├── run_teleop.py                  # ② 셋업 검증 — lerobot-teleoperate (데이터 저장 X)
     ├── run_record.py                  # ③ 데이터 수집 — lerobot-record
+    ├── run_train.py                   # ④ 학습 — lerobot-train 래퍼
+    ├── convert_to_image.py            # ⑤ video dataset → image dataset 변환 (M1.5 OOM 대응)
+    ├── experiments/                   # M1.5 — 학습 OOM 진단 실험 스크립트·절차 문서
+    │   ├── cleanup_helper.sh          # 학습 전 환경 정리 헬퍼 (VSCode/Claude/Firefox kill + 메모리 검증)
+    │   └── exp_a_cleanup_attempt3.md  # 실험 A: cleanup 강화 + 시도 3 절차 + 결과 양식
     └── config/
         ├── base_config.yaml           # 셋업 컨텍스트
         ├── record_config.yaml         # 수집 job 파라미터

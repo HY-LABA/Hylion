@@ -25,3 +25,12 @@
 | 4 | `dgx/docs/finetune/README.md` 부재 — `camera_and_codec.md`, `backlog.md`, `leftarm_v1/`, `leftarm_v2/` 등 인덱스 없음. 새 사용자가 finetune 운영 문서 trail 모름 | 2026-05-15 메인 점검 | 중간 | 미완 |
 | 5 | `dgx/docs/finetune/leftarm_v2/README.md` 부재 — `collection_log.md`, `training_log.md`, `model_config.md` 인덱스 없음. era 안에서 어느 문서가 정본인지 안내 부재 | 2026-05-15 메인 점검 | 중간 | 미완 |
 | 6 | `docs/work_flow/specs/README.md` 의 spec 목록이 자동 ls 형식 아님 — 현재 본문은 spec 작성 가이드 + 정책. 새 spec (02_prereq 등) 등록 누락 가능성 — 자동 ls 형식 도입 또는 매 spec 신설 시 본문 갱신 정책 결정 필요 | 2026-05-15 메인 점검 | 낮음 | 미완 |
+
+## [02_prereq_dataset_video_to_image — wrap 시 연기 항목]
+
+> 본 spec 의 verification_queue 항목 중 사용자 결정 (2026-05-16 /wrap-spec) 으로 *연기* 처리된 항목. 다음 사이클에서 트리거 도래 시 재진입.
+
+| # | 항목 | 트리거 | 우선순위 | 상태 |
+|---|------|--------|----------|------|
+| 7 | TODO-02 — DGX 110ep 변환 실행 + 디스크 사용량 측정 + LeRobotDataset 로드 smoke. 변환 자동화 (스크립트 작성·deploy·dry-run skip) 까지는 완료. 사용자가 학습 종료 후 `nohup python finetune/leftarm_v2/convert_to_image.py ... &` 백그라운드 실행 시작 (또는 시작 예정). 결과 보고 대기. | DGX 110ep 변환 완료 후 사용자 결과 보고 (성공/실패, 디스크 사용량, smoke 결과) | 중간 (다음 사이클 진입 시 즉시 처리) | 미완 (사용자 PHYS_REQUIRED 진행 중) |
+| 8 | TODO-03 — image dataset 으로 train_config 갱신 + 시도 4 학습 진입 (첫 1000 step ckpt 도달 + OOM 없음 + wandb 기록). best practice 보고서 §7 권장 (bfloat16 명시) 적용 검토 포함. | TODO-02 완료 보고 후 (#7 트리거 도래) | 중간 | 미완 |

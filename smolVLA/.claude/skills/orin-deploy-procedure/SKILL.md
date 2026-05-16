@@ -190,6 +190,47 @@ ssh orin "cd ~/smolvla/orin && python tests/inference_baseline.py"
 | 자율성 룰 모호 (예: 5분 실행 추정 미묘) | `CONSTRAINT_AMBIGUITY` |
 | Phase 3 사용자 검증 후 롤백 | `DEPLOY_ROLLBACK` (orchestrator 가 추가) |
 
+## wandb API 활용 — 학습 metric 시계열 조회 (M1.5 reflection 도출, 2026-05-16)
+
+학습 진행 중 또는 완료 후 system metric 시계열 데이터가 필요할 때 (예: GPU idle thrashing 진단, 학습 결과 사후 분석):
+
+```python
+import wandb
+
+api = wandb.Api()
+run = api.run("<entity>/<project>/<run_id>")  # wandb run URL 에서 추출
+
+# system metric 시계열 (GPU 사용률·온도·전력, 시스템 메모리, process 메모리)
+system_history = run.history(stream="system")
+print(system_history[["system.gpu.0.gpu", "system.memory_percent", "system.proc.memory.availableMB"]].tail(20))
+
+# 학습 metric 시계열 (loss, step_time 등)
+train_history = run.history()
+print(train_history[["_step", "_runtime"]].tail(20))
+```
+
+**활용 시점**:
+- PHYS_REQUIRED 학습 도중 GPU idle / memory thrashing 패턴 진단 (M1.5 ANOMALIES #6 `GPU_IDLE_THRASHING`)
+- 사용자가 wandb URL 공유 시 — run_path 추출 후 API 로 전체 history 조회
+- prod-test-runner 가 학습 결과 사후 분석 시 (ssh 접속 없이 metric 확보 가능)
+
+**SSH 경유 호출 패턴** (DGX 의 wandb 인증을 사용해야 할 때):
+
+```bash
+ssh dgx 'cd ~/smolvla/dgx && source .arm_finetune/bin/activate && python3 -c "
+import wandb
+api = wandb.Api()
+run = api.run(\"<entity>/<project>/<run_id>\")
+sys_hist = run.history(stream=\"system\", samples=200)
+print(sys_hist.tail(15).to_string())
+"'
+```
+
+**주의**:
+- wandb API 는 devPC 에서도 실행 가능 (SSH 불필요). `wandb login` 또는 WANDB_API_KEY 환경변수 필요
+- DGX 측에 이미 wandb 인증돼 있으면 (학습 sync 중) ssh 경유 호출이 가장 간단
+- run summary 는 약간 *sync 지연* 있음 — 실시간 step 은 output.log 직접 tail 이 더 정확
+
 ## Reference
 
 - `/CLAUDE.md` § prod-test-runner 자율성 (정책 정의)

@@ -38,6 +38,14 @@ model: sonnet
 - *직접 증명되지 않은 가정* 식별 (예: "pyav leak 으로 추정" 인데 실제 검증 안 됨)
 - 가설 검증에 필요한 *최소 비용 실험* 또는 *코드 검증* 항목 도출
 
+**호출 경로 검증 의무** (M1.5 reflection 도출, 2026-05-16): 코드 review 시 분석 대상 함수가 *현재 환경 설정에서 실제로 호출되는 경로인지* 먼저 확인. 체크 순서:
+
+1. 설정 파일 (YAML/JSON/env) 에 관련 파라미터가 명시돼 있는지 확인
+2. 명시 없으면 default 동작 함수 추적 (grep `default` / `safe` / `auto` 패턴으로 선택 함수 탐색)
+3. 실제 호출 경로 확인 후 해당 경로의 코드만 분석 대상으로 삼기
+
+이 확인 없이 진행하면 호출되지 않는 경로 분석에 시간을 소비하고, 실제 문제가 다른 경로에 있을 위험이 있다 (M1.5 ANOMALIES #2: pyav 분석이 torchcodec 경로였음 — config 미명시 → `get_safe_default_codec` default 적용 → 실제는 torchcodec 호출).
+
 ### 2. 외부 검색 단계
 
 다음 채널을 *체계적*으로 검색 (각 채널 결과 보고서에 명시):
@@ -55,6 +63,24 @@ model: sonnet
 - 본 프로젝트 환경의 현 상태 점검 — 디스크·메모리·라이브러리 버전·시스템 상태
 - 관련 코드 *직접 review* — 의존 라이브러리의 코드 패턴 (Grep/Read) 가 가설을 지지하는지
 - 비교 실험이 필요하면 *제안만* (실험 실행은 task-executor 또는 사용자)
+
+#### 환경 진단 표준 시퀀스 (DGX/Orin ssh 가용 시) — M1.5 reflection 도출
+
+다음 명령을 *반드시 직접 실행* 하여 환경 상태를 실측치로 확인 (추측 X):
+
+```bash
+# 1. Python 패키지 버전
+ssh dgx "source ~/smolvla/dgx/.arm_finetune/bin/activate && pip list | grep -E 'torch|lerobot|torchcodec|torchvision|av'"
+
+# 2. 시스템 라이브러리 (ABI 관련)
+ssh dgx "ldconfig -p | grep -E 'libavutil|libavcodec|libavformat' | head -10"
+ssh dgx "ffmpeg -version 2>&1 | head -3"
+
+# 3. Python 수준 import + default 동작 확인
+ssh dgx "source ~/smolvla/dgx/.arm_finetune/bin/activate && python3 -c \"import torch; print('torch:', torch.__version__, 'cuda:', torch.version.cuda)\""
+```
+
+**config 미명시 시 default 동작 추적 의무**: 코드 review 시 설정 파일에 명시되지 않은 파라미터의 *default 값 + fallback 경로* 를 반드시 추적. 예: `video_backend` 가 YAML 에 없을 때 lerobot 이 호출하는 함수 (`get_safe_default_codec`) 를 Read/Grep 으로 확인. 본 의무는 §1 문제 명확화 단계의 "호출 경로 검증 의무" 와 짝.
 
 ### 4. 해결책 비교 단계
 
@@ -79,6 +105,12 @@ model: sonnet
 ### 6. 보고서 작성
 
 산출물 위치: 호출자가 지정한 경로 (또는 `docs/work_flow/context/research/<주제>.md`).
+
+**Write 의무 (필수)** — M1.5 reflection 도출 (2026-05-16):
+
+보고서 내용을 텍스트로만 반환하는 것은 *산출 미완성*. 반드시 **Write tool 로 지정 경로에 파일 저장 완료 후** done 보고. 저장 없이 텍스트만 반환하면 orchestrator 가 이를 `ORCHESTRATOR_GAP` 으로 등록하고 메인이 수동 복구해야 한다 (M1.5 ANOMALIES #1 사례).
+
+저장 경로: 호출자가 dispatch prompt 에 명시한 경로. 명시 없으면 `docs/work_flow/context/research/<주제>.md`.
 
 ## 산출물 형식 (보고서 template)
 

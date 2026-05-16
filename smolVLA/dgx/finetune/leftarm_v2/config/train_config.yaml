@@ -27,6 +27,14 @@ push_to_hub: false                   # 체크포인트 자동 Hub push X (DGX→
 # X' (시도 1: workers=8, prefetch=2) 가 step 368 에서 system OOM (5GB/min 누수). wandb 증거상
 # main process 3.4GB 안정 / system 95GB 증발 / GPU 12W idle → DataLoader workers 가 주범.
 # 시도 2 buffer = workers 2 × prefetch 1 = 2 batch (X' 의 1/8, v1 default 의 1/16).
+# video decode backend — 명시 pyav 강제. (2026-05-16 사고 분석)
+# 환경: DGX (torch 2.10.0+cu130, torchcodec 0.11.1, ffmpeg 6.1.1) 에서
+# torchcodec 의 FFmpeg6 wheel 이 PyTorch 의 새 dtype symbol (torch_dtype_float4_e2m1fn_x2) 을 요구하나
+# 현 환경 PyTorch 가 export 하지 않아 dataloader 첫 배치 fetch 시 즉시 RuntimeError.
+# lerobot default get_safe_default_codec() 는 torchcodec module import 가능성만 보고 선택해
+# 우리 환경에서 실패. 따라서 명시 pyav 강제. researcher 보고서
+# `docs/work_flow/context/research/m1.5_video_decode_oom.md` §3, ANOMALIES #2·#3 참조.
+dataset_video_backend: pyav
 dataset_return_uint8: true           # float32→uint8 (IPC 1/4 메모리, GPU 변환 — 정확도 영향 0)
 prefetch_factor: 1                   # 2 → 1. prefetch buffer 추가 축소 (workers × prefetch = 2)
 persistent_workers: false            # 무해 유지 (시도 1 OOM 은 단일 epoch 내라 효과 없었음)

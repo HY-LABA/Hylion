@@ -226,3 +226,115 @@ steady-state 누수 ≈ 1,254 MB/min  (Q4 기준)
 
 - run `9qwxdx5k` 가 350 step 만 기록된 채로 wandb 에 남아있음 (early death). 그대로 두면 비교/조회 시 노이즈
 - **조치**: wandb 웹에서 해당 run 에 `failed-oom` 태그 추가, 또는 삭제. 시도 2 가 성공하면 시도 1 은 archive
+
+---
+
+## 시도 3 사고 — 2026-05-16 10:40 KST · torchcodec ABI 미스매치 · DataLoader 첫 배치 즉시 crash
+
+**발생 시각**: 2026-05-16 10:40 KST (실험 A 재시도 중 DataLoader 첫 배치 fetch 시)
+
+**traceback 핵심**:
+
+```
+RuntimeError: Could not load libtorchcodec.
+PyTorch 2.10.0+cu130
+FFmpeg 6 wheel: undefined symbol: torch_dtype_float4_e2m1fn_x2
+다른 FFmpeg 버전: libavutil.so.{56,57,59,60} 없음
+```
+
+**DGX 환경 진단 (메인 ssh)**:
+
+| 패키지 | 버전 |
+|---|---|
+| torch | 2.10.0+cu130 |
+| torchcodec | 0.11.1 |
+| torchvision | 0.25.0 |
+| pyav | 15.1.0 |
+| ffmpeg (시스템) | 6.1.1 (libavutil.so.58 만 존재) |
+| lerobot | 0.5.2 (editable: docs/reference/lerobot) |
+
+**원인 분석**:
+
+lerobot 의 `get_safe_default_codec()` (`lerobot/utils/import_utils.py:72`) 는 `importlib.util.find_spec("torchcodec")` 로 선택 판단 — Python module 존재 여부만 체크. 우리 환경에서 torchcodec Python module 은 import 가능하나 `_core` 의 `.so` load 가 실제 사용 시점에 실패 (FFmpeg6 wheel 이 PyTorch 2.10 의 `torch_dtype_float4_e2m1fn_x2` symbol 을 요구하나 현 PyTorch 가 export 안 함). `train_config.yaml` 에 `dataset_video_backend` 미명시 → default 적용 → torchcodec 선택 → 첫 배치 fetch 시 RuntimeError.
+
+**후속 조치**:
+
+- `train_config.yaml` 에 `dataset_video_backend: pyav` 명시 강제 (2026-05-16)
+- `run_train.py` required 리스트에 `dataset_video_backend` 추가 + cmd 에 `--dataset.video_backend=...` 전달
+- → torchcodec 선택 우회, pyav 로 직접 decode
+- 재시도: 아래 "시도 3" 양식 참조
+
+---
+
+## 시도 3 (재시도, pyav 우회 + cleanup 미수행, 2026-05-16)
+
+> 시도 3 사고 (위 entry, 10:40 torchcodec ABI crash) 의 *후속 재시도*. video_backend=pyav 강제 적용 (TODO-1a-fix 자동화) 후 학습 진입.
+> ⚠️ 원래 실험 A 의도 (cleanup 강화 + pyav) 중 cleanup 은 수행 X — *backend 변수 분리* 만 적용된 결과.
+> 절차 문서: `dgx/finetune/leftarm_v2/experiments/exp_a_cleanup_attempt3.md` (단 cleanup 단계 미수행)
+
+### 사전 조건
+- cleanup_helper.sh 실행 X (사용자가 학습 직행)
+- 시작 시점 baseline MemAvailable: 59 GiB (cleanup 시 100 GiB+ 권장이었으나 미수행)
+- 동시 점유: VSCode, Claude Code 등 정리되지 않음
+
+### 학습 실행
+- **시작 시각**: 2026-05-16 10:58:22 KST
+- **명령**: `python run_train.py train --pass 2a` (시도 2 와 동일 + `--dataset.video_backend=pyav` *추가*)
+- **wandb run URL**: https://wandb.ai/babogaeguri-hanyang-university/leftarm_v2/runs/7gdmthm5
+- **config**: workers=2, prefetch=1, batch=16, steps=20000, LoRA r=16 all-linear, lr=1e-4 (시도 2 그대로)
+- **변경 변수 (시도 2 대비)**: `dataset.video_backend = torchcodec(default) → pyav` 만
+
+### 결과 (학습 kill 시점 14:24 KST, 3시간 26분 가동)
+
+| 항목 | 값 | 시도 1·2 대비 |
+|---|---|---|
+| 도달 step | **808 / 20,000** (4%) | 시도 1 step 368 OOM / 시도 2 ~28분 OOM 대비 *오래 버팀* |
+| 첫 ckpt (1000 step) | 미도달 | 시도 1·2 와 동일 (미도달) |
+| 학습 종료 사유 | **사용자 Ctrl+C** (OOM 안 났음 — 자연 swap thrashing) | 시도 1·2 는 자연 OOM |
+| loss | 0.71 → 0.21 (정상 감소) | 추세 정상 |
+| MemAvailable baseline | 59 GiB | (시도 1·2 기록 없음) |
+| MemAvailable min | **12 MB** (wandb proc_memory_available) | 시도 1·2 의 0 OOM 과 본질 동일 |
+| 누수율 (steady-state) | **1.07 GB/min** | 시도 1: ~5 GB/min, 시도 2: 1.25 GB/min — 거의 동일 |
+| step_time 평균 (정상 구간) | 7-9s | 시도 1: 2.7s (workers=8), 시도 2: 8.5s (workers=2) — workers 영향 |
+| **step_time 압박 시** | step 700 updt_s 54.58s, step 808 step_time **577.70s (9.6분)** | 시도 1 step 350+ 4.77s 와 동일 패턴 |
+| GPU 상태 (압박 절정) | utilization **0%**, power **5W**, 38°C, clock 838 MHz | 시도 1·2 의 "GPU idle 12W" 보다 *더 심함* — 학습 진행 사실상 정지 |
+| main process RSS | 2.21 GB 안정 | 시도 1·2 (3.4 GB) 와 거의 동일 → process 외부 누수 |
+| worker RSS | 1.54-1.79 GB 안정 | workers 가 누수 주체 아님 확정 |
+
+### 메모리 회복 사이클 패턴 (새 발견)
+
+학습 진행 중 MemAvailable 이 자연 회복 후 다시 압박을 반복:
+- 11:00 baseline 59 GiB → 11:44 9.7 GiB (45분, -49 GB)
+- 11:56 **151 MiB** (12분, 거의 0)
+- 12:11 **34 GiB 회복** (15분, +34 GB) — kernel reclaim 또는 외부 정리 (확정 안 됨)
+- 12:34-13:26 1차 압박 (52분 동안 50 step)
+- 13:37-13:45 정상 회복 (50→800 step 짧은 구간)
+- 14:21 **26 MiB** (2차 압박 절정, GPU 0%)
+- 14:24 사용자 kill
+
+→ kernel 의 page reclaim 이 swap 없는 UMA 환경에서 OOM-killer 발동 전에 적극 회수 동작. 단 leak 누적 속도가 reclaim 속도와 비슷해 *무한 thrashing* 상태 도달.
+
+### 판정
+
+- **실패** (학습 ckpt 도달 못 함, GPU idle thrashing)
+- **dmesg OOM 메시지**: 미확인 (sudo 필요, 학습 OOM 안 났으므로 OOM 자체는 없을 가능성)
+- **후속 액션**: image 변환 (TODO-02) 진입 — backend 무관 누수 확정 + workers 누수 주체 아님 → video decode 자체가 근본 원인
+
+### 진단 결론 (M1.5 spec 기준)
+
+| 가설 | 시도 3 결과로 확정 |
+|---|---|
+| workers leak | ❌ 부정 (worker RSS 1.5 GB 안정) |
+| pyav leak (researcher §3) | ⚠️ 부분 확인 (pyav 도 leak 발생) |
+| torchcodec leak | ⚠️ 시도 1·2 데이터 + 시도 3 의 *backend 변수 분리* 로 backend 무관 leak 확정 |
+| **video decode 자체 leak** | ✅ **확정** — backend 무관, process 외부 (libav OS buffer 또는 shmem) |
+| cleanup 효과 | ❌ 시간벌기 수준 (시도 3 cleanup 없이도 시도 1·2 와 누수율 거의 동일) |
+
+→ **image dataset 변환 (TODO-02·03) 이 유일한 근본 해법** confirm. researcher 보고서 §5 옵션 3 + best practice 보고서 §4·§7 와 정합.
+
+### 잔여 미해결 (BACKLOG 후보)
+
+- video decode leak 의 정확한 source (libav buffer / shmem / pyav Cython wrapper) — image 변환으로 우회, 본 사이클 범위 외
+- 시도 3 의 회복 메커니즘 (kernel reclaim 메커니즘 정확한 분석)
+- libsvtav1 vs h264 codec 모순 (시도 1·2 ffprobe "h264" vs 시도 3 output.log "libsvtav1") — image 변환 무관
+- dmesg OOM (sudo 필요, 학습 OOM 안 났으므로 의미 작음)
