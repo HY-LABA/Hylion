@@ -4,7 +4,7 @@
 
 2026-05-17 23:21:25 | START | spec=02_leftarm_v2_finetune, todos=4 (TODO-03-A/B/C/D), parallel_groups=3 (G1: 03A+03B task-executor 병렬; G2: code-tester + prod-test-runner; G3: 03D PHYS_REQUIRED verification_queue)
 2026-05-17 23:21:26 | DISPATCH | task-executor x2 병렬 (TODO-03-A, TODO-03-B) — Group 1
-2026-05-17 23:25:00 | DONE-IMPL | TODO-03-A → prof_computer/docs/orin_eval_2026-05-17.md 신규 (20 trial 시트 + 집계 + 정성 메모)
+2026-05-17 23:25:00 | DONE-IMPL | TODO-03-A → prof_computer/docs/orin_a2_eval_2026-05-17.md 신규 (20 trial 시트 + 집계 + 정성 메모)
 2026-05-17 23:28:30 | DONE-IMPL | TODO-03-B → orin/scripts/run_inference_leftarm_v2.sh 신규 (5 subcommand, lerobot-record 인자 코드 조사 확정) + orin/scripts/README.md 신규 (Coupled Rules §6)
 2026-05-17 23:28:35 | DISPATCH | code-tester (TODO-03-A + TODO-03-B 동시 검증)
 2026-05-17 23:32:00 | DONE-CODETEST | TODO-03-A verdict=READY_TO_SHIP (Critical 0, Recommended 1 — README 트리 drift BACKLOG)

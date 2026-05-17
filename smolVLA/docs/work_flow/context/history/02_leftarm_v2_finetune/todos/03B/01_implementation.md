@@ -90,7 +90,7 @@ rename_map (`top→camera1, wrist→camera2`) 은 학습 시 적용된 값과 �
 - **DOD 정합**:
   - (a) download + n_action_steps 점검·수정 ✓ (`download` subcommand)
   - (b) 두 task instruction 별 추론 실행 ✓ (`live task1` / `live task2`)
-  - (c) 성능평가 시트는 별도 TODO-03-C (prod-test-runner) 또는 spec §83 의 `prof_computer/docs/orin_eval_2026-05-17.md` 로 분리
+  - (c) 성능평가 시트는 별도 TODO-03-C (prod-test-runner) 또는 spec §83 의 `prof_computer/docs/orin_a2_eval_2026-05-17.md` 로 분리
 - **Category A 위반 없음**: `docs/reference/` 미변경 확인
 
 ## 가정 / 잔여 리스크

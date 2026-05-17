@@ -72,7 +72,7 @@
 >
 > **인프라 검증 부가 가치**: Orin SSH·deploy·lerobot trim·LoRA 로드·cal·rotation·camera config 파이프라인 모두 *작동* 확인. 다음 사이클은 데이터·학습 방법 만 바꾸면 됨 (인프라 재작업 X).
 >
-> **평가 시트**: [`prof_computer/docs/orin_eval_2026-05-17.md`](../../../prof_computer/docs/orin_eval_2026-05-17.md).
+> **평가 시트**: [`prof_computer/docs/orin_a2_eval_2026-05-17.md`](../../../prof_computer/docs/orin_a2_eval_2026-05-17.md).
 
 > **입력**: TODO-02 의 prof_computer ckpt ([`BaboGaeguri/leftarm_v2_A2_pc_2026-05-17`](https://huggingface.co/BaboGaeguri/leftarm_v2_A2_pc_2026-05-17), HF Hub).
 > **변경 (2026-05-17 사용자 결정)**:
@@ -93,7 +93,7 @@
   - **신규 entry 작성**: `orin/inference/leftarm_v2_inference.py` — `hil_inference.py` 패턴 참조 + 학습 ckpt + LoRA adapter 로드 + rename_map (`top→camera1`, `wrist→camera2`) + task instruction 인자 (task1/task2).
   - 추론 명령 wrapper: `orin/scripts/run_inference_leftarm_v2.sh` 재조정 — lerobot-record 호출 → `python ~/smolvla/orin/inference/leftarm_v2_inference.py` 호출.
   - 두 task instruction 정의 — collection_log 의 task1·task2 instruction 본문 확인 후 명령 인자로 전달.
-  - **평가 시트** — `prof_computer/docs/orin_eval_2026-05-17.md` (또는 동등 위치) 신설: trial 번호 × {task, orientation, 성공·실패, 실패 원인 메모} 표. 사용자가 시연 중 직접 기록.
+  - **평가 시트** — `prof_computer/docs/orin_a2_eval_2026-05-17.md` (또는 동등 위치) 신설: trial 번호 × {task, orientation, 성공·실패, 실패 원인 메모} 표. 사용자가 시연 중 직접 기록.
 - 테스트:
   - **AUTO_LOCAL/SSH_AUTO**: ckpt 다운로드 성공 + config.json 점검 + dry-run mode 1-2 step 동작 + lerobot CLI 인자 정합 (`--policy.path`/`--policy.device`/instruction 인자).
   - **PHYS_REQUIRED**: 사용자가 실 Orin + 좌측 SO-101 으로 두 task instruction × 5회 × {front, back} = 총 20 trial live 추론. 각 trial 성공·실패·실패 원인 시트 기록. verification_queue 에 success rate 결과 입력.

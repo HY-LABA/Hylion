@@ -10,7 +10,7 @@ M1.5 prof_computer 학습 결과 (`BaboGaeguri/leftarm_v2_A2_pc_2026-05-17`) 의
 
 | 경로 | 변경 종류 | 한 줄 요약 |
 |---|---|---|
-| `prof_computer/docs/orin_eval_2026-05-17.md` | 신규 (N) | 20 trial 평가 시트 — 메타·기준 안내·trial 표·집계 표·정성 메모·다음 단계 섹션 |
+| `prof_computer/docs/orin_a2_eval_2026-05-17.md` | 신규 (N) | 20 trial 평가 시트 — 메타·기준 안내·trial 표·집계 표·정성 메모·다음 단계 섹션 |
 
 ## 적용 룰
 
@@ -24,7 +24,7 @@ M1.5 prof_computer 학습 결과 (`BaboGaeguri/leftarm_v2_A2_pc_2026-05-17`) 의
 
 ## 변경 내용 요약
 
-`prof_computer/docs/orin_eval_2026-05-17.md` 를 신규 작성했다. 평가 시트는 6개 섹션으로 구성된다: (1) 메타 — ckpt 정보·학습 요약·spec/plan 링크, (2) 평가 기준 안내 — 지표·시나리오·task instruction 정본·성공 정의·실패 원인 분류 5종·재시도 정책, (3) trial 기록 표 — 4개 그룹 헤더 (task1×front, task1×back, task2×front, task2×back) × 5행씩 20행, 열은 trial#·task·orientation·성공(✅/❌)·실패 원인 분류·자유 메모, (4) 결과 집계 표 — task×orientation 별 성공/총 + success rate 행 + task1 total·task2 total·전체 total, (5) 종합 정성 메모 — task 구분 응답성·6:4 편향 관찰·동작 품질·M2 진입 가치 판단, (6) 다음 단계 — `/verify-result` 명령 형식과 결과별 분기 안내.
+`prof_computer/docs/orin_a2_eval_2026-05-17.md` 를 신규 작성했다. 평가 시트는 6개 섹션으로 구성된다: (1) 메타 — ckpt 정보·학습 요약·spec/plan 링크, (2) 평가 기준 안내 — 지표·시나리오·task instruction 정본·성공 정의·실패 원인 분류 5종·재시도 정책, (3) trial 기록 표 — 4개 그룹 헤더 (task1×front, task1×back, task2×front, task2×back) × 5행씩 20행, 열은 trial#·task·orientation·성공(✅/❌)·실패 원인 분류·자유 메모, (4) 결과 집계 표 — task×orientation 별 성공/총 + success rate 행 + task1 total·task2 total·전체 total, (5) 종합 정성 메모 — task 구분 응답성·6:4 편향 관찰·동작 품질·M2 진입 가치 판단, (6) 다음 단계 — `/verify-result` 명령 형식과 결과별 분기 안내.
 
 task instruction 은 `collection_log.md` 정본 직접 Read 로 확인했으며, 6:4 편향 (front:back) 수치는 동일 문서의 Orientation 합계 표 기반 (task1: front 30/back 20, task2: front 40/back 20). 학습 메타 (75K step, loss 0.04, 100ep subset) 는 `prof_computer/docs/learning_log.md` §M1.5 중간점검 학습 직접 Read 로 인용.
 

@@ -269,7 +269,7 @@
 
 **다음 단계** (M2 진입은 M1 의 200ep 완성 후):
 
-- [x] **Orin 추론 smoke** — `lerobot-record --policy.path=BaboGaeguri/leftarm_v2_A2_pc_2026-05-17` 로 M1.5 결과의 정성 평가 → **2026-05-18 실시, 0/2 (단축), 0~20% 영역 확정**. 상세: [orin_eval_2026-05-17.md](orin_eval_2026-05-17.md)
+- [x] **Orin 추론 smoke** — `lerobot-record --policy.path=BaboGaeguri/leftarm_v2_A2_pc_2026-05-17` 로 M1.5 결과의 정성 평가 → **2026-05-18 실시, 0/2 (단축), 0~20% 영역 확정**. 상세: [orin_a2_eval_2026-05-17.md](orin_a2_eval_2026-05-17.md)
 - [ ] **M1 잔여 100ep 수집 완료** (현재 100/200)
 - [ ] **M2 본 학습** — 200ep 완성 후 prof_computer 또는 DGX (ecosystem 정비 시) 에서 본 학습. yaml 의 `scheduler_decay_steps` 를 `steps` 와 동기화 권장 (본 사이클은 30k step 이후 lr 거의 0 — backlog 메모)
 - [ ] DGX 의 aarch64 ecosystem 정비 — backlog (장기)
@@ -278,7 +278,7 @@
 
 ### M1.5 추론 후 가설 분리 검증 사이클 — 2026-05-18 · 🔄 진행 중
 
-> **배경**: M1.5 추론 결과 0/2 (단축 평가) — 0~20% 영역 확정 ([orin_eval_2026-05-17.md](orin_eval_2026-05-17.md) §결과 집계). 다음 사이클 학습 방법 결정을 위해 **A2 (현재) → A1 (VLM frozen + expert LoRA) 후퇴 시도 가치** 판단 필요.
+> **배경**: M1.5 추론 결과 0/2 (단축 평가) — 0~20% 영역 확정 ([orin_a2_eval_2026-05-17.md](orin_a2_eval_2026-05-17.md) §결과 집계). 다음 사이클 학습 방법 결정을 위해 **A2 (현재) → A1 (VLM frozen + expert LoRA) 후퇴 시도 가치** 판단 필요.
 >
 > **핵심 의문**: A2 의 0% 가 (가설 α) *VLM LoRA 의 부작용 (100ep noise 학습으로 VLM 손상)* 인지, (가설 β) *데이터 양 부족 (학습 방법은 OK, 더 학습할 데이터 필요)* 인지 분리 불가. A1 으로 무조건 후퇴 시 **본인 우려**: "VLM 적응이 실제 기여했다면 A1 = 환경 인식 ↓ + action 매핑은 동일 학습 → A2 보다 더 나쁜 결과 위험".
 >
@@ -306,16 +306,28 @@
 - 메인 wandb 분석: 본 entry §wandb 분석 (메인 작성)
 - 종합 결정: 본 entry §결정 (양쪽 완료 후 메인 + 사용자 합의)
 
-#### 결과 메모 (사용자 0-shot 추론 — 진행 시 채움)
+#### 결과 메모 (사용자 0-shot 추론)
 
-> Orin 환경, `lerobot/smolvla_base` 직접 로딩, task1·task2 instruction 각각 1회 이상 시도, 정성 관찰.
+> Orin 환경, `lerobot/smolvla_base` 직접 로딩 (entry: `orin/inference/leftarm_base_inference.py`, wrapper: `run_inference_leftarm_v2.sh zero-shot <task>`, max-steps 1000).
+> 사용자 책임 분리 결정 (2026-05-18) — leftarm_v2_inference.py 변경 X, 신규 entry 로 가시화.
 
-- 진행일: (예정)
-- base ckpt 로딩 OK 여부:
-- task1 (`"Pick up the blue and yellow doll and place it on the left side of the table"`) 반응:
-- task2 (`"Hand the yellow can to the person"`) 반응:
-- 두 task instruction 구분 응답성 (다른 동작인지 동일 동작인지):
-- 종합 정성 판정 (반응 / 부분반응 / 무반응):
+- **진행일**: 2026-05-18 (시연장 직후)
+- **base ckpt 로딩 OK 여부**: ✅ 로딩 정상 (`SmolVLAPolicy.from_pretrained("lerobot/smolvla_base")` 성공, robot connect + camera connect 정상)
+- **task1 (`"Pick up the blue and yellow doll and place it on the left side of the table"`) 반응**: ❌ **사용자 도중 강제 종료** — 의미있는 동작 X (학습 모델 0/2 결과 보다도 *더 형편없음* 으로 사용자 판정)
+- **task2 (`"Hand the yellow can to the person"`) 반응**: 미실시 — 사용자 결정 ("볼 것도 없다 — task1 결과로 충분")
+- **두 task instruction 구분 응답성**: 평가 불가 (task1 만 부분 시도)
+- **종합 정성 판정**: **무반응** — base smolvla_base 가 우리 환경 (좌측 SO-101 + top/wrist 카메라 + 시연장 조명) 의 *task instruction* 에 대해 의미있는 응답 X. 학습 ckpt (LoRA A2) 보다도 더 약함.
+
+#### 1차 결론 (wandb 분석 전 임시)
+
+판정 매트릭스 기준 *base 0-shot = 무반응* 행 → 두 분기 모두 *데이터 확장 우선*:
+
+| base 0-shot | VLM LoRA norm | 결론 | 권고 |
+|---|---|---|---|
+| **무반응** ← 현재 | 거의 0 | base 부족 + LoRA 가 부족분도 못 채움 | **데이터 확장 우선** (학습 방법 X) |
+| **무반응** ← 현재 | 큰 변화 | base 부족 + LoRA 가 환경 적응 기여 (작지만) | **A1 비추천**, A2 유지 + 데이터·r 확장 |
+
+→ **A1 (VLM frozen + Expert LoRA) 후퇴는 비추** 확정. 두 분기 모두 *데이터 확장이 1순위*. 학습 방법 조정 (LoRA r↑, scheduler decay 동기화 등) 은 *데이터 확장 후* 의 2순위 작업.
 
 #### wandb 분석 (메인 — 진행 시 채움)
 

@@ -34,6 +34,9 @@ CKPT_LOCAL_DIR="${CKPT_LOCAL_DIR:-${HOME}/smolvla/orin/checkpoints/leftarm_v2_A2
 VENV_PATH="${VENV_PATH:-${HOME}/smolvla/orin/.hylion_arm/bin/activate}"
 CONFIG_DIR="${CONFIG_DIR:-${HOME}/smolvla/orin/config}"
 INFERENCE_SCRIPT="${INFERENCE_SCRIPT:-${HOME}/smolvla/orin/inference/leftarm_v2_inference.py}"
+# zero-shot subcommand 전용 — base smolvla_base 만 로딩하는 별도 entry
+# 가설 분리 검증 (learning_log §M1.5 추론 후 가설 분리 검증 사이클, 2026-05-18)
+BASE_INFERENCE_SCRIPT="${BASE_INFERENCE_SCRIPT:-${HOME}/smolvla/orin/inference/leftarm_base_inference.py}"
 
 # Task instructions (from collection_log.md)
 TASK1_INSTRUCTION="Pick up the blue and yellow doll and place it on the left side of the table"
@@ -254,6 +257,63 @@ cmd_live() {
         --max-steps 50
 }
 
+# ── Subcommand: zero-shot ─────────────────────────────────────────────────────
+# 가설 분리 검증용 — base smolvla_base 만 로딩 (LoRA adapter skip).
+# learning_log.md §M1.5 추론 후 가설 분리 검증 사이클 작업 1 (사용자 담당).
+cmd_zero_shot() {
+    local task_key="${1:-}"
+    if [[ -z "${task_key}" ]]; then
+        echo "ERROR: task argument required for 'zero-shot' subcommand."
+        cmd_help
+        exit 1
+    fi
+
+    case "${task_key}" in
+        task1|task2)
+            ;;
+        *)
+            echo "ERROR: Unknown task '${task_key}'. Use 'task1' or 'task2'."
+            exit 1
+            ;;
+    esac
+
+    echo "=== zero-shot: ${task_key} (base smolvla_base only, LoRA 없음) ==="
+    echo "    inference script: ${BASE_INFERENCE_SCRIPT}"
+
+    # Read and validate robot config (cameras + ports)
+    # ckpt 점검은 불요 — zero-shot 은 HF Hub base 직접 사용 (로컬 ckpt 없음)
+    read_robot_config
+    validate_robot_config
+
+    # shellcheck source=/dev/null
+    source "${VENV_PATH}"
+
+    echo ""
+    echo "--- Running leftarm_base_inference.py (zero-shot, base 사전학습만) ---"
+    echo "    follower_port:  ${FOLLOWER_PORT}"
+    echo "    top.index:      ${TOP_IDX}"
+    echo "    wrist.index:    ${WRIST_IDX}"
+    echo "    base ckpt:      lerobot/smolvla_base (HF Hub)"
+    echo "    task:           ${task_key}"
+    echo "    rename_map:     top->camera1, wrist->camera2 (내부 자동 적용)"
+    echo "    가설 검증:       learning_log §M1.5 추론 후 가설 분리 검증 사이클 작업 1"
+    echo ""
+
+    # leftarm_base_inference.py 직접 호출 (별도 entry, LoRA 영역 없음)
+    # - SmolVLAPolicy.from_pretrained("lerobot/smolvla_base") 직접 로딩
+    # - peft 의존성 X (load_base_policy 헬퍼)
+    # - 가설 검증: base VLM 의 우리 환경 task1·task2 instruction 응답성 정성 측정
+    # - 책임 분리 (사용자 결정 2026-05-18): leftarm_v2_inference.py 변경 X
+    python "${BASE_INFERENCE_SCRIPT}" \
+        --task "${task_key}" \
+        --mode live \
+        --follower-port "${FOLLOWER_PORT}" \
+        --cameras "top:${TOP_IDX},wrist:${WRIST_IDX}" \
+        --gate-json "${CONFIG_DIR}" \
+        --n-action-steps 50 \
+        --max-steps 1000
+}
+
 # ── Subcommand: help ──────────────────────────────────────────────────────────
 cmd_help() {
     cat <<'EOF'
@@ -268,8 +328,10 @@ SUBCOMMANDS:
     download        Download checkpoint from HF Hub + auto-fix n_action_steps
     check           Inspect config.json (n_action_steps + image feature keys)
     dry-run [task]  LoRA 로드 + 코드 경로 검증 (robot 미연결 가능) [default task: task1]
-    live task1      Run live inference (task1: doll pick-and-place)
-    live task2      Run live inference (task2: can handover)
+    live task1      Run live inference (task1: doll pick-and-place, LoRA ckpt)
+    live task2      Run live inference (task2: can handover, LoRA ckpt)
+    zero-shot task1 Run zero-shot inference (base smolvla_base only — 가설 분리 검증)
+    zero-shot task2 Run zero-shot inference (base smolvla_base only — 가설 분리 검증)
     help            Show this help
 
 ENVIRONMENT OVERRIDES (export before calling):
@@ -327,6 +389,9 @@ case "${SUBCMD}" in
         ;;
     live)
         cmd_live "${1:-}"
+        ;;
+    zero-shot|zeroshot)
+        cmd_zero_shot "${1:-}"
         ;;
     help|--help|-h)
         cmd_help

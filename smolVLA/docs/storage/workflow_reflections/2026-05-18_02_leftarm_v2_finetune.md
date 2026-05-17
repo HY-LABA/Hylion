@@ -21,7 +21,7 @@
 | Phase 3 실물 검증 | PHYS_REQUIRED 단축 (2 trial / 20 trial 예정) — 0/2 = 0% |
 | ANOMALY 등록 | 7건 (#1 PROD_TEST_FAIL, #2 DIAG_FINDING, #3 PROD_TEST_FAIL, #4 CONSTRAINT_AMBIGUITY, #5 USER_OVERRIDE, #6 DIAG_FINDING, #7 CONSTRAINT_AMBIGUITY) |
 | BACKLOG 등록 (본 사이클) | 6건 (#9·#10 README drift, #11 rotation 완료, #12 cal 완료, #13 max-steps 미완, #14 다음 사이클 입력) |
-| 인프라 신규 산출물 | `orin/inference/leftarm_v2_inference.py`, `orin/scripts/run_inference_leftarm_v2.sh`, `orin/scripts/README.md`, `prof_computer/docs/orin_eval_2026-05-17.md`, `orin/lerobot/scripts/lerobot_record.py` (F1 try/except), `orin/pyproject.toml` (peft 추가), `orin/scripts/setup_env.sh` (peft 검증 절), `docs/storage/lerobot_upstream_check/02_orin_pyproject_diff.md`·`03_orin_lerobot_diff.md` (entry 추가) |
+| 인프라 신규 산출물 | `orin/inference/leftarm_v2_inference.py`, `orin/scripts/run_inference_leftarm_v2.sh`, `orin/scripts/README.md`, `prof_computer/docs/orin_a2_eval_2026-05-17.md`, `orin/lerobot/scripts/lerobot_record.py` (F1 try/except), `orin/pyproject.toml` (peft 추가), `orin/scripts/setup_env.sh` (peft 검증 절), `docs/storage/lerobot_upstream_check/02_orin_pyproject_diff.md`·`03_orin_lerobot_diff.md` (entry 추가) |
 | DOD 충족 판정 | (d) "M2 본 학습 진입 가치 정량 판단" 충족 — 0-20% 영역 확정, 재정렬 필요 |
 
 ---
@@ -158,7 +158,7 @@ cycle 1 에서 F1 (reachy2_camera) 이 발견됐고, F1 try/except 패치를 적
 | `orin/inference/` | `leftarm_v2_inference.py` 신규 (TODO-03-F) | `orin/inference/README.md` 갱신됨 (자산 표에 등록) | — 완료 |
 | `orin/scripts/` | `run_inference_leftarm_v2.sh` 신규 + `README.md` 신규 (TODO-03-B) | `orin/scripts/README.md` 신설됨 | `orin/README.md` 트리에 scripts/ 항목 drift (BACKLOG #10 미완) |
 | `orin/README.md` | scripts/ 항목이 `run_teleoperate.sh`, `setup_env.sh` 만 (현재 `run_python.sh`, `run_inference_leftarm_v2.sh` 미등록, `inference/` 디렉터리 자체도 트리에 없음) | 미갱신 — BACKLOG #10 | 갱신 제안 #6 |
-| `prof_computer/docs/` | `orin_eval_2026-05-17.md` 신규 (TODO-03-A) | `prof_computer/README.md` 트리 미등록 — BACKLOG #9 | 다음 사이클 nav 정리 시 처리 |
+| `prof_computer/docs/` | `orin_a2_eval_2026-05-17.md` 신규 (TODO-03-A) | `prof_computer/README.md` 트리 미등록 — BACKLOG #9 | 다음 사이클 nav 정리 시 처리 |
 | `docs/storage/lerobot_upstream_check/` | `02_orin_pyproject_diff.md` + `03_orin_lerobot_diff.md` entry 추가 (TODO-03-G, 03-E) | 이미 누적형 문서 — 별도 navigator 갱신 불필요 | — |
 | `orin/pyproject.toml` | `peft>=0.18.0,<1.0.0` 추가 (TODO-03-G) | `02_orin_pyproject_diff.md` 갱신됨 | — |
 | BACKLOG #2·#3 (`07_orin_structure.md`, `08_dgx_structure.md` drift) | 본 사이클 변경 아님 | 여전히 미완 | 독립 todo 로 처리 권고 |

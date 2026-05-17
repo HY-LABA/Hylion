@@ -41,7 +41,7 @@
 
 | # | 항목 | 발견 출처 | 우선순위 | 상태 |
 |---|------|-----------|----------|------|
-| 9 | `prof_computer/README.md` 트리에 신규 `docs/orin_eval_2026-05-17.md` 미등록 (기존 docs 인덱스 부재 연장 — M1.5 reflection §6 본문 정정 의무 일관 적용). 추후 `prof_computer/docs/README.md` 신설 또는 `prof_computer/README.md` 의 docs/ 섹션 정정. | 2026-05-17 code-tester TODO-03-A | 낮음 | 미완 |
+| 9 | `prof_computer/README.md` 트리에 신규 `docs/orin_a2_eval_2026-05-17.md` 미등록 (기존 docs 인덱스 부재 연장 — M1.5 reflection §6 본문 정정 의무 일관 적용). 추후 `prof_computer/docs/README.md` 신설 또는 `prof_computer/README.md` 의 docs/ 섹션 정정. | 2026-05-17 code-tester TODO-03-A | 낮음 | 미완 |
 | 10 | `orin/README.md` 트리에 신규 `scripts/run_inference_leftarm_v2.sh` 미등록 (기존 scripts/ 섹션 drift 연장 — `orin/scripts/README.md` 는 신설했으나 `orin/README.md` 본문은 미갱신). | 2026-05-17 code-tester TODO-03-B | 낮음 | 미완 |
 | 11 | [ad-hoc] rotation 정합 복원 — `orin/inference/leftarm_v2_inference.py` 의 `OpenCVCameraConfig` 생성 시 rotation/width/height 누락 → 추론이 수집 분포와 불일치 (top: 640x480 NO_ROTATION ≠ 480x640 CCW90). `cameras.json` schema 확장 (rotation/width/height/fps/fourcc 추가) + `apply_gate_config` 파라미터 추출 + `OpenCVCameraConfig` 생성부 slot별 파라미터 적용으로 수정 완료 (TODO-03-H 2026-05-18). | 2026-05-18 시연장 직전 ad-hoc 발견 → 즉시 fix | 높음 | 완료 |
 | 12 | [ad-hoc] DGX cal 파일 (`leftarm_test_follower.json`) → Orin lerobot 캐시로 transfer + `leftarm_v2_inference.py` line 387 의 `--follower-id` default `hylion_follower` → `leftarm_test_follower` 로 수정 (수집 시 base_config.yaml robot.id 와 정합). 시연장에서 사용자가 발견 (cal 프롬프트 무한 hang). 메인이 SSH 로 즉시 transfer + Edit + scp 재배포. devPC ↔ Orin 정합 유지. | 2026-05-18 시연장 ad-hoc | 중간 | 완료 |

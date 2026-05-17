@@ -15,7 +15,7 @@
 | `orin/checkpoints/` | 실존 확인 | README.md 만 존재 — 실 ckpt 없음 (정상, 다운로드 대상) |
 | `orin/inference/hil_inference.py` | 실존 확인 | 기존 파일 |
 | `orin/scripts/` | 실존 확인 | `run_python.sh`, `setup_env.sh` 존재 |
-| `prof_computer/docs/orin_eval_2026-05-17.md` | 미존재 (신규) | TODO-03 task-executor 작성 대상 — 정상 |
+| `prof_computer/docs/orin_a2_eval_2026-05-17.md` | 미존재 (신규) | TODO-03 task-executor 작성 대상 — 정상 |
 | `prof_computer/docs/learning_log.md` | 실존 확인 | M1.5 학습 사이클 완전 기록 |
 | `docs/storage/prof_train_setting.md` | 실존 확인 | §5-2 ckpt 다운로드 절차 + §5-3 추론 절차 + §7-5 n_action_steps 함정 |
 | `dgx/docs/finetune/leftarm_v2/collection_log.md` | 실존 확인 | task1·task2 instruction 본문 확인 완료 (아래 가정 섹션 참조) |
@@ -47,7 +47,7 @@ TODO-03 은 단일 todo 이나 내부가 다단계 + 환경 레벨 혼합이므�
 ### Group 1 (병렬 가능 — devPC 자율)
 
 - **TODO-03-A** (평가 시트 작성) → task-executor
-  - 산출: `prof_computer/docs/orin_eval_2026-05-17.md` (신규)
+  - 산출: `prof_computer/docs/orin_a2_eval_2026-05-17.md` (신규)
   - trial 번호 × {task, orientation, 성공/실패, 실패 원인 메모} 표 + 평가 기준 안내
   - Category B 영향 없음 (신규 파일, `prof_computer/docs/` 내부 실존 디렉터리)
   - Category C 체크: `prof_computer/docs/` 는 실존 디렉터리 — 신규 생성 X, 자율 가능
@@ -88,7 +88,7 @@ TODO-03 은 단일 todo 이나 내부가 다단계 + 환경 레벨 혼합이므�
 
 - **TODO-03-D** (20 trial live 추론) → verification_queue 등록 → Phase 3 사용자
   - 시나리오: task1 5회 × {front, back} + task2 5회 × {front, back} = 총 20 trial
-  - 사용자가 `prof_computer/docs/orin_eval_2026-05-17.md` 평가 시트에 기록
+  - 사용자가 `prof_computer/docs/orin_a2_eval_2026-05-17.md` 평가 시트에 기록
   - 환경 레벨: `PHYS_REQUIRED`
 
 ---
@@ -97,7 +97,7 @@ TODO-03 은 단일 todo 이나 내부가 다단계 + 환경 레벨 혼합이므�
 
 ```
 [Group 1 — devPC 자율, 병렬 가능]
-  TODO-03-A  task-executor: 평가 시트 작성  →  prof_computer/docs/orin_eval_2026-05-17.md
+  TODO-03-A  task-executor: 평가 시트 작성  →  prof_computer/docs/orin_a2_eval_2026-05-17.md
   TODO-03-B  task-executor: 추론 wrapper + 점검 절차  →  orin/scripts/run_inference_leftarm_v2.sh
 
        ↓ (Group 1 완료 후)
@@ -161,7 +161,7 @@ TODO-03 은 단일 todo 이나 내부가 다단계 + 환경 레벨 혼합이므�
 
 1. Orin 에 SSH 접속 → venv 활성화 (`source ~/smolvla/orin/.hylion_arm/bin/activate`)
 2. ckpt 확인 (`ls ~/smolvla/orin/checkpoints/leftarm_v2_A2_pc_2026-05-17/`)
-3. `prof_computer/docs/orin_eval_2026-05-17.md` 평가 시트 준비 (devPC 에서 보면서 기록)
+3. `prof_computer/docs/orin_a2_eval_2026-05-17.md` 평가 시트 준비 (devPC 에서 보면서 기록)
 4. task1 instruction `"Pick up the blue and yellow doll and place it on the left side of the table"` 으로 lerobot-record 실행
    - front orientation 5회 → 성공/실패 기록
    - back orientation 5회 → 성공/실패 기록

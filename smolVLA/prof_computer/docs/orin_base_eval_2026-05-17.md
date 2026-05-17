@@ -1,0 +1,131 @@
+# Orin 추론 정성평가 시트 — base smolvla_base (zero-shot)
+
+> 작성: 2026-05-18 | 사용자 시연 + 메인 정리
+> 형제 파일: [orin_a2_eval_2026-05-17.md](orin_a2_eval_2026-05-17.md) (LoRA A2 ckpt 추론)
+
+---
+
+## 메타
+
+| 항목 | 값 |
+|---|---|
+| 평가 대상 ckpt | [`lerobot/smolvla_base`](https://huggingface.co/lerobot/smolvla_base) (HF Hub) |
+| ckpt 형태 | base 사전학습 (LoRA adapter 없음, peft 의존 X) |
+| 추론 entry | `orin/inference/leftarm_base_inference.py` (책임 분리 결정으로 leftarm_v2_inference.py 와 별개 entry) |
+| 추론 wrapper | `bash ~/smolvla/orin/scripts/run_inference_leftarm_v2.sh zero-shot <task>` |
+| max-steps | 1000 (~33.3s, A2 사이클과 동일) |
+| 평가일 | 2026-05-18 |
+| 평가자 | 사용자 (1인) |
+| 평가 환경 | 실 Orin + 좌측 SO-101 + 시연장 (A2 사이클과 *완전 동일* — rename_map / cameras.json / cal / robot.id 모두 동일) |
+| **사이클 비고** | **단축 평가 (task1 시작 후 강제 종료, task2 미실시 결정)**. 사유: 학습 모델 (A2, 0/2) 보다도 *더 형편없음* 으로 사용자 정성 판정 — 평가 자체가 무의미 결론. |
+| 가설 검증 사이클 | [learning_log.md §M1.5 추론 후 가설 분리 검증 사이클](learning_log.md) 작업 1 |
+
+---
+
+## 평가 기준 안내
+
+본 평가의 목적은 *base smolvla_base 가 우리 환경 (좌측 SO-101 + top/wrist 카메라 + 시연장 조명) 에서 task1/task2 instruction 에 어떻게 응답하는지* 정성 측정. 학습 ckpt (A2) 와 *완전 동일 환경* 입력 → 다른 policy weight 비교.
+
+### 가설 분리 검증 매트릭스
+
+| 작업 1 (본 시트) | 작업 2 (wandb VLM LoRA norm 분석) | 종합 가설 | 다음 사이클 권고 |
+|---|---|---|---|
+| base 가 어느 정도 반응 | VLM LoRA norm 거의 0 | base VLM 충분 + VLM LoRA 기여 X | A1 안전, 1순위 |
+| base 가 어느 정도 반응 | VLM LoRA norm 큰 변화 | base 도 OK 지만 LoRA 도 학습됨 | A1 시도 가치 ↑ |
+| base 완전 무반응 ← *현재* | VLM LoRA norm 거의 0 | base 부족 + LoRA 가 부족분도 못 채움 | **데이터 확장 우선** (학습 방법 X) |
+| base 완전 무반응 ← *현재* | VLM LoRA norm 큰 변화 | base 부족 + LoRA 가 환경 적응 기여 | A1 비추, A2 + 데이터·r 확장 |
+
+→ base = **무반응** 행 → 두 분기 모두 *데이터 확장 우선* 으로 같음. **A1 후퇴 비추 확정**.
+
+### 시나리오 구성 (계획)
+
+| 그룹 | task | instruction | 계획 trial 수 | 실시 |
+|---|---|---|---|---|
+| task1 | `"Pick up the blue and yellow doll and place it on the left side of the table"` | 1회 이상 | 1 (도중 강제 종료) |
+| task2 | `"Hand the yellow can to the person"` | 1회 이상 | 0 (skip, 사용자 결정) |
+
+### 성공 정의
+
+A2 사이클 (orin_a2_eval_2026-05-17.md) 와 동일.
+
+---
+
+## Trial 기록
+
+### task1 — zero-shot
+
+| trial # | 모드 | max-steps | 결과 | 메모 |
+|---|---|---|---|---|
+| 1 | zero-shot live | 1000 | ⏹️ **사용자 강제 종료** | 도중 의미있는 동작 X. 학습 모델 A2 (헛스윙) 보다도 더 형편없음으로 사용자 정성 판정. base smolvla_base 가 우리 환경 (조명·테이블·인형 위치) 에서 task instruction 응답 거의 X. |
+
+### task2 — zero-shot
+
+| trial # | 모드 | max-steps | 결과 | 메모 |
+|---|---|---|---|---|
+| 1 | — | — | **미실시 (skip)** | 사용자 결정 ("볼 것도 없다 — task1 결과로 충분"). task1 의 base 무반응 신호가 강해 task2 시도 가치 없다고 판정. |
+
+---
+
+## 결과 집계
+
+| task | 시도 | 결과 |
+|---|---|---|
+| task1 | 1 (강제 종료) | 무반응 |
+| task2 | 0 (skip) | 평가 불가 (미시도) |
+| **종합** | **단축** | **base 무반응 확정** |
+
+---
+
+## 종합 정성 메모
+
+### base 응답성
+
+- **task1 instruction 반응**: 의미있는 동작 X — 인형 방향 이동·잡기 시도·왼쪽 이동 모두 관찰 안 됨. 사용자 표현: "이전에 학습한 모델보다도 훨씬 더 전혀 동작을 못하고 있는 거로 보인다"
+- **task2 instruction 반응**: 미시도 — task1 결과로 base 무반응 강한 신호 확보
+
+### A2 (학습 ckpt) 와의 정성 비교
+
+| 정성 항목 | A2 (LoRA, orin_a2_eval) | base (zero-shot, 본 시트) |
+|---|---|---|
+| task1 instruction 반응 | 헛스윙 (인형 근처 도달은 함) | 의미있는 동작 거의 X |
+| task2 instruction 반응 | 캔 방향 팔 이동 일부 (task1 보다 응답성 약간 ↑) | 미시도 (task1 결과로 충분) |
+| 정량 | 0/2 = 0% (단축) | 0/1 + 1 skip = 0% (단축) |
+| 사용자 정성 | 형편없음 (재정렬 필요) | A2 보다 더 형편없음 (base 자체가 환경 인식 X) |
+
+→ A2 의 약한 응답성도 *LoRA 학습이 일부 기여한 신호* 일 가능성 (가설 매트릭스의 LoRA norm 분석 결과 따라 정확도 ↑).
+
+### 결론 (1차, wandb 분석 전)
+
+- **base smolvla_base 는 우리 환경 task instruction 에 무반응** — 환경 (조명·테이블·인형·카메라 각도·SO-101 형태) 이 base 의 학습 분포에서 너무 벗어남
+- **A1 (VLM frozen + Expert LoRA only) 후퇴는 비추** — base VLM 자체가 환경 인식 X 이므로 VLM 학습 신호 차단은 환경 적응 능력만 손상
+- **데이터 확장이 1순위** — 두 매트릭스 분기 모두 동일 결론. M1 잔여 100ep 수집 + 다양성 보강 (다른 사람·orientation·위치) 후 재학습
+- **학습 방법 조정 (LoRA r↑, scheduler decay 동기화 등) 은 2순위** — 데이터 확장 후 추가 실험
+
+### 다음 사이클 입력
+
+다음 사이클 Phase 1 의 *데이터 확장* 영역 (BACKLOG #14 영역 2) 이 명백한 1순위:
+
+- M1 잔여 100ep 수집 (task1 +50 / task2 +40 — 01_leftarm_v2_collection.md 참조)
+- 다른 사람 추가 (인혁이형·성래 외 +N명)
+- orientation 균형 (front:back 5:5)
+- 인형/캔 위치 분포 확대
+
+학습 방법 조정 (영역 1) 은 데이터 확장 후 별도 사이클.
+
+---
+
+## wandb 분석 (메인 — 다음 사이클 진행 예정)
+
+> 매트릭스 완전 확정 위해 wandb run `8les615t` 의 VLM LoRA adapter weight norm 추이 분석. 현재 매트릭스 두 분기 모두 *데이터 확장 우선* 으로 동일 결론이므로 *긴급성 ↓* — 다음 사이클에서 진행 가능.
+
+상세: [learning_log.md §wandb 분석](learning_log.md)
+
+---
+
+## 관련 자료
+
+- 형제 파일 (A2 LoRA ckpt 평가): [orin_a2_eval_2026-05-17.md](orin_a2_eval_2026-05-17.md)
+- 가설 검증 사이클 전체: [learning_log.md §M1.5 추론 후 가설 분리 검증 사이클](learning_log.md)
+- 추론 entry (zero-shot 전용): `orin/inference/leftarm_base_inference.py`
+- 추론 wrapper subcommand: `bash ~/smolvla/orin/scripts/run_inference_leftarm_v2.sh zero-shot <task1|task2>`
+- A1·A2 4축 매트릭스 정의: `dgx/docs/finetune/leftarm_v2/model_config.md`

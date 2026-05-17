@@ -25,6 +25,7 @@
 | `hil_inference.py` | SmolVLA 사전학습 ckpt (`lerobot/smolvla_base`) 로 실 SO-ARM hardware-in-the-loop 추론. dry-run / live 두 모드 + 안전 장치 (n_action_steps=5, SIGINT 핸들러, try/finally disconnect, `--flip-cameras`). **사전학습 ckpt 책임 보존 — 갱신 X** | 03_smolvla_test_on_orin TODO-07 산출물 (2026-04-29 작성, 04 TODO-O2b 에서 `orin/examples/tutorial/smolvla/` 로부터 이관) |
 | `lego_v1_inference.py` | BaboGaeguri/lego_v1 fine-tune ckpt (lerobot/smolvla_base fine-tune) HIL 추론. fourcc=MJPG (USB 2.0 hub), overview/wrist 카메라 키, GATE_CAMERA_ALIAS. | 08_final_e2e TODO 산출물 |
 | `leftarm_v2_inference.py` | v2 학습 ckpt (`BaboGaeguri/leftarm_v2_A2_pc_2026-05-17`) + LoRA adapter + rename_map 추론. task1/task2 CLI 인자로 instruction 분기. USER_OVERRIDE 2026-05-18 옵션 W 결과 (lerobot-record 폐기 → 신규 entry 작성). peft>=0.10.0 필요. | 02_leftarm_v2_finetune TODO-03-F (2026-05-18) |
+| `leftarm_base_inference.py` | **zero-shot 추론 전용** — `lerobot/smolvla_base` 사전학습 모델만 로딩 (LoRA adapter 없음, peft 의존 X). leftarm_v2_inference.py 와 *동일 환경* (rename_map, camera config, task1/task2 instruction, gate-json) 으로 *base VLM 의 우리 환경 응답성* 정성 측정. 가설 분리 검증 사이클 작업 1 — A2 의 0% 결과가 (α) VLM LoRA 손상 인지 (β) 데이터 부족 인지 분리 위함 (learning_log §M1.5 추론 후 가설 분리 검증 사이클). | M1.5 분리 검증 사이클 (2026-05-18, 책임 분리 결정으로 leftarm_v2_inference.py 변경 X) |
 
 ## 자산 (예정 — 후속 마일스톤별 추가)
 
