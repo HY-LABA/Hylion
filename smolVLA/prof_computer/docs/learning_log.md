@@ -269,7 +269,65 @@
 
 **다음 단계** (M2 진입은 M1 의 200ep 완성 후):
 
-- [ ] **Orin 추론 smoke** — `lerobot-record --policy.path=BaboGaeguri/leftarm_v2_A2_pc_2026-05-17` 로 M1.5 결과의 정성 평가 (M3 영역 일부 선검증)
+- [x] **Orin 추론 smoke** — `lerobot-record --policy.path=BaboGaeguri/leftarm_v2_A2_pc_2026-05-17` 로 M1.5 결과의 정성 평가 → **2026-05-18 실시, 0/2 (단축), 0~20% 영역 확정**. 상세: [orin_eval_2026-05-17.md](orin_eval_2026-05-17.md)
 - [ ] **M1 잔여 100ep 수집 완료** (현재 100/200)
 - [ ] **M2 본 학습** — 200ep 완성 후 prof_computer 또는 DGX (ecosystem 정비 시) 에서 본 학습. yaml 의 `scheduler_decay_steps` 를 `steps` 와 동기화 권장 (본 사이클은 30k step 이후 lr 거의 0 — backlog 메모)
 - [ ] DGX 의 aarch64 ecosystem 정비 — backlog (장기)
+
+---
+
+### M1.5 추론 후 가설 분리 검증 사이클 — 2026-05-18 · 🔄 진행 중
+
+> **배경**: M1.5 추론 결과 0/2 (단축 평가) — 0~20% 영역 확정 ([orin_eval_2026-05-17.md](orin_eval_2026-05-17.md) §결과 집계). 다음 사이클 학습 방법 결정을 위해 **A2 (현재) → A1 (VLM frozen + expert LoRA) 후퇴 시도 가치** 판단 필요.
+>
+> **핵심 의문**: A2 의 0% 가 (가설 α) *VLM LoRA 의 부작용 (100ep noise 학습으로 VLM 손상)* 인지, (가설 β) *데이터 양 부족 (학습 방법은 OK, 더 학습할 데이터 필요)* 인지 분리 불가. A1 으로 무조건 후퇴 시 **본인 우려**: "VLM 적응이 실제 기여했다면 A1 = 환경 인식 ↓ + action 매핑은 동일 학습 → A2 보다 더 나쁜 결과 위험".
+>
+> → **두 가설을 학습 추가 없이 분리 검증**: (1) base smolvla 0-shot 추론 + (2) A2 학습 중 VLM LoRA weight 변화 분석. 사용자 + 메인 병렬 진행.
+
+#### 분리 검증 작업 분담
+
+| # | 작업 | 담당 | 산출 | 가설 검증 |
+|---|---|---|---|---|
+| 1 | base smolvla 0-shot Orin 추론 (ckpt 없이 base 만 로딩, 우리 환경 task1·task2 instruction 응답성 정성 측정) | 사용자 | 정성 메모 (반응 정도·instruction 구분 여부) | base VLM 의 우리 환경 인식 능력 → A1 안전성 |
+| 2 | M1.5 학습 wandb run `8les615t` 분석 (VLM LoRA adapter weight norm 추이 — 학습 동안 유의미 변화 여부) | 메인 | log 추출 + 정량 분석 | VLM LoRA 의 실제 학습 기여도 |
+
+#### 판정 매트릭스 (두 결과 조합)
+
+| 작업 1 (base 0-shot) | 작업 2 (LoRA norm) | 종합 가설 | 다음 사이클 권고 |
+|---|---|---|---|
+| base 가 어느 정도 반응 | VLM LoRA norm 거의 0 | base VLM 충분 + VLM LoRA 기여 X | **A1 안전, 1순위** |
+| base 가 어느 정도 반응 | VLM LoRA norm 큰 변화 | base 도 OK 지만 LoRA 도 학습됨 | A1 시도 가치 ↑ (단 A2 와 비교 valuable) |
+| base 완전 무반응 | VLM LoRA norm 거의 0 | base 부족 + LoRA 가 부족분도 못 채움 | **데이터 확장 우선** (학습 방법 X) |
+| base 완전 무반응 | VLM LoRA norm 큰 변화 | base 부족 + LoRA 가 환경 적응 기여 | **A1 비추천**, A2 유지 + 데이터·r 확장 |
+
+#### 산출 위치
+
+- 사용자 0-shot 추론 결과: 본 entry §결과 메모 (Orin 추론 시 사용자 보고 → 메인이 본 entry 갱신)
+- 메인 wandb 분석: 본 entry §wandb 분석 (메인 작성)
+- 종합 결정: 본 entry §결정 (양쪽 완료 후 메인 + 사용자 합의)
+
+#### 결과 메모 (사용자 0-shot 추론 — 진행 시 채움)
+
+> Orin 환경, `lerobot/smolvla_base` 직접 로딩, task1·task2 instruction 각각 1회 이상 시도, 정성 관찰.
+
+- 진행일: (예정)
+- base ckpt 로딩 OK 여부:
+- task1 (`"Pick up the blue and yellow doll and place it on the left side of the table"`) 반응:
+- task2 (`"Hand the yellow can to the person"`) 반응:
+- 두 task instruction 구분 응답성 (다른 동작인지 동일 동작인지):
+- 종합 정성 판정 (반응 / 부분반응 / 무반응):
+
+#### wandb 분석 (메인 — 진행 시 채움)
+
+> run `8les615t` (`leftarm_v2_2a_pc_2026-05-17_12-51-51`), WSL2 로컬 `~/prof_computer_runs/leftarm_v2_2a_pc_2026-05-17_12-51-51/wandb/run-20260517_125310-8les615t/`, wandb API key 위치 `.venv_arm_finetune/.env`.
+
+- 분석 메트릭 (후보):
+  - VLM LoRA layer 별 weight norm 학습 초기 vs 후기 차이
+  - expert LoRA 와의 상대적 변화량 (expert 가 더 크게 변하면 학습 신호가 expert 쪽 집중 신호)
+  - loss 곡선 inflection (수렴 시점이 VLM LoRA 변화량과 상관 있는지)
+- 분석 결과:
+- VLM LoRA 학습 기여도 판정 (큰 변화 / 미미 / 거의 0):
+
+#### 결정 (양쪽 완료 후)
+
+> 위 판정 매트릭스 기반 + 사용자 + 메인 합의. 다음 사이클 spec Phase 1 시작 전 본 섹션 확정.
