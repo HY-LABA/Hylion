@@ -310,6 +310,39 @@ M2 — 학습 (일반 환경)
 
 ---
 
+## 10) 첫 검증 사이클 — M1.5 (2026-05-17, prof_computer)
+
+본 가이드의 §1 옵션 #1 (로컬 GPU PC) 의 첫 구체 인스턴스: **[smolVLA/prof_computer/](../../prof_computer/)** (Windows 10 + WSL2 + RTX 3090 24GB).
+
+### 검증 결과 — 가설 직접 증명
+
+| §0 가설 | M1.5 검증 (75000 step / 7h34m) |
+|---|---|
+| "일반 환경에선 torchcodec 정상" | ✅ torchcodec 0.10 import 정상, 학습 도중 backend 동작 |
+| "DGX 의 OOM (pyav buffer leak) 회피" | ✅ system RAM 누수 0.18 GB/h (DGX 시도 2 의 1.25 GB/min 대비 400× 감소) |
+| "표준 lerobot 명령 그대로 사용" | ✅ §3 의 명령 패턴 (보강): batch 4 (RTX 3090 24GB 제약 반영, 일반 가이드의 64 와 다름), bf16 효과 미미 확인, scheduler_decay_steps 동기화 필요 (backlog) |
+
+### prof_computer 특수 사항 (§4-3 "로컬 PC" 보완)
+
+- **Python**: Ubuntu 22.04 의 default 3.10 → lerobot 0.5.2 `requires-python>=3.12` 미달. **deadsnakes PPA** 로 python3.12 추가 필요
+- **PyTorch**: cu128 wheel (lerobot 공식 `requirements-ubuntu.txt` lock 일치). DGX 의 cu130 과 다름 (RTX 3090 Ampere ↔ GB10 Blackwell)
+- **batch_size**: §3 의 64 권장값 (A100 24GB+ 가정) 은 RTX 3090 24GB 에 OOM. **batch 4** 가 안전 (VRAM peak 60.7%)
+- **use_amp (bf16)**: §3 권장이나 prof_computer 실측 결과 VRAM 절감 0.09%p (smoke 시도 3, learning_log §smoke 3). 원인 미상 — lerobot smolvla + PEFT 결합 시 AMP scope 가 좁을 가능성. 정확도 영향 ↑↓ 둘 다 우려라 **fp32 채택**
+- **scheduler_decay_steps**: lerobot default 30000 < 우리 steps 75000 → 30k 이후 lr 거의 0. 다음 학습에서 yaml 의 `policy.scheduler_decay_steps` 를 `steps` 와 동기화 권장
+
+### 산출물
+
+- Local ckpt: `~/prof_computer_runs/leftarm_v2_2a_pc_2026-05-17_12-51-51/` (75 ckpt)
+- HF Hub: [BaboGaeguri/leftarm_v2_A2_pc_2026-05-17](https://huggingface.co/BaboGaeguri/leftarm_v2_A2_pc_2026-05-17) (46 MB, public, LoRA adapter only)
+- 상세 사이클 로그: [smolVLA/prof_computer/docs/learning_log.md](../../prof_computer/docs/learning_log.md)
+
+### 다음 사이클
+
+- Orin 에서 위 HF repo fetch + smoke 추론 (M3 영역 일부 선검증)
+- M1 잔여 100ep 수집 완료 → M2 본 학습 (200ep) 진입. 본 가이드의 §3 명령에 위 "prof_computer 특수 사항" 반영해서 사용
+
+---
+
 ## Sources
 
 본 가이드는 다음 자료의 종합:

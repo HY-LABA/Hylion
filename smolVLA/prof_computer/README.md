@@ -2,8 +2,10 @@
 
 > [prof_train_setting.md](../docs/storage/prof_train_setting.md) §1 옵션 #1 "로컬 GPU PC" 의 구체 구현체.
 > 시연장 외 (개발실·실험) 학습 수행. DGX 의 aarch64 한계 (torchcodec 부재 → pyav fallback leak) 우회를 위한 일반 x86 학습 노드.
-> 등록: 2026-05-16 · 첫 학습 완주: 2026-05-17 (leftarm_v2 2A, 75000 step)
+> 등록: 2026-05-16 · **M1.5 중간점검 학습 완주: 2026-05-17** (leftarm_v2 100ep subset, 75000 step)
 > 실측 사양: [02_hardware.md §6](../docs/storage/02_hardware.md) · 소프트웨어: [03_software.md §7](../docs/storage/03_software.md)
+>
+> **위치**: M1 (200ep 수집 중, 100ep 도달) → **M1.5 (현재 사이클, prof_computer 로 이관 — image 변환 폐기, video dataset 그대로 학습 성공)** → M2 (200ep 완성 후 본 학습, 미시작) → M3 (Orin 추론).
 
 ## 1) 노드 정체성
 
@@ -79,19 +81,23 @@ prof_computer/
   - smoke 3 (batch 8 bf16) → ⚠️ bf16 효과 없음 확인
   - smoke 4 (batch 4 fp32) → ✅ VRAM 51.79%, 본 학습 진입 결정
 
-### 본 학습 (2026-05-17, leftarm_v2 2A, ~~20K~~ → **75K step**)
+### M1.5 중간점검 학습 (2026-05-17, leftarm_v2 100ep subset)
 
-- [x] 본 학습 (batch 4 fp32, steps 75000 = DGX 의도 5 epoch on batch 16 와 sample 수 동등)
+> **M1.5 의 원 결정** ([realplaying.md M1.5](../realplaying.md)) 은 "image dataset 변환" 이었으나, **본 사이클에서 변경** — image 변환 폐기 + prof_computer (일반 x86 환경) 로 video dataset 그대로 학습.
+> DOD ("100ep subset 학습 진입 → OOM 없이 첫 ckpt 도달") 초과 달성: 75000 step 완주 + 5.5 epoch + loss 0.04 수렴.
+
+- [x] 본 사이클 학습 (batch 4 fp32, steps 75000, DGX 의도 5 epoch on batch 16 과 sample 수 동등)
   - 학습 시간 7시간 34분, step time 0.343 s/step
   - VRAM peak 60.67%, GPU temp peak 83°C
   - System RAM 누수 0.18 GB/h (DGX 시도 2 의 1.25 GB/min 대비 400× 감소)
   - loss min 0.013, final 0.04
-  - 75개 ckpt 저장, last ckpt 125 MB (LoRA adapter only)
+  - 75개 ckpt 저장, last ckpt 폴더 125 MB (LoRA adapter 46MB + meta)
   - 상세: [docs/learning_log.md](docs/learning_log.md)
+- [x] HF Hub model repo push 완료: [`BaboGaeguri/leftarm_v2_A2_pc_2026-05-17`](https://huggingface.co/BaboGaeguri/leftarm_v2_A2_pc_2026-05-17) (46 MB, public)
 
-### 다음 사이클 (예정)
+### 다음 사이클
 
-- [ ] best ckpt 선별 (last = step 75000)
-- [ ] HF Hub model repo push (`BaboGaeguri/leftarm_v2_lora_pc_2026-05-17` 등)
-- [ ] Orin 에서 ckpt fetch + smoke 추론 (시연장 정성 검증)
-- [ ] DGX 의 aarch64 ecosystem 정비 (torchcodec wheel 또는 FFmpeg 7) — backlog
+- [ ] **Orin 추론 검증** — `lerobot-record --policy.path=BaboGaeguri/leftarm_v2_A2_pc_2026-05-17 ...` 으로 시연장 정성 평가 (M3 영역 일부 선검증)
+- [ ] **M1 완성** — 잔여 100ep 수집 (현재 100/200 ep)
+- [ ] **M2 본 학습** — 200ep 완성 후 prof_computer 또는 (가능 시) DGX 에서 본 학습
+- [ ] DGX 의 aarch64 ecosystem 정비 (torchcodec wheel 또는 FFmpeg 7) — backlog (장기)

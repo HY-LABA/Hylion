@@ -3,7 +3,7 @@
 ## Project Snapshot
 
 - Project: smolVLA for Physical AI robotics workflow
-- Platform: Orin (NVIDIA Jetson AGX) 중심 실행·검증 + DGX (학습 + 데이터 수집, 시연장 이동 운영)
+- Platform: Orin (NVIDIA Jetson AGX) 중심 실행·검증 + DGX (학습 + 데이터 수집, 시연장 이동 운영) + **prof_computer (DGX 보조 학습 노드 — Windows 10 + WSL2 + RTX 3090, M1.5 결정 2026-05-16 이후 학습 책임 분담)**
 - Main development layer: `smolVLA/orin/`
 - Core objective: implement and stabilize custom behavior without touching upstream submodule code
 - 자동화 정책: spec 작성 → 모든 todo 자동 처리 → 사용자 실물 검증으로 사이클 마무리
@@ -18,6 +18,7 @@
   - `seeedwiki/`: Seeed SO-101 위키
 - `smolVLA/orin/`: custom runtime, wrappers, and extensions (Orin)
 - `smolVLA/dgx/`: 학습 + 데이터 수집 (DGX, 시연장 직접 이동 운영)
+- `smolVLA/prof_computer/`: **DGX 보조 학습 노드** (Windows 10 + WSL2 + RTX 3090). [prof_train_setting.md](docs/storage/prof_train_setting.md) §1 옵션 #1 의 구체 구현. M1.5 (2026-05-17) 검증 학습 완주 — DGX aarch64 한계 (torchcodec 부재) 우회 경로.
 - `smolVLA/docs/`: project docs and operational knowledge
 - `smolVLA/docs/storage/legacy/`: 이전 워크플로우 자산 보관 (참조용)
 - `smolVLA/docs/storage/workflow_reflections/`: spec 사이클별 reflection 보고서

@@ -76,18 +76,25 @@
   - video → image dataset 변환 스크립트 작성
   - 원본 `leftarm_v2` 보존 + 새 `leftarm_v2_image` dataset 생성
   - 변환된 dataset 의 lerobot-train 호환성 검증 (학습 진입 + 첫 ckpt 도달)
-- **결정 포인트 (M1.5)**: lerobot video decode leak 회피 방식 → **"image dataset 변환" 으로 결정 (2026-05-15)**. (대안: torchcodec 활성화, FFmpeg 업그레이드, lerobot upstream patch — 모두 DGX 환경상 비현실적이라 image 변환 채택.)
-- **DOD**: `leftarm_v2_image` dataset 으로 `lerobot-train` 이 100ep subset 학습 진입 → OOM 없이 첫 ckpt (save_freq=1000 step) 도달. 그 이상의 학습 완주·성능은 M2 의 책임.
-- **재사용성 노트**: 본 변환 스크립트는 향후 rightarm 등 다른 lerobot dataset 에 같은 문제 발생 시 그대로 적용 가능. DGX 환경이 PyTorch/FFmpeg 호환 정비될 때까지의 *우회 인프라*.
+- **결정 포인트 (M1.5)**: lerobot video decode leak 회피 방식
+  - 1차 결정 (2026-05-15): **"image dataset 변환"**. (대안: torchcodec 활성화, FFmpeg 업그레이드, lerobot upstream patch — 모두 DGX 환경상 비현실적이라 image 변환 채택.)
+  - **2차 결정 (2026-05-16)**: 1차 결정 **폐기** → **"DGX 자체 학습 보류, 일반 x86 GPU 환경으로 이관"** (사용자 결정). image 변환·cleanup·GOP 재인코딩 등 우회로 산출물 모두 `docs/storage/legacy/realplaying/train_troubleshooting/` 로 이관. 가이드: [`docs/storage/prof_train_setting.md`](docs/storage/prof_train_setting.md).
+- **DOD (2차 결정 반영)**: 일반 x86 환경 (= prof_train_setting §1 옵션 중 하나) 에서 `lerobot-train` 이 100ep subset 학습 진입 → OOM 없이 첫 ckpt 도달. 그 이상의 학습 완주·성능은 M2 의 책임.
+- **본 사이클 결과 (2026-05-17)**: `smolVLA/prof_computer/` (RTX 3090 + WSL2, prof_train_setting §1 옵션 #1 인스턴스) 에서 **75000 step (5.5 epoch) 완주**. loss 0.04 수렴, VRAM peak 60.7%, RAM 누수 0.18 GB/h (DGX 시도 2 의 1.25 GB/min 대비 400× 감소). prereq spec 02 가설 ("torchcodec 정상 환경에선 DGX 의 OOM 메커니즘 재현 불가") 직접 증명. 산출물:
+  - Local ckpt: `~/prof_computer_runs/leftarm_v2_2a_pc_2026-05-17_12-51-51/checkpoints/` (75개)
+  - HF Hub: [`BaboGaeguri/leftarm_v2_A2_pc_2026-05-17`](https://huggingface.co/BaboGaeguri/leftarm_v2_A2_pc_2026-05-17) (LoRA adapter only, 46MB)
+  - 상세: [smolVLA/prof_computer/docs/learning_log.md](smolVLA/prof_computer/docs/learning_log.md)
+- **재사용성 노트**: 향후 rightarm 등 다른 dataset 도 prof_computer (또는 prof_train_setting §1 의 다른 옵션 — Colab/RunPod 등) 에서 동일 절차로 학습. DGX 의 aarch64 ecosystem 정비 (lerobot torchcodec aarch64 wheel 또는 PyTorch + FFmpeg ABI 정합) 전까지 prof_computer 가 학습 노드 대행.
 
-### [ ] M2 — 학습 (DGX)  (spec `02`)
+### [ ] M2 — 학습 (DGX 또는 prof_computer)  (spec `02`)
 
-- **목표**: leftarm_v2 dataset 으로 SmolVLA 멀티태스크 정책을 fine-tune 한다 (1 모델 / 2 task).
+- **목표**: leftarm_v2 dataset (M1 의 200 episodes 완성 후) 으로 SmolVLA 멀티태스크 정책을 fine-tune 한다 (1 모델 / 2 task).
+- **학습 노드 선택** (M1.5 2차 결정 반영): DGX 의 aarch64 ecosystem 정비 전까지는 **prof_computer 우선**. DGX 가 정비되면 그쪽도 가능. M1.5 의 검증 학습 (100ep, 75k step) 은 prof_computer 에서 완주됨 — 동일 노드에서 200ep 으로 확장.
 - **주요 작업**:
-  - 모델 구성 결정 (체크포인트, LoRA vs full fine-tune, 하이퍼파라미터, step 수)
-  - DGX 에서 학습 실행, 학습 곡선·메트릭 점검
+  - 모델 구성 결정 (M1.5 본 사이클의 검증 — LoRA r=16 / all-linear / batch 4 / steps 75000 / fp32 — 을 200ep 으로 확장. scheduler_decay_steps 동기화 적용)
+  - prof_computer 또는 DGX 에서 학습 실행, 학습 곡선·메트릭 점검
   - 학습 산출 체크포인트 검증 (smoke / 로드 테스트)
-- **결정 포인트 (M2)**: 모델 구성 — `smolvla_base` 기반 / LoRA 적용 여부·rank / 하이퍼파라미터 (구 `11_smolvla_model_decision` 주제).
+- **결정 포인트 (M2)**: 모델 구성 — `smolvla_base` 기반 / LoRA 적용 여부·rank / 하이퍼파라미터 (구 `11_smolvla_model_decision` 주제). M1.5 검증값 (A2: LoRA all-linear r=16) 을 기본으로 하되 200ep 데이터 반영해 정밀 튜닝.
 - **DOD**: 학습 완료, 체크포인트가 Orin 배포 가능한 형태로 산출, 두 task 모두에 대해 의미있는 수렴.
 
 ### [ ] M3 — 배포 + 추론 (Orin)  (spec `03`)

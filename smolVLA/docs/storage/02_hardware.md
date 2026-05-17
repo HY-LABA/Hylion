@@ -170,7 +170,9 @@ DGX 의 시도 1·2 OOM 사고 (`smolVLA/dgx/docs/finetune/leftarm_v2/training_l
 2. **system RAM 누수 가설은 부정됨** — DGX 시도 2 의 1.25 GB/min 누수가 PC 에서 0.18 GB/h (400배 감소). torchcodec 정상 동작이 직접 원인.
 3. **VRAM·system RAM 분리** → DGX 와 달리 dataloader workers 가 system RAM 만 점유. PC 는 `num_workers=4` + `prefetch_factor=2` 안정 사용.
 
-### 6-2) 본 학습 실측 (2026-05-17, leftarm_v2 2A pass)
+### 6-2) M1.5 중간점검 학습 실측 (2026-05-17, leftarm_v2 100ep subset)
+
+> 사이클 식별: [realplaying.md](../../realplaying.md) 의 **M1.5** ("video decode 회피"). 원 결정 (image 변환) 폐기 + prof_computer 로 이관해 video dataset 그대로 학습. M2 본 학습 (200ep) 은 M1 완성 후 별도 사이클.
 
 | 지표 | 값 |
 |---|---|

@@ -157,7 +157,9 @@ DataCollector venv 상세는 ~~`docs/storage/07_datacollector_venv_setting.md`~~
 | 데이터셋 캐시 | `~/smolvla/.hf_cache` (DGX 로컬) | `~/.cache/huggingface` (WSL `/dev/sdd` 가상디스크) | 둘 다 HF Hub lazy fetch |
 | 학습 산출물 | `~/smolvla/dgx/outputs/<run>/` | `~/prof_computer_runs/<run>/` | wandb run name `_pc_` 접두로 구분 |
 
-### 7-4) 본 학습 검증 (2026-05-17, leftarm_v2 2A)
+### 7-4) M1.5 중간점검 학습 검증 (2026-05-17, leftarm_v2 100ep subset)
+
+> 사이클 식별: [realplaying.md](../../realplaying.md) 의 **M1.5** ("video decode 회피"). 원 결정 (image 변환) 폐기 + prof_computer 이관 결정 (2026-05-16) 후 본 검증 학습. M2 본 학습 (200ep) 은 M1 완성 후 별도.
 
 | 항목 | 값 |
 |---|---|

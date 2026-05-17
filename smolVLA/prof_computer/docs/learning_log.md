@@ -185,7 +185,11 @@
 
 ---
 
-### 2A first pass (PC) — 2026-05-17 12:53 ~ 20:27 · ✅ COMPLETED (75000 step 완주)
+### M1.5 중간점검 학습 (PC) — 2026-05-17 12:53 ~ 20:27 · ✅ COMPLETED (75000 step 완주)
+
+> **사이클 식별**: realplaying.md 의 **M1.5** ("데이터셋 학습 호환성 정비 — video decode 회피"). 원 결정은 image dataset 변환이었으나 prof_computer 로 이관 (사용자 결정 2026-05-16, [prof_train_setting.md](../../docs/storage/prof_train_setting.md)) 으로 video dataset 그대로 학습 시도. 100 ep subset 만 사용 (M1 잔여 100ep 미수집 상태 — 본 학습 = M2 는 200ep 완성 후 진행).
+>
+> M1.5 DOD ("100ep subset 학습 진입 → OOM 없이 첫 ckpt 도달") 초과 달성 — 75000 step 완주.
 
 - 명령: `python run_train.py train --pass 2a` (`train_config.yaml`: batch=4, steps=75000, use_amp=false, num_workers=4, prefetch_factor=2, video_backend=torchcodec, LoRA r=16 all-linear)
 - run name: `leftarm_v2_2a_pc_2026-05-17_12-51-51`
@@ -199,7 +203,7 @@
 | 시작 / 종료 | 2026-05-17 12:53:27 / 20:27:11 |
 | 총 시간 | **7시간 33분 44초** |
 | 도달 step | 75000 / 75000 (100%) ✅ |
-| 도달 sample | 300,000 (75000 × batch 4) — DGX 의도 (20K step × batch 16) 와 동등 |
+| 도달 sample | 300,000 (75000 × batch 4) — DGX 의 M2-2A 의도 (20K step × batch 16) 와 sample 수 동등 (단 본 사이클은 M2 가 아니라 M1.5 중간점검) |
 | epoch | 5.5 |
 | step time (steady) | 0.343 s/step (DGX 시도 1 의 2.7 s/step 대비 5× 빠름) |
 | dataloading_s | 0.004 (dataloader bottleneck 0 — torchcodec 효과) |
@@ -262,3 +266,10 @@
 | 정성 추론 (Orin smoke) | 미실행 | **다음 사이클 검증 예정** |
 
 → **prereq spec 02 가설 직접 검증**: torchcodec 정상 환경에서는 DGX 의 OOM 메커니즘 (pyav buffer leak × DataLoader workers × UMA 단일 풀) 가 발생 자체 불가. PC 노드가 DGX 의 aarch64 ecosystem 정비 (lerobot upstream 의 torchcodec aarch64 wheel 또는 PyTorch + FFmpeg ABI 정합) 전까지 학습 책임 대행.
+
+**다음 단계** (M2 진입은 M1 의 200ep 완성 후):
+
+- [ ] **Orin 추론 smoke** — `lerobot-record --policy.path=BaboGaeguri/leftarm_v2_A2_pc_2026-05-17` 로 M1.5 결과의 정성 평가 (M3 영역 일부 선검증)
+- [ ] **M1 잔여 100ep 수집 완료** (현재 100/200)
+- [ ] **M2 본 학습** — 200ep 완성 후 prof_computer 또는 DGX (ecosystem 정비 시) 에서 본 학습. yaml 의 `scheduler_decay_steps` 를 `steps` 와 동기화 권장 (본 사이클은 30k step 이후 lr 거의 0 — backlog 메모)
+- [ ] DGX 의 aarch64 ecosystem 정비 — backlog (장기)
