@@ -1,0 +1,62 @@
+# prof_computer/leftarm_v2/base_config.yaml — 셋업 컨텍스트 (학습 전용)
+#
+# DGX 의 dgx/finetune/leftarm_v2/config/base_config.yaml 의 PC 적응판:
+#   - 식별·dataset·계정 — DGX 와 동일 (HF Hub 공유)
+#   - paths.output_root — prof_computer 로컬 경로
+#   - hardware/robot/teleop/cameras/calibration — prof_computer 는 SO-ARM 미연결,
+#     record/teleop 미사용. 단 _lib.py 구조 일관성 위해 형태 유지 (학습은 안 읽음).
+#
+# train_config.yaml / train_config_smoke.yaml 이 본 파일을 참조.
+
+# ── 식별 ──────────────────────────────────────────────────────
+name: leftarm_v2
+hf_repo_id: BaboGaeguri/leftarm_v2
+status: training              # prof_computer 측은 항상 training (수집 X)
+
+# ── 저장 위치 ──
+paths:
+  # lerobot 표준 dataset 캐시: HF_HOME 는 venv activate 시 export
+  # (setup_env.sh 가 ~/.cache/huggingface 로 설정 — WSL 로컬, /mnt/c 회피).
+  dataset_local: ${HF_HOME}/lerobot/BaboGaeguri/leftarm_v2
+  hf_hub: https://huggingface.co/datasets/BaboGaeguri/leftarm_v2
+  # 학습 산출물 — DGX 의 ~/smolvla/dgx/outputs 와 분리.
+  # WSL 로컬 ($HOME) — /mnt/c 통한 IO 성능 저하 회피.
+  output_root: ~/prof_computer_runs
+
+# ── 계정 (DGX 와 동일 — HF Hub·wandb 같은 계정 공유) ──
+accounts:
+  hf_user: BaboGaeguri          # HF Hub 로그인 ✓
+                                # venv activate 시 .env 의 HF_TOKEN 자동 export → hf 인증 동작
+  wandb_entity: babogaeguri-hanyang-university  # wandb team entity
+                                # ⚠️ HF 계정 (BaboGaeguri) 과 다름. viewer.teams = ['babogaeguri-hanyang-university']
+                                # leftarm_v1 / DGX leftarm_v2 와 일관성 유지
+  wandb_project: leftarm_v2
+
+# ── 물리 셋업 — prof_computer 는 학습 전용, 본 섹션 미사용 ──
+# DGX 의 record/teleop 와의 구조 일관성 위해 형태만 유지. _lib.py 의 헬퍼는 호출되지 않음.
+robot:
+  type: so101_follower
+  id: leftarm_test_follower
+teleop:
+  type: so101_leader
+  id: leftarm_test_leader
+cameras:                          # 학습 시 run_train.py 가 rename_map 생성용으로 키 순서만 사용
+  top:   { width: 480, height: 640, fps: 30, color_mode: rgb, fourcc: MJPG, rotation: -90 }
+  wrist: { width: 640, height: 480, fps: 30, color_mode: rgb, fourcc: MJPG }
+
+# ── 캘리브레이션 — prof_computer 는 학습 전용, 미사용 ──
+calibration:
+  dir: ${HF_HOME}/lerobot/calibration
+  follower: ${HF_HOME}/lerobot/calibration/robots/so_follower/leftarm_test_follower.json
+  leader: ${HF_HOME}/lerobot/calibration/teleoperators/so_leader/leftarm_test_leader.json
+  calibrated_at: "n/a (prof_computer)"
+  note: "prof_computer 는 SO-ARM 미연결 — 본 섹션 미사용"
+
+# ── 하드웨어 — prof_computer 는 학습 전용, 미사용 ──
+# 학습은 hardware 섹션을 안 읽음 (_lib.get_hardware 미호출). 단 _lib.py 구조 호환 위해
+# null 유지. record/teleop 가 prof_computer 에서 의도치 않게 실행되면 어쨌든 에러로 차단.
+hardware:
+  follower_port: null
+  leader_port: null
+  camera_top_index: null
+  camera_wrist_index: null

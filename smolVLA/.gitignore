@@ -3,6 +3,13 @@
 # ── venv (노드별) ──────────────────────────────────────────────────────────────
 orin/.hylion_arm/
 dgx/.arm_finetune/
+prof_computer/.venv_arm_finetune/
+
+# ── prof_computer 런타임 산출물 (학습 결과·WSL 로컬, repo 비추적) ─────────────
+# 본 학습은 ~/prof_computer_runs/ (WSL home) 에 저장하므로 repo 영향 없음.
+# 단 사용자가 실수로 prof_computer/ 안에 runs 두면 차단:
+prof_computer/runs/
+prof_computer/outputs/
 
 # ── DGX 런타임/데이터 (repo 비추적) ───────────────────────────────────────────
 dgx/outputs/          # 학습 산출물 (체크포인트·wandb·로그) — 런타임 생성

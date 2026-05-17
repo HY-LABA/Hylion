@@ -11,6 +11,7 @@
 - 개발 PC: Ubuntu 환경 사용 중
 - 엣지 장치: `Jetson Orin Nano Super Developer Kit`
 - 학습/파인튜닝 + 데이터 수집 서버: `NVIDIA DGX Spark` (06 결정으로 DataCollector 책임 흡수 — 시연장 직접 이동 운영)
+- **DGX 보조 학습 노드 (prof_computer)**: Windows 10 + WSL2 (Ubuntu 22.04) + RTX 3090. [prof_train_setting.md](prof_train_setting.md) §1 옵션 #1 "로컬 GPU PC" 의 구체 구현 — DGX Spark aarch64 한계 (torchcodec 부재) 우회를 위한 일반 x86 학습 노드. 실측 §6 참조. (등록: 2026-05-16, 본 학습 첫 사이클 완주 2026-05-17)
 - ~~데이터 수집 PC (DataCollector)~~: x86_64 노트북 (Intel Core i3-7100U, GPU 없음 — Intel HD 620 only) — **운영 종료 (2026-05-02, 06_dgx_absorbs_datacollector 결정 A). 실측 기록은 §5 보존.**
 
 ## 2) devPC 사양 확인 방법 및 실측
@@ -137,7 +138,64 @@ cameras_str = (
 
 **적용 가능 영역**: orin·dgx 의 env_check 도 같은 7단계 패턴 미러 가능 — 노드별 책임 맞춤 (orin = 추론용 ckpt 존재 검사, dgx = 학습용 데이터셋 cache 검사 등). 차기 사이클 reflection 후보.
 
-## 6) SO-ARM 핵심 부품 (BOM 기준) — **Arm Kit Pro**
+## 6) prof_computer 실측 (2026-05-16 등록, 2026-05-17 첫 학습 완주) — DGX 보조 학습 노드
+
+> [prof_train_setting.md](prof_train_setting.md) §1 옵션 #1 (로컬 GPU PC, RTX 3090 기준) 의 구체 인스턴스. DGX Spark 의 aarch64 + cu130 + FFmpeg 6 조합에서 torchcodec wheel ABI 미스매치 → pyav fallback buffer leak → OOM (DGX `training_log.md §시도1·2`) 우회를 위해 사용자 결정 (2026-05-16). 데이터는 HF Hub (`BaboGaeguri/leftarm_v2` 등) 를 공유. 작업 영역은 `smolVLA/prof_computer/`.
+
+| 항목 | 실측값 | 비고 |
+|---|---|---|
+| 호스트명 | `DESKTOP-G8LO9C5` | Windows hostname |
+| 제조사 / 모델 | `Micro-Star International (MSI)` / `MS-7D08` | 데스크톱 |
+| OS | `Windows 10 Home 22H2 (build 19045.6466)` | WSL2 호스트 |
+| WSL2 | `2.7.3.0`, kernel `6.6.114.1-microsoft-standard-WSL2` | Ubuntu-22.04 + docker-desktop 두 distro. 학습 distro = Ubuntu-22.04 |
+| CPU | `11th Gen Intel(R) Core(TM) i9-11900K @ 3.50GHz` | 8 core / 16 thread |
+| 메모리 | `64 GB` (WSL 측 31GB 할당 — `.wslconfig` 기본값) | `C:\Users\admin\.wslconfig` 에 `memory=48GB / processors=12 / swap=16GB` 명시 (재시작 시 적용. 현재 32GB 영역에서도 본 학습 7시간 무누수 확인) |
+| GPU 모델 | `NVIDIA GeForce RTX 3090` | Ampere, compute_cap 8.6, sm_86 |
+| GPU 메모리 | **24 GB VRAM** (`memory.total=24576 MiB`) | **DGX UMA 와 다른 분리 메모리 모델**. SmolVLA + LoRA r=16 batch 4 + fp32 환경에서 VRAM peak **60.7%** 측정 (본 학습 2026-05-17 75000 step, learning_log §2A) |
+| GPU 드라이버 | `560.94` (Windows 측 — WSL 에 자동 노출) | WSL2 GPU passthrough 정상 |
+| Python (학습용) | **`3.12.x` (deadsnakes PPA, 시스템 3.10 과 병존)** | lerobot 0.5.2 `requires-python>=3.12` 충족 |
+| 저장장치 (PC) | `Samsung SSD 980 PRO 1TB` (NVMe, 931.5 GB) | C: 765GB used / 165GB free, G: 773GB used / 157GB free |
+| 저장장치 (WSL2 ext4) | 1007 GB 가상 디스크 (`/dev/sdd`) | 본 학습 후 사용 60 GB / 가용 897 GB |
+| WSL 사용자 | `laba` (sudo, docker 그룹) | uid=1000 |
+| 카메라 / SO-ARM | 없음 (학습 전용) | 데이터 수집은 DGX 가 시연장에서 수행. HF Hub 로 데이터 공유 |
+| ssh / 네트워크 | (미확인) | 외부 ssh 접근 필요 없음 — 단독 노드. wandb·HF Hub outbound 만 |
+
+### 6-1) DGX 와의 메모리 모델 차이 (학습 운영상 핵심)
+
+DGX (§4) = **UMA 128GB** (CPU/GPU 단일 풀, swap 0) ↔ prof_computer = **분리 64GB system RAM + 24GB GPU VRAM** (swap 가능).
+
+DGX 의 시도 1·2 OOM 사고 (`smolVLA/dgx/docs/finetune/leftarm_v2/training_log.md`) 는 UMA 의 **system 95GB 증발 → global_oom** 메커니즘이었음. prof_computer 에서는 다른 제약이 우선:
+
+1. **VRAM 24GB 가 1순위 제약** — DGX 의 batch 16 이 PC 에서는 첫 step 후 CUDA OOM (smoke 시도 1). batch 4 (fp32) 로 VRAM peak 60.7% 안전 영역 확보. learning_log §smoke 1~4.
+2. **system RAM 누수 가설은 부정됨** — DGX 시도 2 의 1.25 GB/min 누수가 PC 에서 0.18 GB/h (400배 감소). torchcodec 정상 동작이 직접 원인.
+3. **VRAM·system RAM 분리** → DGX 와 달리 dataloader workers 가 system RAM 만 점유. PC 는 `num_workers=4` + `prefetch_factor=2` 안정 사용.
+
+### 6-2) 본 학습 실측 (2026-05-17, leftarm_v2 2A pass)
+
+| 지표 | 값 |
+|---|---|
+| 학습 시간 | 7시간 34분 (75000 step, 5.5 epoch) |
+| step time (steady) | 0.343 s/step |
+| VRAM peak | **60.67%** (24GB 의 ~14.7GB) |
+| System RAM 누수 (학습 동안) | -1.36 GB / 7.5h = **0.18 GB/h** |
+| GPU temp peak | 83°C |
+| GPU power steady | 300-320W (TDP 350W 의 87%) |
+| loss min / final | 0.013 / 0.04 |
+| 저장 ckpt | 75개 (step 1000 마다) |
+| last ckpt 크기 | 125 MB (LoRA adapter only) |
+
+→ DGX 시도 1·2 의 위협 시나리오 (system RAM 5GB/min 누수, pyav leak, 28분 SIGKILL) **모두 재현 0%**. prof_computer 가 `prereq spec 02_prereq_dataset_video_to_image` 의 가설 ("torchcodec 정상 환경에선 pyav 우회로 불요") 을 직접 증명.
+
+### 6-3) prof_computer 사용 시점 트리거
+
+- DGX 가 시연장 이동·점검 등으로 가동 불가
+- 새 hyperparameter 후보를 DGX 본 학습 전에 빠르게 실험
+- 동일 dataset 으로 DGX 와 결과 비교 (단 DGX 가 aarch64 ecosystem 정비 전까지는 학습 자체 불가)
+- 시연장 외에서 우선 정성 검증
+
+→ DGX·prof_computer 모두 동일 HF Hub dataset + `dgx/finetune/leftarm_v2/` config 패턴 공유. 학습 산출 (output_dir, wandb run name) 만 분리 (PC 측 `~/prof_computer_runs/`, run name 에 `_pc_` 접두).
+
+## 7) SO-ARM 핵심 부품 (BOM 기준) — **Arm Kit Pro**
 
 - 키트 등급: **Arm Kit Pro** (팔로워 12V 구성)
 - 모터 계열: `Feetech STS3215`
@@ -171,7 +229,7 @@ leader + follower(현재 보유 1쌍) 합계:
   - 상품 예시: `etguuds USB A to USB C Cable 6.6ft, 2-Pack, 3A`
   - ASIN 예시: `B0B8NWLLW2`
 
-## 7) 카메라 (SO-ARM용)
+## 8) 카메라 (SO-ARM용)
 
 - 모델: `OV5648 USB Camera Module`
 - 수량: 1대 (overview, SO-ARM 관측용)
@@ -207,7 +265,7 @@ leader + follower(현재 보유 1쌍) 합계:
 | 보관 온도 | 0 ~ 50°C |
 | 호환 OS | Windows XP/Vista/7/8.1/10, Linux with UVC (≥2.6.26), Android 4.0+ with UVC |
 
-## 7-1) 카메라 (SO-ARM용, wrist 카메라 — 신규)
+## 8-1) 카메라 (SO-ARM용, wrist 카메라 — 신규)
 
 - 모델: `INNO-MAKER U20CAM-720P`
 - 수량: 1대 (wrist 카메라 — 그리퍼 근거리 광각 촬영)
@@ -231,15 +289,15 @@ leader + follower(현재 보유 1쌍) 합계:
 | 지원 해상도 | 1280×720 / 800×600 / 640×480 / 320×240 |
 | 본 프로젝트 용도 | wrist 카메라 1대 (그리퍼 근거리 광각 촬영) |
 
-## 8) 로봇 구성 수량
+## 9) 로봇 구성 수량
 
 - Follower arm: 1대
 - Leader arm: 1대
 - Camera: overview OV5648 x1 + wrist U20CAM-720P x1 (혼합 구성)
 
-## 9) 카메라 키 컨벤션 + 분기 결과 (08_final_e2e H2 검토 — 2026-05-04)
+## 10) 카메라 키 컨벤션 + 분기 결과 (08_final_e2e H2 검토 — 2026-05-04)
 
-### 9-1) 노드별 카메라 키 컨벤션
+### 10-1) 노드별 카메라 키 컨벤션
 
 | 노드 | 키 이름 | 파일 | 비고 |
 |---|---|---|---|
@@ -248,7 +306,7 @@ leader + follower(현재 보유 1쌍) 합계:
 
 두 노드가 카메라를 독립적으로 사용 (수집 시 DGX 키 → 데이터셋 저장, 추론 시 Orin 키 → policy forward). 노드 간 직접 키 공유 없으므로 현재 불일치는 동작 무관.
 
-### 9-2) 코드 분기 필요성 검토 결과
+### 10-2) 코드 분기 필요성 검토 결과
 
 | 검토 영역 | 결과 |
 |---|---|
@@ -257,7 +315,7 @@ leader + follower(현재 보유 1쌍) 합계:
 | `orin/inference/hil_inference.py` flip 기본값 | `set()` (플립 없음) 기본값 유지. wrist 물리 장착 방향은 실물 셋업 시 확인 후 `cameras.json.wrist.flip` 또는 `--flip-cameras wrist` 로 적용 |
 | §5-2 fourcc=MJPG 패턴 | 두 카메라 모두 MJPEG 지원 — DGX record.py 이미 fourcc=MJPG 강제 적용 중. 변경 불필요 |
 
-### 9-3) 잠재 리스크 (BACKLOG 추적)
+### 10-3) 잠재 리스크 (BACKLOG 추적)
 
 - **wrist 광각 (FOV-H 102°) vs smolvla_base 사전학습 분포**: smolvla_base 의 `camera2` 슬롯이 svla_so100_pickplace 기준으로 어떤 화각 카메라로 수집됐는지 미확인. wrist U20CAM-720P 의 102° 광각이 사전학습 분포와 다르면 데이터 수집 (C2) → 학습 (T1) → 추론 (I1) 에서 정성 차이 가능. 03 BACKLOG #11 + spec §TODO-H2 잔여 리스크로 추적 중.
 - **wrist 장착 방향 flip 미결**: wrist 카메라가 물리적으로 거꾸로 장착될 경우 `cameras.json.wrist.flip=true` 또는 `--flip-cameras wrist` 적용 필요. 실물 셋업 시 확인 (03 BACKLOG #16 연계).

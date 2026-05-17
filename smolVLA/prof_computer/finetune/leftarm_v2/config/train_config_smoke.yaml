@@ -1,0 +1,39 @@
+# prof_computer/leftarm_v2/train_config_smoke.yaml — smoke test (~100 step).
+#
+# 목적: 본 학습 (train_config.yaml, 20K step) 진입 전 환경 파이프라인 검증.
+# 측정: VRAM peak / system RAM 누수율 / step time / torchcodec 동작 / loss 정상.
+# 통과 기준 (learning_log.md):
+#   - 100 step 정상 완주 (SIGKILL 없음)
+#   - VRAM peak < 22 GB (24GB 의 92%)
+#   - RAM 누수율 < 500 MB/min (DGX 시도 2 의 1.25 GB/min 보다 큰 폭 개선)
+#   - loss 정상 (DGX 시도 1·2 의 0.7→0.3 범위)
+#
+# train_config.yaml 과의 차이만 표시 (나머지 동일).
+
+policy_path: lerobot/smolvla_base
+method: lora
+lora:
+  target_modules: all-linear
+  r: 16
+batch_size: 4                        # 본 학습 동일 (smoke 시도 4 검증용)
+                                     # smoke 1 (b16) OOM → smoke 2 (b8, fp32) VRAM 94.82% → smoke 3 (b8, bf16) VRAM 94.73%
+                                     # → batch 만 단일 변수 ½ 축소. VRAM ~12GB 안전 영역 기대.
+use_amp: false                       # bf16 효과 없음 (smoke 3 검증) → 제거. DGX 와 동일 fp32.
+steps: 100                           # ★ 본 학습 75000 → smoke 100
+num_workers: 4
+save_freq: 50                        # ★ 본 학습 1000 → smoke 50 (100 step 안에 ckpt 2회)
+log_freq: 10                         # ★ 본 학습 50 → smoke 10 (분해능 ↑)
+wandb_enable: true                   # smoke 도 wandb 기록 — run name 으로 본 학습과 구분
+device: cuda
+push_to_hub: false
+
+dataset_return_uint8: true
+prefetch_factor: 2
+persistent_workers: false
+video_backend: torchcodec
+
+# smoke 도 동일 subset (100ep balanced) — 100 step 만 돌리니 전 episode 안 봄.
+# 그래도 dataset subset 자체는 train 과 동일해야 dataset.episodes 인자 일관.
+dataset_subset_2a:
+  episode_ranges_inclusive:
+    - [0, 99]

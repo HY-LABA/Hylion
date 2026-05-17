@@ -1,0 +1,52 @@
+# prof_computer/leftarm_v2/train_config.yaml — 본 학습 (2A) 설정.
+#
+# DGX 의 dgx/finetune/leftarm_v2/config/train_config.yaml 의 PC 적응판:
+#   - 학습 방법론 (LoRA r=16, all-linear, batch 16, steps 20000) — DGX 와 동일.
+#     결정 근거: dgx/docs/finetune/leftarm_v2/model_config.md §3 (A2 채택).
+#   - num_workers — DGX 는 시도1 OOM 후 8→2. PC 는 VRAM·system RAM 분리 모델이라
+#     workers 가 GPU 영향 없음 → DGX 보다 늘려도 안전. 단 smoke test 결과 보고 결정.
+#   - video_backend: torchcodec 명시 — lerobot default 와 동일하나 명시.
+#                    DGX 가 aarch64 + cu130 으로 torchcodec ABI 깨졌던 게
+#                    PC (x86_64 + cu128) 에선 해결 (learning_log.md 셋업 1 검증).
+#
+# smoke test 용 변형: train_config_smoke.yaml (steps=100, save_freq=50).
+
+policy_path: lerobot/smolvla_base    # 사전학습 체크포인트 (DGX 동일)
+method: lora                         # A2: VLM + expert 양쪽 LoRA adapter
+lora:
+  target_modules: all-linear         # VLM + expert 모든 linear (DGX v1 검증값)
+  r: 16                              # rank — v1 검증값
+batch_size: 4                        # DGX 16 → PC 4 — RTX 3090 24GB 분리 VRAM 제약.
+                                     # smoke 시도 1 (batch 16): CUDA OOM 확정.
+                                     # smoke 시도 2 (batch 8, fp32): VRAM 94.82% plateau — 본 학습 4시간엔 위험.
+                                     # smoke 시도 3 (batch 8, bf16): VRAM 94.73% — bf16 효과 없음 확인.
+                                     # → batch 만 단일 변수로 ½ 추가 축소. VRAM peak ~12GB 안전 영역 기대.
+use_amp: false                       # bf16 효과 없음 확인 (smoke 3) → 변수 단순화 위해 제거 (DGX 와 동일 fp32).
+                                     # 향후 lerobot upstream 이 bf16 경로 개선 시 재검토.
+steps: 75000                         # DGX 의도 (5 epoch on batch 16) 과 동등.
+                                     # 60k frames / batch 4 = 15000 step/epoch → 5 epoch = 75000 step.
+                                     # DGX 의 20000 step (batch 16) 과 학습량 동등 (sample 수 동일).
+                                     # 예상 학습 시간: 75000 × ~0.27s ≈ 5시간 38분 (smoke 4 결과로 외삽 갱신).
+num_workers: 4                       # DGX 2 → PC 4 — PC 는 system RAM·VRAM 분리라
+                                     # workers ↑ 가 GPU 메모리 영향 X. smoke 후 재조정 가능
+save_freq: 1000                      # checkpoint 저장 step 주기
+log_freq: 50                         # wandb/console 로그 주기
+wandb_enable: true                   # entity·project: base_config.accounts
+device: cuda                         # RTX 3090 명시
+push_to_hub: false                   # 체크포인트 자동 Hub push X
+
+# 메모리 안정 옵션 (DGX 시도 1·2 OOM 분석 반영, PC 환경에도 무해)
+dataset_return_uint8: true           # float32→uint8 (IPC 1/4, GPU 변환 — 정확도 영향 0)
+prefetch_factor: 2                   # PC 는 system RAM 압박 회피 여유 — DGX 1 → PC 2
+persistent_workers: false            # workers 재시작 비용 < memory leak 위험
+
+# video backend — lerobot default 와 동일하나 명시 (학습 결과의 환경 의존성 추적용).
+# DGX 는 torchcodec ABI 깨져서 pyav fallback 강제 → buffer leak 사고.
+# PC 는 torchcodec 0.10 정상 import 확인 (learning_log.md 셋업 1).
+video_backend: torchcodec
+
+# 2A dataset subset — run_train.py 가 episode index 리스트로 expand 해 전달.
+# P 방식 (100ep balanced): task1 [0..49] + task2 [50..99] = ep 0~99 연속.
+dataset_subset_2a:
+  episode_ranges_inclusive:
+    - [0, 99]                        # = list(range(0, 100)) — 100 ep balanced

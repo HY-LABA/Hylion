@@ -111,7 +111,67 @@ JetPack 판별 근거:
      참조 경로: docs/storage/legacy/arm_2week_plan/others/02_datacollector_separate_node/docs_storage_07_datacollector_venv_setting.md -->
 DataCollector venv 상세는 ~~`docs/storage/07_datacollector_venv_setting.md`~~ → **legacy 이관**: `docs/storage/legacy/arm_2week_plan/others/02_datacollector_separate_node/docs_storage_07_datacollector_venv_setting.md` 참조 (DataCollector 노드 운영 종료 — 06 결정).
 
-## 7) 추가 확인 필요 항목
+## 7) prof_computer 실측 소프트웨어 정보 (2026-05-16 등록, 2026-05-17 본 학습 완주) — DGX 보조 학습 노드
+
+> [02_hardware.md §6](02_hardware.md) 의 소프트웨어 측 대응. [prof_train_setting.md](prof_train_setting.md) §1 옵션 #1 (로컬 GPU PC) 의 구체 구현. 작업 영역: `smolVLA/prof_computer/`. venv·의존성은 `smolVLA/prof_computer/scripts/setup_env.sh` 에서 관리.
+
+### 7-1) 호스트 (Windows) 측
+
+- OS: `Windows 10 Home 22H2` (build `19045.6466`)
+- WSL2: `2.7.3.0`, kernel `6.6.114.1-microsoft-standard-WSL2`, WSLg `1.0.73`
+- WSL distro: `Ubuntu-22.04` (학습용, §7-2), `docker-desktop` (자체 distro — 학습 무관)
+- NVIDIA 드라이버 (Windows): `560.94` (CUDA 13 지원, WSL2 GPU passthrough 노출)
+- `.wslconfig` (2026-05-16 작성, `C:\Users\admin\.wslconfig`):
+  - `memory=48GB` / `processors=12` / `swap=16GB` / `localhostForwarding=true`
+  - 근거: DGX training_log 의 5GB/min 누수 가설 잔존 시 헤드룸 확보. 본 학습 (2026-05-17) 에서 누수 0 확인 — 32GB 영역에서도 충분함 입증
+- Python (Windows side): `3.12.x` (`C:\Users\admin\AppData\Local\Programs\Python\Python312\python.exe`) — 학습 미사용 (코드 편집·문서 작업용)
+
+### 7-2) WSL Ubuntu 측 (학습 distro)
+
+- OS: `Ubuntu 22.04.5 LTS` (jammy), kernel `6.6.114.1-microsoft-standard-WSL2`
+- 사용자: `laba` (uid=1000, `sudo`·`docker` 그룹 소속)
+- Python:
+  - 시스템 default: `3.10.12` (Ubuntu 22.04 표준) — **lerobot 요구 미달**
+  - **학습용**: `3.12.x` (deadsnakes PPA, 시스템 3.10 과 병존) — lerobot 0.5.2 `requires-python = ">=3.12"` (`docs/reference/lerobot/pyproject.toml:32`) 충족용
+  - venv: `prof_computer/.venv_arm_finetune` (`python3.12 -m venv` 로 생성)
+- GPU 접근: `nvidia-smi` WSL 내 동작 확인 (RTX 3090 24576 MiB, driver 560.94)
+- CUDA toolkit (nvcc): **미설치** (학습엔 PyTorch wheel 의 bundled CUDA runtime 사용)
+- 설치된 핵심 apt 패키지: `git 2.34.1`, `curl 7.81.0`, `rsync 3.2.7`
+- **셋업 시 추가 설치** (`prof_computer/scripts/setup_env.sh` 가 안내):
+  - `software-properties-common` (PPA 추가용)
+  - deadsnakes PPA → `python3.12`, `python3.12-venv`, `python3.12-dev`
+  - `python3-pip`, `build-essential`, `ffmpeg`, `v4l-utils`
+- HF Hub / wandb 로그인: `.venv_arm_finetune/.env` 에 `HF_TOKEN` + `WANDB_API_KEY` 저장 → venv activate 시 자동 `set -a` source (`.gitignore` 의 `.env` 패턴으로 git push 차단)
+
+### 7-3) 의존성 트랙 — DGX 와의 정합성
+
+**핵심 원칙**: `smolVLA/docs/reference/lerobot/` 의 editable install — DGX (`dgx/`) 와 동일.
+
+| 항목 | DGX (시연장) | prof_computer (PC) | 비고 |
+|---|---|---|---|
+| Python | `3.12.3` (시스템 — Ubuntu 24.04) | `3.12.x` (deadsnakes PPA — Ubuntu 22.04) | 메이저.마이너 동일 |
+| lerobot | `docs/reference/lerobot/` editable | 동일 | submodule 공유 |
+| **PyTorch** | `torch==2.10.0+cu130` (GB10 Blackwell) | **`torch==2.10.0` (cu128 wheel)** | torch 메이저·마이너 동일, CUDA wheel 만 칩 차이. lerobot 공식 `requirements-ubuntu.txt` 가 cu128 영역 lock |
+| extras | `[smolvla,training,hardware,feetech]` | `[smolvla,training,peft]` | PC 는 학습 전용 (hardware/feetech 제외), peft 명시 (LoRA fine-tune 필수 — setup 초기 누락으로 본 학습 진입 시 발견) |
+| **video backend** | pyav default (torchcodec aarch64 ABI 미스매치) | **torchcodec 0.10.0** ✅ | DGX OOM 사고 직접 원인 vs PC 정상 — prereq spec 02 가설 직접 검증 |
+| 데이터셋 캐시 | `~/smolvla/.hf_cache` (DGX 로컬) | `~/.cache/huggingface` (WSL `/dev/sdd` 가상디스크) | 둘 다 HF Hub lazy fetch |
+| 학습 산출물 | `~/smolvla/dgx/outputs/<run>/` | `~/prof_computer_runs/<run>/` | wandb run name `_pc_` 접두로 구분 |
+
+### 7-4) 본 학습 검증 (2026-05-17, leftarm_v2 2A)
+
+| 항목 | 값 |
+|---|---|
+| 도달 step | 75000 / 75000 (5.5 epoch) |
+| 학습 시간 | 7시간 34분 |
+| step time | 0.343 s/step (DGX 시도 1 의 2.7 s/step 대비 5× 빠름) |
+| VRAM peak | 60.67% (~14.7 GB / 24 GB) |
+| System RAM 누수 | 0.18 GB/h (DGX 시도 2 의 1.25 GB/min 대비 400× 감소) |
+| GPU temp peak | 83°C |
+| loss min / final | 0.013 / 0.04 (DGX 시도 1 step 350 loss 0.292 대비 압도적 수렴) |
+
+→ `prereq spec 02_prereq_dataset_video_to_image` 가설 (torchcodec 정상 환경에선 DGX OOM 재현 불가) 직접 증명. 상세: `smolVLA/prof_computer/docs/learning_log.md`.
+
+## 8) 추가 확인 필요 항목
 
 - [x] Orin 시스템 소프트웨어 재검증 완료 (2026-04-23)
   - `nvcc -V` 정상 출력 (`release 12.6, V12.6.68`)
