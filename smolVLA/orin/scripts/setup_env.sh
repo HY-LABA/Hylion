@@ -164,6 +164,10 @@ except Exception as e:
     sys.exit(1)
 PYEOF
 
+# ── 6-b. peft 설치 검증 (leftarm_v2 LoRA adapter 추론용 — TODO-03-G) ──────────
+echo "[setup] peft import 검증 중..."
+python -c "import peft; print(f'  peft: {peft.__version__} ✓')" || { echo "[ERROR] peft import 실패 — pip install peft>=0.18.0 재시도 또는 venv 재구성 필요"; exit 1; }
+
 echo ""
 echo "══════════════════════════════════════════════════════"
 echo " 환경 설치 완료!"

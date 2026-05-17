@@ -34,3 +34,16 @@
 |---|------|--------|----------|------|
 | 7 | TODO-02 — DGX 110ep 변환 실행 + 디스크 사용량 측정 + LeRobotDataset 로드 smoke. 변환 자동화 (스크립트 작성·deploy·dry-run skip) 까지는 완료. 사용자가 학습 종료 후 `nohup python finetune/leftarm_v2/convert_to_image.py ... &` 백그라운드 실행 시작 (또는 시작 예정). 결과 보고 대기. | DGX 110ep 변환 완료 후 사용자 결과 보고 (성공/실패, 디스크 사용량, smoke 결과) | 중간 (다음 사이클 진입 시 즉시 처리) | 미완 (사용자 PHYS_REQUIRED 진행 중) |
 | 8 | TODO-03 — image dataset 으로 train_config 갱신 + 시도 4 학습 진입 (첫 1000 step ckpt 도달 + OOM 없음 + wandb 기록). best practice 보고서 §7 권장 (bfloat16 명시) 적용 검토 포함. | TODO-02 완료 보고 후 (#7 트리거 도래) | 중간 | 미완 |
+
+## [02_leftarm_v2_finetune (TODO-03 사이클) — code-tester Recommended 항목]
+
+> 2026-05-17 code-tester 가 READY_TO_SHIP verdict 와 함께 발견. 본 사이클 강제 의무 아님 — 기존 *README 트리 drift* 의 연장. M1.5 Coupled Rules §6 일관 적용 대상.
+
+| # | 항목 | 발견 출처 | 우선순위 | 상태 |
+|---|------|-----------|----------|------|
+| 9 | `prof_computer/README.md` 트리에 신규 `docs/orin_eval_2026-05-17.md` 미등록 (기존 docs 인덱스 부재 연장 — M1.5 reflection §6 본문 정정 의무 일관 적용). 추후 `prof_computer/docs/README.md` 신설 또는 `prof_computer/README.md` 의 docs/ 섹션 정정. | 2026-05-17 code-tester TODO-03-A | 낮음 | 미완 |
+| 10 | `orin/README.md` 트리에 신규 `scripts/run_inference_leftarm_v2.sh` 미등록 (기존 scripts/ 섹션 drift 연장 — `orin/scripts/README.md` 는 신설했으나 `orin/README.md` 본문은 미갱신). | 2026-05-17 code-tester TODO-03-B | 낮음 | 미완 |
+| 11 | [ad-hoc] rotation 정합 복원 — `orin/inference/leftarm_v2_inference.py` 의 `OpenCVCameraConfig` 생성 시 rotation/width/height 누락 → 추론이 수집 분포와 불일치 (top: 640x480 NO_ROTATION ≠ 480x640 CCW90). `cameras.json` schema 확장 (rotation/width/height/fps/fourcc 추가) + `apply_gate_config` 파라미터 추출 + `OpenCVCameraConfig` 생성부 slot별 파라미터 적용으로 수정 완료 (TODO-03-H 2026-05-18). | 2026-05-18 시연장 직전 ad-hoc 발견 → 즉시 fix | 높음 | 완료 |
+| 12 | [ad-hoc] DGX cal 파일 (`leftarm_test_follower.json`) → Orin lerobot 캐시로 transfer + `leftarm_v2_inference.py` line 387 의 `--follower-id` default `hylion_follower` → `leftarm_test_follower` 로 수정 (수집 시 base_config.yaml robot.id 와 정합). 시연장에서 사용자가 발견 (cal 프롬프트 무한 hang). 메인이 SSH 로 즉시 transfer + Edit + scp 재배포. devPC ↔ Orin 정합 유지. | 2026-05-18 시연장 ad-hoc | 중간 | 완료 |
+| 13 | [ad-hoc] `orin/scripts/run_inference_leftarm_v2.sh` line 254 `--max-steps 50` 을 Orin 에서 *직접 sed* 로 500 → 1000 으로 임시 변경 (시연장 단축 trial). devPC 의 wrapper 는 *기존 500 그대로* — Orin ↔ devPC 비동기 상태. 다음 사이클에서 *학습 방법 점검 후 적정 max-steps 결정* 시 정식 동기화 (env 패턴 또는 default 값 정합). | 2026-05-18 시연장 ad-hoc | 중간 | 미완 (다음 사이클 정식 처리) |
+| 14 | task1·task2 *단축 결과 (0/2 = 0%)* → 본 사이클 인프라 검증 (Orin SSH·deploy·lerobot trim·LoRA 로드·cal·rotation·camera config) 모두 *작동* 확인. **다음 사이클은 데이터·학습 방법 만 결정**. 4개 영역: (1) 학습 방법 (LoRA r·target·dropout / VLM trainable / epoch / lr·scheduler·batch), (2) 데이터셋 확장 (M1 잔여 100ep + 다른 사람 + orientation 5:5 균형 + 위치 분포), (3) 학습 노드 (prof_computer vs DGX 재시도), (4) 검증 시점 패턴 (정성 + 정량). | 2026-05-18 Phase 3 결과 | 높음 | 다음 사이클 Phase 1 의 핵심 입력 |

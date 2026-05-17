@@ -22,7 +22,9 @@
 
 | 파일 | 책임 | 출처 |
 |---|---|---|
-| `hil_inference.py` | SmolVLA 사전학습/학습 ckpt 로 실 SO-ARM hardware-in-the-loop 추론. dry-run / live 두 모드 + 안전 장치 (n_action_steps=5, SIGINT 핸들러, try/finally disconnect, `--flip-cameras`) | 03_smolvla_test_on_orin TODO-07 산출물 (2026-04-29 작성, 04 TODO-O2b 에서 `orin/examples/tutorial/smolvla/` 로부터 이관) |
+| `hil_inference.py` | SmolVLA 사전학습 ckpt (`lerobot/smolvla_base`) 로 실 SO-ARM hardware-in-the-loop 추론. dry-run / live 두 모드 + 안전 장치 (n_action_steps=5, SIGINT 핸들러, try/finally disconnect, `--flip-cameras`). **사전학습 ckpt 책임 보존 — 갱신 X** | 03_smolvla_test_on_orin TODO-07 산출물 (2026-04-29 작성, 04 TODO-O2b 에서 `orin/examples/tutorial/smolvla/` 로부터 이관) |
+| `lego_v1_inference.py` | BaboGaeguri/lego_v1 fine-tune ckpt (lerobot/smolvla_base fine-tune) HIL 추론. fourcc=MJPG (USB 2.0 hub), overview/wrist 카메라 키, GATE_CAMERA_ALIAS. | 08_final_e2e TODO 산출물 |
+| `leftarm_v2_inference.py` | v2 학습 ckpt (`BaboGaeguri/leftarm_v2_A2_pc_2026-05-17`) + LoRA adapter + rename_map 추론. task1/task2 CLI 인자로 instruction 분기. USER_OVERRIDE 2026-05-18 옵션 W 결과 (lerobot-record 폐기 → 신규 entry 작성). peft>=0.10.0 필요. | 02_leftarm_v2_finetune TODO-03-F (2026-05-18) |
 
 ## 자산 (예정 — 후속 마일스톤별 추가)
 
@@ -30,8 +32,7 @@
 
 | 시점 | 자산 | 사유 |
 |---|---|---|
-| 05_leftarmVLA TODO-14 | `hil_inference.py` 갱신 (학습 ckpt 인자 추가) | 사전학습 → 학습 ckpt 전환 |
-| 향후 | `archive/` 디렉터리 또는 `<milestone>/` 하위 디렉터리 | 정책 버전 분기 시 (지금은 단일 entry 라 불필요. 05 진입 시 검토) |
+| 향후 | `archive/` 디렉터리 또는 `<milestone>/` 하위 디렉터리 | 정책 버전 분기 시 (지금은 단일 entry 라 불필요. 다음 milestone 진입 시 검토) |
 
 ---
 
@@ -45,6 +46,8 @@
 ---
 
 ## 사전 단계 — 카메라 인덱스 발견 (03 BACKLOG #15)
+
+`orin/config/cameras.json` 에는 `index` 외에도 `rotation`, `width`, `height`, `fps`, `fourcc` 필드가 있으며, `leftarm_v2_inference.py` 가 이를 읽어 `OpenCVCameraConfig` 를 구성한다 (수집/학습 base_config.yaml 의 카메라 설정과 정합 — TODO-03-H 2026-05-18). 시연 전 `cameras.json` 의 `index` 만 채우면 되고, 나머지 필드는 기본값이 기재돼 있어 변경 불필요.
 
 hil_inference.py 실행 전 **반드시** 카메라 인덱스를 확인하라.
 Linux 에서 카메라 인덱스(/dev/videoN)는 재부팅·USB 재연결 시 변경될 수 있다.

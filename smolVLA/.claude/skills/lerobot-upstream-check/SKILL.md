@@ -117,6 +117,36 @@ upstream (`lerobot/src/lerobot/`) 대비 변경 이력 누적:
 
 > 본 파일은 이름과 달리 lerobot 코드 diff 가 아닌 **DGX 측 wrapper 스크립트 변경 이력**. DGX 는 `docs/reference/lerobot/` 를 editable install 하므로 lerobot 코드 자체 diff 는 0 — `setup_finetune_env.sh`, `smoke_test.sh`, `preflight_check.sh` 등 보정 wrapper 변경만 기록.
 
+## 외부 CLI entry 채택 시 trim 호환성 사전 점검 (02_leftarm_v2_finetune 도출)
+
+> **사용 시점**: Phase 1 spec 작성 또는 planner 분석 시 `lerobot-record`, `lerobot-train`, `lerobot-eval` 등 외부 CLI entry 를 추론·수집·평가 명령으로 채택하기 전 필수.
+>
+> **도입 사유**: 02_leftarm_v2_finetune TODO-03 사이클 (2026-05-18) — Phase 1 에서 `lerobot-record --policy.path` 를 추론 entry 로 채택했으나, `orin/lerobot/` trim 에 없는 모듈 4개를 `lerobot_record.py` 가 top-level import (양파 구조). prod-test 2 cycle FAIL 후 End-B 분기 → USER_OVERRIDE 옵션 W → 신규 entry (`leftarm_v2_inference.py`) 작성. Phase 1 사전 grep 으로 조기 회피 가능했던 패턴.
+
+### 검증 절차
+
+```bash
+# 1. orin trim 에 포함된 모듈 목록 확인
+ls orin/lerobot/
+
+# 2. 채택 예정 CLI entry 의 top-level import 확인
+head -150 orin/lerobot/scripts/lerobot_record.py | grep -E "^from|^import"
+
+# 3. 각 import 모듈이 orin trim 에 존재하는지 대조
+# 예: "from lerobot.common.control_utils import ..." → orin/lerobot/common/ 존재?
+ls orin/lerobot/ | grep -E "common|datasets|teleoperators"
+```
+
+### 해석
+
+| 결과 | 대응 |
+|---|---|
+| import 모듈이 trim 에 *모두* 있음 | CLI entry 사용 가능 (Category B 주의) |
+| 일부 missing — *optional* import (try/except 또는 lazy import 가능) | try/except wrap 검토 (lerobot_record.py F1 reachy2_camera 패턴 참조) |
+| 일부 missing — *핵심 경로* 의존성 (Dataset·Teleoperator·Control 등) | CLI entry 사용 X, 신규 inference entry 작성 권고 (orin/inference/ 패턴) |
+
+**note**: `lerobot_record.py` 는 *수집 명령* 으로 `datasets`·`teleoperators`·`common.control_utils` 가 핵심 경로 의존성 — try/except 로 해결 불가. Orin inference-only trim 과 *본질적 양립 불가*. 동일 패턴 의심 시 새 entry 작성이 정합.
+
 ## 변경 시 체크리스트
 
 - [ ] 옵션 B 원칙 준수 (upstream 디렉터리·파일 보존)?

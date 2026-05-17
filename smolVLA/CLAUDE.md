@@ -64,6 +64,15 @@ spec 의 모든 todo 를 **자율 처리**. 사용자는 `/observe` 로 read-onl
 
 - max 2 cycle. 그래도 MAJOR 면 todo 실패 마킹 (다른 todo 는 계속 진행, BACKLOG 추가 X).
 
+#### prod-test-runner 사이클 정책 (02_leftarm_v2_finetune 도출, 2026-05-18)
+
+- max 2 cycle. 그래도 FAIL 이면 orchestrator 가 사용자에게 분기 prompt (**End-B 후보**).
+- 사용자 분기 선택:
+  - (a) 신규 todo 추가 후 재시도 (planner 재호출, Phase 2 재진입)
+  - (b) entry / 접근 방식 변경 (`USER_OVERRIDE` — 예: 02_leftarm_v2_finetune TODO-03 의 옵션 W = lerobot-record → leftarm_v2_inference.py 신설)
+  - (c) spec 종료 (End-B 실패) — BACKLOG 이관 + 다음 사이클 재고
+- **Category B 영역 FAIL 은 max 2 cycle 이전에도 즉시 사용자 게이트** (자동 재시도 X 원칙 우선). prod-test-runner 가 FAIL 사유 분석 시 변경 대상이 Category B 영역에 해당하면 cycle 1 에서도 즉시 보고.
+
 #### awaits_user 항목
 
 - planner 가 "사용자 결정 필요" 분류한 todo 는 답 받기 전까지 dispatch X.
@@ -265,3 +274,4 @@ skill·hook·CLAUDE.md 갱신 시 (reflection 결과):
 - **검증**: prod-test-runner verdict ∈ {AUTOMATED_PASS, NEEDS_USER_VERIFICATION}.
 - **spec 종료**: Phase 3 사용자 검증 통과 + reflection 갱신 제안 처리 + `/wrap-spec` 완료.
 - **항상 보고**: 무엇이 변했는지·왜 변했는지·어떻게 검증했는지·잔여 리스크.
+- **DOD 분기 결정 항목** (02_leftarm_v2_finetune 도출, 2026-05-18): spec 에 "X 이면 Y 경로, Z 이면 W 경로" 형태의 *분기 결정 DOD 항목* 이 있으면, 해당 분기 기준점 도달 자체가 DOD 충족임. 분기 결정 후 선택된 경로의 첫 단계만 확인하면 됨 — 모든 분기를 시도할 필요 없음. (예: TODO-03(d) "0~20% 영역 → 재정렬 / 50%+ → M2 본 학습 진입" 의 *분기 결정 자체* 가 본 DOD. 단축 trial 로 0-20% 확정 = DOD 충족). planner 는 검증 큐 구성 시 *분기 결정 = DOD* 임을 인식할 것.

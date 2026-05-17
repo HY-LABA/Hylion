@@ -80,7 +80,11 @@ import torch
 
 from lerobot.cameras import CameraConfig  # noqa: F401
 from lerobot.cameras.opencv import OpenCVCameraConfig  # noqa: F401
-from lerobot.cameras.reachy2_camera import Reachy2CameraConfig  # noqa: F401
+try:
+    from lerobot.cameras.reachy2_camera import Reachy2CameraConfig  # noqa: F401
+except ImportError:
+    # orin trim — reachy2_camera 모듈 미포함 (inference-only, SO-ARM 작업 무관)
+    pass
 from lerobot.cameras.realsense import RealSenseCameraConfig  # noqa: F401
 from lerobot.cameras.zmq import ZMQCameraConfig  # noqa: F401
 from lerobot.common.control_utils import (

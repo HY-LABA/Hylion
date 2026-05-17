@@ -52,6 +52,21 @@ spec 작성 시점에 *언급된 파일·경로* 가 실제 존재하는지 검�
 - 가정 명시 (확신 vs 확인 필요)
 - Category B/C 영역 변경 포함?
 
+#### 3-a. researcher 선행 호출 트리거 명시 (02_prereq 갱신 전파 + 02_leftarm_v2_finetune 도출)
+
+다음 케이스에서 planner 는 plan.md 완성 전 orchestrator 에 *researcher 선행 호출* 을 권고:
+
+- **새 외부 CLI entry 채택 가정** (lerobot-record/eval/train 등) — trim 호환성·dependency 매트릭스 불명확 시. `lerobot-upstream-check` SKILL §외부 CLI entry 채택 시 trim 호환성 사전 점검 절차 활용
+- **외부 환경 default 동작 가정** (config 미명시 파라미터, DGX/Orin 의 라이브러리 버전 의존 동작 — 02_prereq video_backend default 사례)
+- **수집 ↔ 추론 cross-config 정합** 이 불명확한 경우 (camera·robot 설정 포함 — §6-b 참조)
+
+researcher 선행 호출 시 plan §확인 필요 가정 에 *"researcher 결과 대기 (awaits_researcher)"* 표시.
+결과 후 plan §확신 가정 으로 이동 또는 spec 수정 권고.
+
+**도입 사유** (02_leftarm_v2_finetune reflection 2026-05-18): 02_prereq 사이클에서 researcher.md 에 환경 진단 표준 시퀀스가 추가됐으나, 본 사이클에서 *planner 가 researcher 를 호출하지 않아* 효과 미발현. lerobot-record trim 불일치 + rotation/follower-id 정합 누락 패턴이 *재발*. planner 가 plan 작성 중 *도메인 지식 부족* 을 감지한 경우의 escalation 절차로 본 절 신설.
+
+기존 정책 (researcher 는 spec 진입 시 또는 큰 가설 변경 시 메인이 호출) 유지. 본 절은 *planner 가 plan 작성 단계에서 추가 escalation*.
+
 ### 4. DAG 구성
 
 - 같은 영향 영역에 의존 없는 todo 들 → **병렬 그룹**
@@ -93,6 +108,25 @@ todo 가 *대규모* interactive CLI entry (`main.sh`, `interactive_cli/` 류, �
 prod-test-runner §4-a 가 본 시나리오 따라 runtime smoke 실행. 누락 시 사용자 walkthrough 단계에서 회귀 발견 (07 walkthrough trigger todo 11건 패턴 재발).
 
 **적용 범위 조절**: 단순 wrapper 스크립트 (단일 명령 실행 류) 는 시나리오 의무 X — 권고 수준. 다단계 메뉴·flow 분기 포함 시만 의무화. 오버 엔지니어링 회피.
+
+#### 6-b. 추론 entry 작성 시 수집-추론 정합 매트릭스 점검 (02_leftarm_v2_finetune 도출)
+
+todo 가 *새 추론 entry 작성* 또는 *기존 entry 의 학습 ckpt 교체* 를 포함하면, planner 가 plan 작성 전 다음 *수집 ↔ 추론 정합 매트릭스* 를 Read 로 점검하고 plan.md §확인 필요 가정 에 기록:
+
+| 정합 항목 | 수집 측 확인 위치 | 추론 측 확인 위치 |
+|---|---|---|
+| camera rotation | `dgx/finetune/<era>/config/base_config.yaml` cameras.*.rotation | `orin/config/cameras.json` rotation 필드 + entry 의 OpenCVCameraConfig 생성부 |
+| camera dimension (width/height) | `base_config.yaml` cameras.*.width/height | 동상 |
+| camera fourcc | `base_config.yaml` cameras.*.fourcc | 동상 |
+| robot.id (follower-id) | `base_config.yaml` robot.id | 추론 entry 의 `--follower-id` default 값 |
+| cal 파일 위치·이름 | DGX 의 `~/.cache/lerobot/calibration/.../<id>.json` 또는 base_config.yaml robot.calibration_dir | Orin 의 `~/.cache/huggingface/lerobot/calibration/.../<id>.json` |
+| max-steps (wrapper) | 학습 config 의 n_action_steps | 추론 wrapper `--max-steps` default 또는 환경 변수 |
+
+점검 결과 → plan.md §확신 가정 또는 §확인 필요 가정 에 명시. 정합 불일치 발견 시 → task-executor 가 추론 entry 작성 시 함께 수정하도록 plan 에 명시.
+
+**도입 사유** (02_leftarm_v2_finetune 2026-05-18): TODO-03 사이클에서 4건 ad-hoc fix (rotation·follower-id·cal·max-steps) 가 모두 시연장 직전·중 발견됨. Phase 1 에서 본 매트릭스 점검만 했어도 정식 플로우 처리 가능했음.
+
+**적용 범위 조절**: 추론 entry *신규 작성* 또는 *ckpt 교체* 시만 의무. 단순 스크립트 래핑 변경 시는 권고 수준.
 
 ### 7. `context/plan.md` 작성
 

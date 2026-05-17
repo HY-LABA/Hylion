@@ -32,6 +32,9 @@ smolvla = [
     "transformers==5.3.0",
     "num2words>=0.5.14,<0.6.0",
     "accelerate>=1.7.0,<2.0.0",
+    # peft: leftarm_v2 LoRA adapter 추론에 필요. upstream smolvla extra 에는 미포함 (별도 peft-dep extra).
+    # spec 02 TODO-03-G, 사용자 승인 2026-05-18 (옵션 1)
+    "peft>=0.18.0,<1.0.0",
 ]
 hardware = [
     "pynput>=1.7.8,<1.9.0",

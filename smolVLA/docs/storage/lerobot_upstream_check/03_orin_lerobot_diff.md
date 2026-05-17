@@ -343,6 +343,43 @@ docstring 의 CLI 예시 인자에서 `so100_follower` / `so100_leader` → `so1
 
 ---
 
+### [2026-05-17] `scripts/lerobot_record.py` — reachy2_camera import try/except wrap (TODO-03-E F1)
+
+**대상 파일:** `orin/lerobot/scripts/lerobot_record.py`
+
+**변경 내용:**
+
+```python
+# before (upstream 그대로 — orin trim 과 불일치)
+from lerobot.cameras.reachy2_camera import Reachy2CameraConfig  # noqa: F401
+
+# after (orin trim 일관 — ImportError 보호)
+try:
+    from lerobot.cameras.reachy2_camera import Reachy2CameraConfig  # noqa: F401
+except ImportError:
+    # orin trim — reachy2_camera 모듈 미포함 (inference-only, SO-ARM 작업 무관)
+    pass
+```
+
+**변경 이유:**
+
+upstream 이 `cameras/reachy2_camera/` 서브모듈을 추가했으나, `orin/lerobot/cameras/` trim 에는 해당 폴더가 없음. `lerobot-record --help` 포함 CLI 전체가 `ModuleNotFoundError: No module named 'lerobot.cameras.reachy2_camera'` 로 실패하는 FAIL (F1) 상태였음.
+
+수정 방향: 사용자 승인 **옵션 A** — try/except ImportError 로 wrap. upstream 코드 흐름 최대 보존 + Orin trim 불일치 해소. reachy2_camera 는 Reachy2 로봇 전용이며 SO-ARM 작업 무관 (dead code).
+
+**영향 범위:**
+
+| 기능 | 영향 |
+|---|---|
+| `lerobot-record` CLI 가용성 | 복원 (--help 포함 정상 진입 가능) |
+| SO-ARM 추론 경로 | 없음 (Reachy2CameraConfig 은 SO-ARM 작업에서 미사용) |
+| Reachy2 카메라 사용 | orin trim 에서 원래 미지원 — 변경 없음 |
+| upstream 동기화 | 최소 변경 유지 — import 보호만 추가 |
+
+**inference-only 트리밍 여부:** yes — reachy2_camera 는 Reachy2 로봇 전용 카메라 모듈. SO-ARM inference-only 트림에서 미포함.
+
+---
+
 ## upstream 동기화 시 재확인 항목
 
 `orin/lerobot/`을 upstream에서 재동기화할 때 아래 파일들이 변경되었는지 확인하고, 필요 시 변경 이력을 추가한다.

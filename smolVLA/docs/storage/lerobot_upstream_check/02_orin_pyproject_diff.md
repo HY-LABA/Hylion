@@ -50,7 +50,7 @@ orin은 실행에 필요한 3개 extra만 유지하며, 중첩 참조 없이 패
 
 | extra | upstream 방식 | orin 방식 |
 |---|---|---|
-| `smolvla` | `lerobot[transformers-dep]` (간접) | `transformers==5.3.0` (직접) |
+| `smolvla` | `lerobot[transformers-dep]` (간접) + peft 미포함 | `transformers==5.3.0` (직접) + `peft>=0.18.0,<1.0.0` (직접, 2026-05-18 추가) |
 | `hardware` | `lerobot[pynput-dep]`, `lerobot[pyserial-dep]`, `lerobot[deepdiff-dep]` | `pynput`, `pyserial`, `deepdiff` (직접) |
 | `feetech` | `feetech-servo-sdk`, `lerobot[pyserial-dep]`, `lerobot[deepdiff-dep]` | 직접 나열 |
 | `zmq` | 동일 (`pyzmq`) | — |
@@ -101,6 +101,55 @@ orin에 없는 섹션:
 ---
 
 ## 변경 이력
+
+### [2026-05-18] peft 의존성 추가 — leftarm_v2 LoRA adapter 추론 (spec 02 TODO-03-G)
+
+**변경 파일:** `orin/pyproject.toml` `[project.optional-dependencies]` `smolvla` 섹션
+
+**변경 내용:**
+
+```toml
+# Before
+smolvla = [
+    "transformers==5.3.0",
+    "num2words>=0.5.14,<0.6.0",
+    "accelerate>=1.7.0,<2.0.0",
+]
+
+# After
+smolvla = [
+    "transformers==5.3.0",
+    "num2words>=0.5.14,<0.6.0",
+    "accelerate>=1.7.0,<2.0.0",
+    # peft: leftarm_v2 LoRA adapter 추론에 필요. upstream smolvla extra 에는 미포함 (별도 peft-dep extra).
+    # spec 02 TODO-03-G, 사용자 승인 2026-05-18 (옵션 1)
+    "peft>=0.18.0,<1.0.0",
+]
+```
+
+**변경 이유:**
+
+`leftarm_v2_inference.py` (TODO-03-F 산출물) 가 DGX 에서 생성된 LoRA adapter checkpoint 를 로드하기 위해 `peft` 라이브러리 필요. Orin SSH 환경 확인 결과 peft 미설치 (BLOCKER) 로 확인됨.
+
+upstream lerobot `smolvla` extra 조사 결과 (`docs/reference/lerobot/pyproject.toml` line 183):
+```toml
+smolvla = ["lerobot[transformers-dep]", "num2words>=0.5.14,<0.6.0", "accelerate>=1.7.0,<2.0.0"]
+```
+peft 는 smolvla extra 에 **미포함** — 별도 `peft-dep = ["peft>=0.18.0,<1.0.0"]` extra 로 관리됨 (**분기 B**).
+
+**버전 범위 근거:** upstream `peft-dep = ["peft>=0.18.0,<1.0.0"]` (line 134) 그대로 채택. aarch64/cp310 PyPI wheel 존재 확인 필요 (prod-test-runner cycle 3 의무).
+
+**함께 변경된 파일:**
+- `orin/scripts/setup_env.sh` — §6-b: peft import 검증 라인 추가 (Coupled Rule §1)
+
+**영향:**
+- Orin venv 재 install 의무: `pip install -e orin/[smolvla,hardware,feetech]` 재실행 — prod-test-runner cycle 3 에서 SSH 로 진행
+- 디스크 영향: peft 자체는 경량 (~수 MB), transitive 의존성 (tqdm, huggingface-hub 등) 대부분 이미 설치됨
+- aarch64 wheel 가용성: PyPI 에 peft>=0.18.0 aarch64 wheel 존재하나 실 install 시 확인 필요 (pure-Python 패키지이므로 플랫폼 무관 가능성 높음)
+
+**출처:** spec 02 TODO-03-G, 사용자 승인 2026-05-18 (옵션 1 — 정식 pyproject 갱신)
+
+---
 
 ### [2026-04-23] 초기 작성 + torch 의존성 관리 방식 변경
 
