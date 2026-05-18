@@ -1,7 +1,10 @@
 #!/usr/bin/env python3
-"""prof_computer/finetune/leftarm_v2/run_train_camera_empty.py — empty_cameras 검증 분기 wrapper.
+"""prof_computer/finetune/leftarm_v2/branches/002_a2_100ep_empty1/run_train.py — 분기 002 학습 wrapper.
 
-run_train.py 의 분리 entry. 단일 변수 (`empty_cameras`) 만 다른 별도 학습 경로:
+분기 식별: 002_a2_100ep_empty1
+  - 매트릭스: A2 (LoRA r=16, target=all-linear)
+  - 데이터: 100ep balanced subset (M1.5 와 동일)
+  - 서브: empty1 (`empty_cameras=1` — base smolvla 의 3 cam 입력 형식 정합)
 
 검증 가설 (2026-05-18):
   - base smolvla 의 config 가 camera1/2/3 3 cam 으로 사전학습됨 (HF Hub config.json 확인)
@@ -12,38 +15,48 @@ run_train.py 의 분리 entry. 단일 변수 (`empty_cameras`) 만 다른 별도
   - empty_cameras=1 로 두면 missing camera3 슬롯을 -1 padded image + mask 0 으로 zero-fill →
     base 의 3 cam 형식 정합 회복
 
-본 분기는 M1.5 와 *단일 변수 (empty_cameras 0→1)* 만 다른 학습:
-  - config: train_config_camera_empty.yaml + train_config_camera_empty_smoke.yaml
-  - output_dir prefix: `leftarm_v2_camera_empty_2a_pc_<ts>` (M1.5 ckpt 와 식별 분리)
-  - run_name 동일 prefix → wandb 에서 검색 분리
+본 분기 = 001_a2_100ep (M1.5 원본) 과 *단일 변수 (empty_cameras 0→1)* 만 차이.
 
-사용 (M1.5 와 동일 venv):
+사용 (분기 디렉터리에서 직접 실행):
   source <prof_computer>/.venv_arm_finetune/bin/activate
-  python run_train_camera_empty.py train --pass smoke           # 100 step 검증
-  python run_train_camera_empty.py train --pass 2a              # 75000 step 본 학습
-  python run_train_camera_empty.py train --pass 2a --dry-run    # 명령만 출력
+  cd <prof_computer>/finetune/leftarm_v2/branches/002_a2_100ep_empty1
+  python run_train.py train --pass smoke           # 100 step 검증
+  python run_train.py train --pass 2a              # 75000 step 본 학습
+  python run_train.py train --pass 2a --dry-run    # 명령만 출력
 
-비교 대상: M1.5 (run_train.py + train_config.yaml, empty_cameras 미명시 = 0)
-  - 동일 dataset (100ep balanced), 동일 LoRA (r=16, all-linear), 동일 batch/steps/optimizer
-  - 차이: 본 분기만 --policy.empty_cameras=1
+공용 자원 (상위 디렉터리):
+  - _lib.py (die, expand_path)
+  - config/base_config.yaml (식별·계정·하드웨어)
 
-결정 근거: prof_computer/docs/model_config.md + 본 사이클 대화 (research_empty_cameras_2026-05-18.md)
+분기 고유 (본 디렉터리):
+  - train_config.yaml (2A 본 학습 — empty_cameras: 1)
+  - train_config_smoke.yaml (smoke 100 step)
+
+학습 산출: ~/prof_computer_runs/<run_name>/  (run_name prefix: leftarm_v2_camera_empty_<pass>_pc_<ts>)
+비교 대상: branches/001_a2_100ep/ (M1.5 원본)
+결정 근거: prof_computer/docs/model_config.md + prof_computer/docs/leftarm_v2/research_empty_cameras_2026-05-18.md
 """
 import argparse
 import os
 import shlex
 import shutil
 import subprocess
+import sys
 from datetime import datetime
 from pathlib import Path
 
 import yaml
 
-from _lib import die, expand_path
+# ── 공용 자원 import (상위 디렉터리의 _lib.py) ──
+SCRIPT_DIR = Path(__file__).resolve().parent              # branches/002_a2_100ep_empty1/
+LEFTARM_V2_DIR = SCRIPT_DIR.parent.parent                 # prof_computer/finetune/leftarm_v2/
+sys.path.insert(0, str(LEFTARM_V2_DIR))
+from _lib import die, expand_path                         # noqa: E402
 
-SCRIPT_DIR = Path(__file__).resolve().parent
-CONFIG_DIR = SCRIPT_DIR / "config"
-TAG = "[run_train_camera_empty]"
+# ── 경로 ──
+BRANCH_DIR = SCRIPT_DIR                                   # 본 분기 디렉터리 (train_config.yaml 위치)
+SHARED_CONFIG_DIR = LEFTARM_V2_DIR / "config"             # base_config.yaml 위치
+TAG = "[002_a2_100ep_empty1]"
 
 
 def _load_yaml(path):
@@ -105,7 +118,7 @@ def cmd_train(args, base, train):
                 "video_backend", "empty_cameras")
     for k in required:
         if train.get(k) is None:
-            die(f"train_config_camera_empty.yaml.{k} 미설정")
+            die(f"train_config.yaml.{k} 미설정")
 
     # ── rename_map: dataset 카메라 키 → smolvla 입력 키 (camera1, camera2, ...) ──
     cam_names = list(base["cameras"].keys())
@@ -149,7 +162,7 @@ def cmd_train(args, base, train):
     if train["method"] == "lora":
         lora = train.get("lora") or {}
         if "target_modules" not in lora or "r" not in lora:
-            die("method=lora 시 train_config_camera_empty.yaml.lora.{target_modules, r} 필요")
+            die("method=lora 시 train_config.yaml.lora.{target_modules, r} 필요")
         cmd += [
             "--peft.method_type=LORA",
             f"--peft.target_modules={lora['target_modules']}",
@@ -158,7 +171,7 @@ def cmd_train(args, base, train):
     elif train["method"] == "full":
         pass
     else:
-        die(f"train_config_camera_empty.yaml.method 는 lora | full (현재: {train['method']!r})")
+        die(f"train_config.yaml.method 는 lora | full (현재: {train['method']!r})")
 
     # ── 요약 출력 ──
     if episodes is None:
@@ -255,11 +268,10 @@ def main():
                     help="명령만 출력, 실행 안 함")
     args = ap.parse_args()
 
-    base = _load_yaml(CONFIG_DIR / "base_config.yaml")
-    # 본 분기 전용 yaml — smoke 와 2a/2b 분리
-    train_yaml = ("train_config_camera_empty_smoke.yaml" if args.pass_name == "smoke"
-                  else "train_config_camera_empty.yaml")
-    train = _load_yaml(CONFIG_DIR / train_yaml)
+    # base_config 는 공용 (상위 디렉터리), train_config 는 분기 고유 (본 디렉터리)
+    base = _load_yaml(SHARED_CONFIG_DIR / "base_config.yaml")
+    train_yaml = "train_config_smoke.yaml" if args.pass_name == "smoke" else "train_config.yaml"
+    train = _load_yaml(BRANCH_DIR / train_yaml)
     if args.action == "train":
         cmd_train(args, base, train)
 

@@ -18,11 +18,11 @@
 
 학습 분기마다 *wrapper + config* 1쌍씩 분리. 분기 정의·결정 근거는 [model_config.md](../../docs/model_config.md) §2 매트릭스.
 
-| 분기 | wrapper | config (본 학습) | config (smoke) | run name prefix |
+| 분기 | 디렉터리 | 변경 변수 | run name prefix | 상태 |
 |---|---|---|---|---|
-| **M1.5 baseline** (A2: LoRA r=16 all-linear) | `run_train.py` | `config/train_config.yaml` | `config/train_config_smoke.yaml` | `leftarm_v2_2a_pc_<ts>` |
-| **camera_empty** (M1.5 + `empty_cameras: 1`) | `run_train_camera_empty.py` | `config/train_config_camera_empty.yaml` | `config/train_config_camera_empty_smoke.yaml` | `leftarm_v2_camera_empty_2a_pc_<ts>` |
-| (향후 신규 분기) | `run_train_<branch>.py` | `config/train_config_<branch>.yaml` | `config/train_config_<branch>_smoke.yaml` | `leftarm_v2_<branch>_2a_pc_<ts>` |
+| **001_a2_100ep** (M1.5 baseline, A2 LoRA r=16 all-linear) | `branches/001_a2_100ep/` | (baseline — 변경 없음) | `leftarm_v2_2a_pc_<ts>` | ✅ 완료 (2026-05-17) |
+| **002_a2_100ep_empty1** (001 + `empty_cameras: 1`) | `branches/002_a2_100ep_empty1/` | `empty_cameras: 0 → 1` | `leftarm_v2_camera_empty_2a_pc_<ts>` | ✅ 완료 (2026-05-18) |
+| (향후 신규 분기) | `branches/<NNN>_<매트릭스>_<ep수>[_<서브>]/` | (해당 변경 명시) | `leftarm_v2_<...>_<pass>_pc_<ts>` | (예정) |
 
 **컨벤션 원칙**:
 - 분기 = *단일 변수* 변경 (비교 깔끔)
@@ -39,22 +39,21 @@ source /mnt/c/Users/admin/Desktop/Hylion/smolVLA/prof_computer/.venv_arm_finetun
 hf auth whoami
 cat ~/.netrc | grep -A2 wandb
 
-# 3. 작업 디렉터리 이동
-cd /mnt/c/Users/admin/Desktop/Hylion/smolVLA/prof_computer/finetune/leftarm_v2
+# 3. 분기 선택 — 해당 분기 디렉터리로 이동
+cd /mnt/c/Users/admin/Desktop/Hylion/smolVLA/prof_computer/finetune/leftarm_v2/branches/001_a2_100ep
+# 또는: cd .../branches/002_a2_100ep_empty1
 
-# 4. 분기 선택 (예: M1.5 baseline)
-#    dry-run 으로 명령 점검
+# 4. dry-run 점검
 python run_train.py train --pass 2a --dry-run
 
 # 5. smoke (100 step, ~1분)
 python run_train.py train --pass smoke
 
-# 6. smoke 통과 시 본 학습 (75000 step, ~7-8시간)
+# 6. smoke 통과 시 본 학습 (75000 step, ~7-9시간)
 python run_train.py train --pass 2a
 ```
 
-분기별 실행: 같은 패턴, wrapper 파일명만 변경.
-- camera_empty 분기: `python run_train_camera_empty.py train --pass smoke|2a`
+→ 모든 분기 *같은 명령 패턴* (`python run_train.py train --pass <smoke|2a|2b>`). 분기 차이 = *어느 디렉터리에서 실행* 인지뿐. 분기 디렉터리 안의 wrapper 가 *공용 _lib.py + base_config.yaml* 을 자동 import.
 
 ## 4) 학습 산출물 경로
 
