@@ -34,14 +34,14 @@ fine-tune 시 어느 part 를 *얼마나* 학습시킬지가 핵심 결정.
 
 [VLM frozen / LoRA / Full FT] × [expert LoRA / Full FT] = 6 옵션. *2026-05-18 확장* — 원 4 옵션 (A1/A2/B1/B2) 의 대각 외 오프-대각 옵션 (C1/C2) 추가, *VLA 의미 보존 여부* 축 도입.
 
-| 옵션 | VLM | expert | trainable (대략) | 메모리/시간 | VLA 의미 보존 | 100ep 적합 | 비고 |
-|---|---|---|---|---|---|---|---|
-| A1 | frozen | LoRA | ~3M | 가장 작음 | ❌ (ACT 화) | ⚠️ paper 권장이나 본 환경 비추 | base 0-shot 우리 환경 무반응 ([learning_log.md §M1.5 추론 후 가설 분리 검증](leftarm_v2/learning_log.md)) — frozen 시 환경 적응 0, expert 가 base VLM representation 위에 매핑만 학습 → 사실상 instruction-conditioned ACT. *2026-05-18 비추 확정* |
-| **A2** | LoRA | LoRA | ~6–12M | 작음 | ✅ 부분 (LoRA r=16) | ✅ **v1 검증, 채택** | M1.5 실측: VLM_vision LoRA 학습량 = EXPERT_lm 과 동등 (ΔB/A 0.486 vs 0.494) — VLM 적응 *실제 작동*. 결과 0% (단축) — *데이터 양 병목* |
-| B1 | frozen | Full FT | ~150M | 중간 | ❌ (ACT 화) | ⚠️ 가능하나 무거움 | A1 의 expert 확장판. VLA 의미 폐기 + 100ep 과적합 위험. lerobot 표준 entry 로 *config 만으로는 불가* — PEFT wrap 이 base 전체 frozen + adapter 만 trainable 강제 ([pretrained.py:303](../../docs/reference/lerobot/src/lerobot/policies/pretrained.py#L303)) |
-| B2 | Full FT | Full FT | ~600M | 큼 | ✅ 최대 | ❌ 100ep 과적합 위험 + RTX 3090 24GB OOM | 200ep + DGX 환경 후 영역 |
-| **C1** | LoRA | Full FT | ~156M | 큼 (24GB 경계) | ⚠️ VLM 측 LoRA 만 살아 *부분 약화* | ⚠️ 코드 수정 필요 | "VLM 적응 유지 + expert capacity ↑". 본 시점 가장 가치 ↑ 후보였으나 lerobot 표준 entry 로 *config 만 불가* (B1 과 동일 이유) — 신규 학습 entry + lerobot 코드 우회 필요. *Phase 1 spec 영역* |
-| C2 | Full FT | LoRA | ~456M | 큼 (24GB 경계) | ✅ VLM 최대 + expert 약 | ⚠️ 코드 수정 + VLM Full FT 100ep 과적합 위험 | wandb 결과 (VLM_text rel_to_\|A\|=0.430 이미 충분 학습) 로 *추가 가치 의문*. 시간 비용 ↑. 본 시점 비추 |
+| 옵션 | VLM | expert | trainable (대략) | 메모리/시간 | VLA 의미 보존 | 100ep 적합 | **300ep 적합** | 비고 |
+|---|---|---|---|---|---|---|---|---|
+| A1 | frozen | LoRA | ~3M | 가장 작음 | ❌ (ACT 화) | ⚠️ paper 권장이나 본 환경 비추 | ⚠️ 본질 동일 — 데이터 ↑ 효과는 expert 단독 학습 안정성 ↑ 이나 *VLA 의미 폐기* 그대로 | base 0-shot 우리 환경 무반응 ([learning_log.md §M1.5 추론 후 가설 분리 검증](leftarm_v2/learning_log.md)) — frozen 시 환경 적응 0, expert 가 base VLM representation 위에 매핑만 학습 → 사실상 instruction-conditioned ACT. *2026-05-18 비추 확정* |
+| **A2** | LoRA | LoRA | ~6–12M | 작음 | ✅ 부분 (LoRA r=16) | ✅ **v1 검증, 채택** | ✅ **권장 영역 안** ([best_practice §4-4](leftarm_v2/lerobot_smolvla_training_best_practice.md): VLA 고성능 300-1200ep, multi-task 100ep/task 권장 — 300ep = task 당 150ep 균형 가정 시 안정 영역) — **003 분기 채택** | M1.5 실측: VLM_vision LoRA 학습량 = EXPERT_lm 과 동등 (ΔB/A 0.486 vs 0.494) — VLM 적응 *실제 작동*. 100ep 결과 0% (단축) — *데이터 양 병목 가설*. 300ep 으로 데이터 확장 검증 진입 (003) |
+| B1 | frozen | Full FT | ~150M | 중간 | ❌ (ACT 화) | ⚠️ 가능하나 무거움 | ⚠️ 과적합 위험 ↓ (300ep / 150M trainable 비율 개선) — 단 *VLA 의미 폐기* 본질 동일 + 여전히 lerobot 코드 우회 필요 | A1 의 expert 확장판. VLA 의미 폐기 + 100ep 과적합 위험. lerobot 표준 entry 로 *config 만으로는 불가* — PEFT wrap 이 base 전체 frozen + adapter 만 trainable 강제 ([pretrained.py:303](../../docs/reference/lerobot/src/lerobot/policies/pretrained.py#L303)) |
+| B2 | Full FT | Full FT | ~600M | 큼 | ✅ 최대 | ❌ 100ep 과적합 위험 + RTX 3090 24GB OOM | ⚠️ 과적합 위험 ↓ (300ep 영역 진입) — 단 RTX 3090 24GB OOM 그대로 (메모리는 step 단위). DGX 학습 재가능 시점만 의미 | 200ep + DGX 환경 후 영역 |
+| **C1** | LoRA | Full FT | ~156M | 큼 (24GB 경계) | ⚠️ VLM 측 LoRA 만 살아 *부분 약화* | ⚠️ 코드 수정 필요 | ✅ **300ep 에서 시도 가치 ↑** — expert Full FT 의 과적합 위험 ↓ 영역 진입 + LoRA r=16 표현력 한계 돌파 가능. *코드 수정 + Phase 1 spec 영역 그대로* | "VLM 적응 유지 + expert capacity ↑". 본 시점 가장 가치 ↑ 후보였으나 lerobot 표준 entry 로 *config 만 불가* (B1 과 동일 이유) — 신규 학습 entry + lerobot 코드 우회 필요. *Phase 1 spec 영역* |
+| C2 | Full FT | LoRA | ~456M | 큼 (24GB 경계) | ✅ VLM 최대 + expert 약 | ⚠️ 코드 수정 + VLM Full FT 100ep 과적합 위험 | ❌ 300ep 도 VLM 600M Full FT 엔 부족 (paper SO100 250ep × multitask 권장과 비교 — VLA 분야 600M Full FT 표준 데이터 양 1000ep+) | wandb 결과 (VLM_text rel_to_\|A\|=0.430 이미 충분 학습) 로 *추가 가치 의문*. 시간 비용 ↑. 본 시점 비추 |
 
 > **VLA 의미 보존 축의 의미**: VLM frozen 분기 (A1/B1) 는 *smolVLA 라는 VLA framework 의 가치 (사전학습 multimodal representation + action 의 통합 학습)* 가 사라지고 사실상 *vision-conditioned action policy = ACT 류* 가 됨. 본 프로젝트가 smolVLA 를 base 로 선택한 이유 자체와 배치되는 분기.
 
@@ -55,13 +55,24 @@ fine-tune 시 어느 part 를 *얼마나* 학습시킬지가 핵심 결정.
   - VLM frozen 분기는 *환경 적응 능력 0 + VLA 의미 폐기* → 본 환경 비추
   - → **VLM 측 학습 신호는 살리는 게 필수** (LoRA 또는 Full FT)
 - **LoRA vs Full FT**: 100ep / 60k frames 는 Full FT 600M (B2) 을 안정 학습시키기엔 부족 (과적합) + RTX 3090 24GB OOM. LoRA 는 trainable params 1–2% 수준이라 100ep 도 안전. *중간 옵션 C1 (expert 만 Full FT)* 은 가치 ↑ 후보지만 lerobot 코드 우회 필요 — 별도 spec 영역.
+- **300ep 영역 변화** (*2026-05-18 데이터 확장 결정 반영*): 데이터가 100ep → 310ep 으로 ~3배 확장되며 일부 옵션의 *과적합 위험* 영역이 변경. 근거: [best_practice §4-4](leftarm_v2/lerobot_smolvla_training_best_practice.md) — multi-task 권장 100ep/task (= 200ep) 초과 + VLA 일반 고성능 300-1200ep 영역 *진입점*. 영역 변화:
+  - A2 (LoRA r=16) — 권장 영역 안 (003 채택)
+  - B1 (expert Full FT) — 100ep 과적합 영역 → 300ep *완화 영역 진입*. 단 lerobot 코드 우회 + VLA 의미 폐기 본질 동일
+  - C1 (LoRA VLM + expert Full FT) — *가장 큰 변화* — 100ep 에선 expert 150M 과적합 위험 영역이었으나 300ep 에선 *시도 가치 영역 진입*. 코드 우회 + Phase 1 spec 영역
+  - B2 / C2 — 600M / 450M Full FT 영역은 *VLA 분야 표준 데이터 양 (1000ep+)* 기준 300ep 도 *여전히 부족* — 본 시점 비추
 - **C1/C2 의 lerobot 표준 entry 불가 이유**: [pretrained.py:303](../../docs/reference/lerobot/src/lerobot/policies/pretrained.py#L303) 의 `wrap_with_peft()` 가 `for p in self.parameters(): p.requires_grad_(False)` 로 *모든* base param 강제 frozen → LoRA adapter 만 trainable. expert base weight 도 같이 frozen 됨. expert 만 별도 unfreeze 하려면 *lerobot upstream 코드 우회 (Category A read-only)* 또는 신규 학습 entry 필요.
 
-### 다음 사이클 결정 (2026-05-18)
+### 다음 사이클 결정 (2026-05-18 — 데이터 확장 진행 중 반영)
 
-- **현 100ep 그대로 의미 있는 자율 학습 분기 = A2 + r=32** (capacity ↑ 단일 변수). 큰 도약 어려움 — 근본 병목은 데이터 양.
-- **C1 진입은 별도 spec 필요** — 신규 학습 entry 작성 + PEFT manual wrap + expert param unfreeze + lr group 분리.
-- **데이터 확장 (M1 잔여 100ep + 다양성) 이 1순위** — 학습 방법 조정은 그 다음.
+**100ep 시점 결정** (M1.5 사후):
+- 현 100ep 그대로 의미 있는 자율 학습 분기 = A2 + r=32 (capacity ↑ 단일 변수). 큰 도약 어려움 — 근본 병목은 데이터 양.
+- C1 진입은 별도 spec 필요 — 신규 학습 entry 작성 + PEFT manual wrap + expert param unfreeze + lr group 분리.
+- 데이터 확장 (M1 잔여 100ep + 다양성) 이 1순위 — 학습 방법 조정은 그 다음.
+
+**310ep 시점 결정** (2026-05-18 DGX 추가 수집 push 완료, 003 분기 진입):
+- **A2 유지 + 310ep + empty=1 + scheduler 동기화 = 003 분기 채택** — 데이터 확장 효과 + upstream 정합 + 학습 효율 backlog 해결 *3 영역 동시 변경*. 003 결과 보고 다음 단계 결정.
+- **C1 진입 시점 *재고*** — 300ep 영역에서 expert Full FT 의 과적합 위험 영역 완화. 003 결과가 *유의미 개선* 이면 C1 우선순위 ↑ (별도 spec 으로 진행). *비슷한 0/2* 면 C1 코드 우회 비용 대비 기대 효과 ↓ — 데이터 추가 (400ep) 또는 다른 hypothesis 우선.
+- **데이터 추가 수집 (310→400ep)** 계속 진행 가치 — M1 목표 도달 + 권장 영역 깊이 진입.
 
 ---
 

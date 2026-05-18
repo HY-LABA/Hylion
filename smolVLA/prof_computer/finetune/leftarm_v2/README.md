@@ -20,8 +20,9 @@
 
 | 분기 | 디렉터리 | 변경 변수 | run name prefix | 상태 |
 |---|---|---|---|---|
-| **001_a2_100ep** (M1.5 baseline, A2 LoRA r=16 all-linear) | `branches/001_a2_100ep/` | (baseline — 변경 없음) | `leftarm_v2_2a_pc_<ts>` | ✅ 완료 (2026-05-17) |
-| **002_a2_100ep_empty1** (001 + `empty_cameras: 1`) | `branches/002_a2_100ep_empty1/` | `empty_cameras: 0 → 1` | `leftarm_v2_camera_empty_2a_pc_<ts>` | ✅ 완료 (2026-05-18) |
+| **001_a2_100ep** (M1.5 baseline, A2 LoRA r=16 all-linear) | `branches/001_a2_100ep/` | (baseline — 변경 없음) | `leftarm_v2_2a_pc_<ts>` | ✅ 완료 (2026-05-17) — Orin 0/2 |
+| **002_a2_100ep_empty1** (001 + `empty_cameras: 1`) | `branches/002_a2_100ep_empty1/` | `empty_cameras: 0 → 1` | `leftarm_v2_camera_empty_<pass>_pc_<ts>` | ✅ 완료 (2026-05-18) — Orin 0/2 (empty 단독 효과 0 확정) |
+| **003_a2_310ep_empty1_sched_sync** (310ep + empty=1 + scheduler 동기화) | `branches/003_a2_310ep_empty1_sched_sync/` | dataset 110→310, `empty_cameras: 0 → 1`, `scheduler_decay_steps: 30000 → 120000` | `leftarm_v2_003_<pass>_pc_<ts>` | 🔄 진행 예정 (2026-05-18) — 데이터 확장 효과 측정 |
 | (향후 신규 분기) | `branches/<NNN>_<매트릭스>_<ep수>[_<서브>]/` | (해당 변경 명시) | `leftarm_v2_<...>_<pass>_pc_<ts>` | (예정) |
 
 **컨벤션 원칙**:
