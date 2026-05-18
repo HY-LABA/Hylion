@@ -1,0 +1,41 @@
+# prof_computer/leftarm_v2/train_config_camera_empty_smoke.yaml — empty_cameras 분기 smoke.
+#
+# train_config_smoke.yaml (M1.5 smoke 시도 4 검증판) 의 *완전 복제 + empty_cameras: 1 단일 차이*.
+# 본 학습 (train_config_camera_empty.yaml, 75K step) 진입 전 100 step 환경 검증.
+#
+# 통과 기준 (M1.5 smoke 4 결과 영역과 비교):
+#   - 100 step 정상 완주
+#   - VRAM peak < 60% (M1.5 smoke 4 = 51.79%, empty_cameras 의 zero-pad image 추가 ≈ 작은 메모리 영향)
+#   - --policy.empty_cameras=1 인자가 lerobot CLI 에 인식되어 학습 로그에 반영됨 확인
+#   - loss 정상 (M1.5 smoke 4 = step 100 loss 0.560 영역)
+#
+# 본 분기 검증 핵심: empty_cameras=1 적용 시 _prepare_images() 가 missing camera3 슬롯을
+# -1 padded image 로 채우는지 (코드 review 만으론 *학습 시점 동작* 미확정 — smoke 로 final 확인).
+
+policy_path: lerobot/smolvla_base
+method: lora
+lora:
+  target_modules: all-linear
+  r: 16
+batch_size: 4                        # M1.5 smoke 4 동일
+use_amp: false                       # M1.5 smoke 4 동일
+steps: 100                           # M1.5 smoke 4 동일
+num_workers: 4                       # M1.5 smoke 4 동일
+save_freq: 50                        # M1.5 smoke 4 동일
+log_freq: 10                         # M1.5 smoke 4 동일
+wandb_enable: true                   # M1.5 smoke 4 동일
+device: cuda
+push_to_hub: false
+
+dataset_return_uint8: true
+prefetch_factor: 2
+persistent_workers: false
+video_backend: torchcodec
+
+# ── 본 분기의 단일 변수 (smoke 도 동일 적용) ────────────────────
+empty_cameras: 1
+
+# smoke 도 동일 subset (100ep balanced).
+dataset_subset_2a:
+  episode_ranges_inclusive:
+    - [0, 99]
