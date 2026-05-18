@@ -1,0 +1,48 @@
+# 003_a2_310ep_empty1_sched_sync_bf16_smoke — smoke test (100 step)
+#
+# 본 학습 진입 전 *accelerate launch + bf16 + batch ↑* 검증.
+# 핵심 변경 vs 002 smoke:
+#   - accelerate launch --mixed_precision=bf16 (wrapper 통제)
+#   - empty_cameras=1 (유지 — 002 smoke 와 동일)
+#   - scheduler_decay_steps=100 (smoke step 수와 동기화)
+#   - batch_size: smoke 별 변경 ★
+#
+# Smoke 절차 (각 변종마다 *batch_size 만 변경* + smoke 실행):
+#   smoke 1: batch_size: 4   — bf16 단독 검증 (VRAM 절감 측정)
+#   smoke 2: batch_size: 8   — bf16 + batch 8 (smoke 2 fp32 시 94% 였음 → bf16 시 ~48% 추정)
+#   smoke 3: batch_size: 12  — bf16 + batch 12 (가장 공격적)
+#
+# 통과 기준:
+#   - VRAM peak < 80% (안전 영역)
+#   - 100 step 정상 완주
+#   - loss 정상 강하 (0.5~0.7 영역)
+#   - accelerate launch + bf16 정상 동작 확인
+
+policy_path: lerobot/smolvla_base
+method: lora
+lora:
+  target_modules: all-linear
+  r: 16
+batch_size: 6                        # ★ smoke 별 변경 (4 → 8 → 12)
+# use_amp 제거 — accelerate launch --mixed_precision=bf16 이 통제
+steps: 100                           # ★ 본 학습 120000 → smoke 100
+num_workers: 4
+save_freq: 50                        # ★ smoke 50 (100 step 안 ckpt 2회)
+log_freq: 10                         # ★ smoke 10 (분해능 ↑)
+wandb_enable: true
+device: cuda
+push_to_hub: false
+
+dataset_return_uint8: true
+prefetch_factor: 2
+persistent_workers: false
+video_backend: torchcodec
+
+# 본 분기 핵심 변수 (smoke 도 동일 적용)
+empty_cameras: 1
+scheduler_decay_steps: 100           # smoke step 수와 동기화 (lerobot 의 auto-scale 도 적용되지만 명시)
+
+# smoke 는 100ep subset (M1.5 smoke 와 동일 — 빠른 검증)
+dataset_subset_2a:
+  episode_ranges_inclusive:
+    - [0, 99]

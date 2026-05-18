@@ -1,0 +1,63 @@
+# 003_a2_310ep_empty1_sched_sync — 본 학습 config (2026-05-18)
+#
+# 분기 식별: 003_a2_310ep_empty1_sched_sync
+#   - 매트릭스: A2 (LoRA r=16, target=all-linear)
+#   - 데이터: 310ep (M1 진행분, DGX 가 2026-05-18 12:21 UTC push 완료)
+#   - 서브:
+#     * empty1 = empty_cameras: 1 (upstream LIBERO CI 표준 패턴, base smolvla 3 cam 입력 형식 정합)
+#     * sched_sync = scheduler_decay_steps = steps (M1.5 후반 정체 backlog 해결)
+#
+# vs 001 (M1.5 baseline) 변경 변수 3개:
+#   1) dataset 110→310 (실제 학습 ep 100→310)
+#   2) empty_cameras 0→1
+#   3) scheduler_decay_steps 30000→120000 (= steps 동기화)
+#
+# 003 결과 해석 (참고):
+#   - ≥1/2 (≥50%): 3 변수 조합 효과 — 어느 게 dominant 인지 후속 사이클 영역
+#   - 0/2 + 동작 차이 없음: 3 변수 모두 무효 — 학습 방법 매트릭스 변경 또는 더 근본적 영역
+#   - 0/2 + 동작 개선 신호: 부분 fix — 데이터 추가 (400ep) 가치 명확
+#
+# upstream 정합 근거: research_empty_cameras_2026-05-18.md §3-2 (LIBERO 2 cam + empty=1 CI 패턴)
+# scheduler 동기화 근거: M1.5 wandb 분석 (LoRA weight step 37000+ 변화 < 2%, lr 0 영역 학습 정지)
+
+policy_path: lerobot/smolvla_base    # M1.5 동일
+method: lora                         # M1.5 동일 (A2)
+lora:
+  target_modules: all-linear         # M1.5 동일
+  r: 16                              # M1.5 동일
+batch_size: 6                        # ★ bf16 + b6 — smoke 3 검증 (VRAM peak 79.52%, 20.49 GB / 24 GB). M1.5 batch 4 보다 +50% sample-pass, epoch 2.93→4.39
+# use_amp 제거 — accelerate launch --mixed_precision=bf16 이 통제
+steps: 120000                        # ~4.4 epoch on 310ep × batch 6 (164k frame / 6 = 27k step/epoch × 4.4 ≈ 120k step)
+                                     # researcher 권장 영역 정중앙 (3-10 epoch)
+                                     # 예상 학습 시간: 120000 × 0.48s (smoke 3 bf16+b6 step time) ≈ 16시간
+num_workers: 4                       # M1.5 동일
+save_freq: 2000                      # 120k step / 2000 = 60 ckpt (M1.5 의 1000 보다 sparse — disk 부담 균형)
+log_freq: 50                         # M1.5 동일
+wandb_enable: true                   # M1.5 동일
+device: cuda                         # M1.5 동일
+push_to_hub: false                   # M1.5 동일
+
+dataset_return_uint8: true           # M1.5 동일
+prefetch_factor: 2                   # M1.5 동일
+persistent_workers: false            # M1.5 동일
+
+video_backend: torchcodec            # M1.5 동일 (PC 환경 정상)
+
+# ── 본 분기 신규 변수 1: empty_cameras=1 ────────────────────
+# upstream LIBERO CI 표준 패턴 + base smolvla 3 cam 입력 형식 정합.
+# 002 (camera_empty, 100ep) 에선 추론 효과 0 확인됐으나 310ep 환경에서 *통계 분해능 ↑* 시 효과 드러날 가능성 + 어차피 upstream 권장.
+empty_cameras: 1
+
+# ── 본 분기 신규 변수 2: scheduler_decay_steps=steps ────────
+# lerobot smolvla preset 의 default scheduler_decay_steps=30000 이 steps=120000 보다 짧아
+# 후반 90000 step lr ≈ 2.5e-6 (학습 정지 영역) 가는 backlog 해결.
+# scheduler_decay_steps = steps = 120000 으로 전 구간 cosine decay 유지.
+# 단 본 설정은 yaml 만으로 자동 적용 X — run_train.py 가 --policy.scheduler_decay_steps=<steps> 명시 전달 필요.
+scheduler_decay_steps: 120000
+
+# 본 학습 dataset 은 *전체 310ep* — subset 지정 안 함 (M1.5 의 100ep subset 와 다름).
+# run_train.py 에서 args.pass_name == "full" 분기로 처리 (episodes 인자 미전달 = lerobot 전체 사용).
+# 또는 --pass 2a 로 100ep subset 도 가능 — smoke 등 검증용.
+dataset_subset_2a:
+  episode_ranges_inclusive:
+    - [0, 99]                        # smoke 또는 100ep 비교 검증 시 사용
