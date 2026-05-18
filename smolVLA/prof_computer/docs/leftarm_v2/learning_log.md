@@ -471,30 +471,79 @@ M1.5 원본 *완전 보존* + 별도 entry 3 파일:
 
 → **본 학습 진입 안전 신호 모두 통과**.
 
-#### 본 학습 — 2026-05-18 10:02 ~ (진행 중) · 🔄 RUNNING
+#### 본 학습 — 2026-05-18 10:02 ~ 19:25 · ✅ COMPLETED (75000 step 완주)
 
 - 명령: `python run_train_camera_empty.py train --pass 2a`
-- wandb run: `wandb.ai/babogaeguri-hanyang-university/leftarm_v2/runs/8jkr7edb`
+- wandb run: [`wandb.ai/babogaeguri-hanyang-university/leftarm_v2/runs/8jkr7edb`](https://wandb.ai/babogaeguri-hanyang-university/leftarm_v2/runs/8jkr7edb)
 - output_dir: `~/prof_computer_runs/leftarm_v2_camera_empty_2a_pc_2026-05-18_10-01-11`
-- 예상 시간: 75000 × 0.41s ≈ **약 8시간 30분** (M1.5 의 7시간 34분 + camera3 zero-pad 처리 ~12% 오버헤드)
 - 평행 진행: 사용자 — 3번째 카메라 셋업 (다음 사이클 데이터 수집 준비)
 
-**진행 메트릭 (학습 도중 — 갱신 예정)**:
+**학습 메트릭 (완료 후 wandb summary 기준)**:
 
-| step | loss | grad_norm | lr | 시각 |
-|---|---|---|---|---|
-| 50 | 0.744 | 0.935 | 2.6e-6 | 10:03:19 |
-| 100 | 0.707 | 0.950 | 7.6e-6 | 10:03:43 |
-| (학습 완료 후 갱신) | | | | |
+| 지표 | 값 |
+|---|---|
+| 시작 / 종료 | 2026-05-18 10:02:22 / 19:25:11 |
+| 총 시간 | **9시간 22분** (8시간 30분 예측 대비 +10%) |
+| 도달 step | 75000 / 75000 (100%) ✅ |
+| 도달 sample | 300,000 |
+| epoch | 5.5 |
+| step time (steady) | 0.397 s/step |
+| dataloading_s | 0.004-0.005 (data bottleneck 0 — torchcodec 효과) |
+| **final loss (step 75000, single-batch)** | **0.130** |
+| loss steady oscillation (last 20K) | 0.05-0.20 band (M1.5 final 0.04 보다 약간 ↑) |
+| grad_norm 후반 | 0.56-0.71 (안정, clip 10 한참 아래) |
+| lr 마지막 | 2.5e-6 (cosine min 도달) |
+| ckpt 저장 | 75개 (step 1000 마다, last = step 75000) |
+| last ckpt 크기 | 45 MB (LoRA adapter only, M1.5 와 거의 동일) |
 
-**학습 후 채울 항목**:
+**시스템 메트릭** (wandb 차트 분석):
 
-- [ ] 총 시간 / 완주 여부
-- [ ] 최종 loss (step 75000)
-- [ ] VRAM peak / system RAM 누수율
-- [ ] M1.5 학습 메트릭과의 비교 표
-- [ ] best ckpt 선정 (loss 곡선 분석)
-- [ ] HF Hub push: `BaboGaeguri/leftarm_v2_camera_empty_A2_pc_2026-05-18` (가칭)
+| 지표 | 값 |
+|---|---|
+| VRAM (allocated) | ~14-15 GB / 24 GB = 40-42% steady |
+| GPU power | 300-340W steady (TDP 350W 의 86-97% — M1.5 보다 약간 ↑ 활용) |
+| GPU util | 60-90% (M1.5 60-80% 대비 ↑ — empty_cameras zero-pad image 추가 처리) |
+| GPU temp | 80°C steady (RTX 3090 throttle 85°C 한참 아래) |
+| System Memory util | 15% steady |
+| Process Memory (main) | 2.1 GB 안정 (누수 0) |
+| System RAM 누수율 | 0 (M1.5 와 동일 — torchcodec 환경 안정성 재검증) |
+| Disk 사용 (학습 후) | 73→80 GB (ckpt 75개 × ~150 MB 누적) |
+
+**M1.5 (001) 와의 비교** — *empty_cameras 단일 변수만 차이*:
+
+| 지표 | M1.5 (001) | 002 (camera_empty) | 차이 |
+|---|---|---|---|
+| 총 시간 | 7시간 34분 | 9시간 22분 | **+24%** (camera3 zero-pad 처리 오버헤드 — smoke 의 +12% 보다 본 학습에서 더 큰 차이) |
+| step time | 0.343 s | 0.397 s | +16% |
+| final loss (single-batch) | 0.132 | 0.130 | 거의 동등 |
+| loss steady (last 20K) | 0.013-0.087 | 0.05-0.20 | **002 가 약간 ↑** (empty_cameras=1 의 zero-pad slot 처리로 expert fit 부담 ↑ 추정) |
+| grad_norm 후반 | 0.55-0.65 | 0.56-0.71 | 거의 동등 |
+| VRAM peak | 60.7% (~14.7 GB) | 40-42% (~14-15 GB) | 비슷 (측정 방식 차이 가능) |
+| GPU util | 60-80% | 60-90% | 002 가 약간 ↑ |
+| GPU temp peak | 83°C | 80°C | 002 가 살짝 낮음 |
+| 완주 | ✅ | ✅ | 동일 |
+
+→ **학습 메트릭 차원에선 *큰 차이 없음***. final loss 가 002 에서 약간 ↑ 였으나 *추론 성능 영향* 은 별개 (loss = 학습 fit, 추론 = generalization). **다음 단계 = Orin 추론 비교 평가** 가 *empty_cameras 가설* 의 *결정적 검증*.
+
+#### 다음 단계 (학습 완료 후 즉시)
+
+- [ ] **HF Hub push**: `BaboGaeguri/leftarm_v2_camera_empty_A2_pc_2026-05-18` (가칭) — Orin 접근 위해
+  ```bash
+  hf upload BaboGaeguri/leftarm_v2_camera_empty_A2_pc_2026-05-18 \
+    ~/prof_computer_runs/leftarm_v2_camera_empty_2a_pc_2026-05-18_10-01-11/checkpoints/last/pretrained_model
+  ```
+- [ ] **Orin 추론 평가** — M1.5 와 *완전 동일 패턴* 단축 평가 (task1 front 1회 + task2 front 1회)
+- [ ] **`orin_camera_empty_eval_2026-05-18.md`** 신설 — 평가 시트 (`orin_a2_eval_2026-05-17.md` 양식 동일)
+- [ ] **결과 비교 + 다음 사이클 결정**:
+  - 유의미 개선 (≥1/2) → empty_cameras 가 부분 fix 확정 → 200ep 수집 + camera_empty 패턴 유지
+  - 동작 패턴 개선 (헛스윙 → reach 등) → 부분 fix 신호 → 데이터 확장 + empty_cameras 유지
+  - 비슷한 0/2 → empty_cameras 가 root cause 아님 → 데이터 확장이 *유일한 가치 영역* + 다른 가설 (workspace, dataset 품질 등)
+
+#### best ckpt 선정 (잠정)
+
+- loss steady (last 20K) = 0.05-0.20 band → step 30000 이후 *학습 정체 영역* 이라 *step 별 ckpt 차이 거의 없음* 예상
+- 추천: **last (step 75000)** 또는 **step 30000 부근 (lr decay 끝, 학습 정체 시작)**
+- 단 *추론 성능 비교* 는 본 분석 외 영역 (별도 검증 시점에)
 
 #### 다음 단계 — Orin 추론 비교 검증 (학습 완료 후)
 
