@@ -28,6 +28,6 @@ record_opts:                      # → lerobot-record 최상위 인자 (--datas
 #    (lerobot num_episodes 시맨틱 = 이번 세션 추가분, 누적 아님. 예: 20×5 차수 → 100)
 tasks:
   - instruction: "Pick up the blue and yellow doll and place it on the left side of the table"
-    target_episodes: 100
+    target_episodes: 200    # 2026-05-18 100→200 갱신 (자세한 근거: collection_log.md §Orientation 합계)
   - instruction: "Hand the yellow can to the person"
-    target_episodes: 100
+    target_episodes: 200    # 2026-05-18 100→200 갱신

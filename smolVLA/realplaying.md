@@ -49,20 +49,21 @@
 
 ### [ ] M1 — leftarm_v2 데이터 수집  (spec `01`)
 
-- **목표**: leftarm_v2 학습용 dataset (2 task, 총 200 episodes) 을 dev 환경에서 수집·검증한다.
+- **목표**: leftarm_v2 학습용 dataset (2 task, 총 **400 episodes**) 을 dev 환경에서 수집·검증한다.
 - **task (확정 2026-05-14)**: leftarm_v2 = 2 task 멀티태스크
   - ① 인형(doll) 을 집어 상자에 넣기
   - ② 캔(can) 을 집어 상자에 넣기
   - 한 SmolVLA 모델이 instruction 으로 두 task 를 구분해 수행 (M2).
-- **에피소드 (확정)**: task 당 100, 총 200 (fresh 수집 — leftarm_v1 끌어오지 않음).
+- **에피소드 (2026-05-18 갱신)**: task 당 **200**, 총 **400** (fresh 수집 — leftarm_v1 끌어오지 않음). 100→200 조정 사유: researcher 추정 (300~500ep) 의 중간 영역 진입 + camera mismatch 확신 영역 도달 (자세한 근거: [prof_computer/docs/leftarm_v2/research_empty_cameras_2026-05-18.md](smolVLA/prof_computer/docs/leftarm_v2/research_empty_cameras_2026-05-18.md) 또는 본 사이클 대화).
 - **주요 작업**:
-  - leftarm_v2 dataset 설계 (task instruction 문자열 2종, dataset 구조, HF repo 명명, 에피소드 배분 100/100)
-  - 수집 환경 최소 파라미터 기록 (카메라 위치·조명·작업영역 — 시연장 재현용 최소 셋)
+  - leftarm_v2 dataset 설계 (task instruction 문자열 2종, dataset 구조, HF repo 명명, 에피소드 배분 200/200)
+  - 수집 환경 최소 파라미터 기록 (카메라 위치·조명·작업영역 — 시연장 재현용 최소 셋) + 다양화 영역 (위치분포·조명·배경) 명시 기록 — 8차부터
   - 좌측 SO-101 + 카메라 calibration·포트·인덱스 재검증
-  - teleoperation 으로 200 episodes 수집 → HF Hub push
-  - dataset 검증 (200 ep, task 분포 100/100, frame shape·dtype)
-- **결정 포인트 (M1)**: dev 수집환경 ↔ 시연장 정합 → **"최소 파라미터만 기록" 으로 결정 (2026-05-14)**. 카메라·조명·작업영역 핵심값만 기록하고 dev 환경 그대로 수집.
-- **DOD**: leftarm_v2 200 episodes (2 task × 100) 수집 완료 + HF Hub push + 검증 통과 → DGX 학습 입력으로 사용 가능.
+  - teleoperation 으로 400 episodes 수집 → HF Hub push
+  - dataset 검증 (400 ep, task 분포 200/200, frame shape·dtype)
+- **결정 포인트 (M1)**: dev 수집환경 ↔ 시연장 정합 → **"최소 파라미터만 기록" 으로 결정 (2026-05-14)**. 카메라·조명·작업영역 핵심값만 기록하고 dev 환경 그대로 수집. *2026-05-18 보강*: vision encoder 의 task-irrelevant invariance 학습을 위해 위치분포·조명·배경 다양화 의식적 기록 ([collection_log.md §추가 다양화 영역](smolVLA/dgx/docs/finetune/leftarm_v2/collection_log.md) 참조).
+- **DOD**: leftarm_v2 400 episodes (2 task × 200) 수집 완료 + HF Hub push + 검증 통과 → 학습 입력으로 사용 가능.
+- **선택 중간점검 (권장)**: 200ep 시점에서 *M1.5 (100ep) 와 동일 학습 setup* 으로 1회 학습 + Orin 추론 — 데이터 양 효과 정량화 + 400ep 진입 가치 calibration.
 
 ### [ ] M1.5 — 데이터셋 학습 호환성 정비 (video decode 회피)  (spec `02_prereq`)
 
@@ -145,3 +146,4 @@ DGX 머신 `~/smolvla/dgx/docs/` 에 수집·학습 운영 상세 문서가 존�
 | 2026-05-14 | 정정 — 최종 목표를 "재현성 검증" → **"실제 성능 확보 (+ 재현성)"** 로 수정. M1 을 현실 반영: task 확정 (leftarm_v2 = 2 task: 인형→상자, 캔→상자), 에피소드 100/task = 200, leftarm_v1(40ep) 은 동결 별개 체크포인트. M2 멀티태스크 1 모델 명시. M1 결정 포인트(환경 정합) "최소 파라미터만 기록" 으로 해소. DGX 운영 문서 참조 섹션 추가. |
 | 2026-05-15 | M1 진행 중 task 정의 재정의 (인형→테이블 왼쪽 spatial reference, 캔→사람에게 hand-over) — top view 가동범위 제약 + task 다양성 확보 차원에서 "노란 플라스틱 상자" 폐기. 110ep (task1:50/task2:60) 시점에 M2-A (100ep balanced subset) 시도 진입. |
 | 2026-05-15 | **M1.5 신설** — 데이터셋 학습 호환성 정비. M2-A 학습 시도 1·2 가 둘 다 ~28분 후 system-wide OOM. 진단 결과 lerobot 의 video dataset 학습 시 pyav 의 buffer leak (codec/workers 무관). DGX 의 PyTorch 2.10 + GB10 + FFmpeg 6 환경에서 torchcodec/video_reader 빌드 호환 불가 → **image dataset 변환** 을 정공법으로 채택. spec `02_prereq` 신규. M2 학습은 본 milestone 완료 후 재진입. |
+| 2026-05-18 | **M1 목표 200→400ep 조정** (task 당 100→200). 사유: M1.5 추론 0/2 + researcher 보고서 ([prof_computer/docs/leftarm_v2/research_empty_cameras_2026-05-18.md](smolVLA/prof_computer/docs/leftarm_v2/research_empty_cameras_2026-05-18.md)) 의 데이터 양 추정 (300~500ep) 영역 진입 + camera mismatch 확신 영역 도달 (400ep 시점 데이터 부족 가설 신뢰도 ↑). 추가 도입: 수집 다양화 영역 (위치분포·조명·배경) — 8차부터 명시 ([collection_log.md §추가 다양화 영역](smolVLA/dgx/docs/finetune/leftarm_v2/collection_log.md)). |

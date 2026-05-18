@@ -12,8 +12,8 @@
 |---|---|
 | repo_id | `BaboGaeguri/leftarm_v2` |
 | 성격 | 멀티태스크 pick-and-place (단일 dataset, instruction 별 수집) |
-| task 1 | "Pick up the blue and yellow doll and place it on the left side of the table" — 목표 100 ep |
-| task 2 | "Hand the yellow can to the person" — 목표 100 ep |
+| task 1 | "Pick up the blue and yellow doll and place it on the left side of the table" — 목표 **200 ep** (2026-05-18 100→200 조정) |
+| task 2 | "Hand the yellow can to the person" — 목표 **200 ep** (2026-05-18 100→200 조정) |
 | fps | 30 |
 | 카메라 | top 480×640 (rotation -90, MJPG), wrist 640×480 (MJPG) |
 | 코덱 | `h264_nvenc` (GPU NVENC — leftarm_v1 의 libsvtav1 에서 변경, [camera_and_codec.md §3](../camera_and_codec.md) 근거) |
@@ -52,37 +52,57 @@ task 2 instruction (`Hand the yellow can to the person`) 에 "the person" 이 �
 - 각 차수 로그 entry 에 `orientation: ...` (task 2 는 추가로 `person: ...`) 명시
 - 목표: task 별로 앞/뒤 + 사람 대략 균형
 
+### 3. 추가 다양화 영역 (2026-05-18 도입 — 8차부터 적용)
+
+vision encoder 의 *task-irrelevant 변동 invariance* 학습 목적. 차수당 *의식적 다양화*:
+
+| 다양화 차원 | 가능 값 | 의도 |
+|---|---|---|
+| **위치분포** (물체 시작 위치) | `좌` / `우` / `중앙` / `혼합 (예: 3,3,4)` | spatial generalization. task1 의 "테이블 왼쪽" instruction grounding 학습 보강. 차수 내 비율로 명시 |
+| **조명** | `default` (기본 시연장 조명) / `오전 자연광` / `오후 자연광` / `저녁 형광등 only` / 기타 | vision encoder 의 color/lighting invariance 학습 |
+| **배경** | `clean` / `주변 사람` / `테이블 위 잡동사니` / 기타 | task-irrelevant feature 무시 학습 |
+
+**중요**: 1~7차 (2026-05-15 수집분) 은 다양화 영역 *미명시* — 빈 칸 또는 `-` 표기. 8차부터 적용.
+
+### 4. 시연자 다양화 — task 1 도 적용 (2026-05-18 도입)
+
+기존 시연자 칼럼이 task 2 전용이었으나, *task 1 도 시연자 다양성 변수*. 8차부터 task 1 수집 시도 `person` 칼럼 채움. 1~7차의 task 1 시연자 (본인) 는 *사후 분류 X* — 빈 칸 유지.
+
 ---
 
 ## 현재 누적 상태
 
 ### 차수별 상세
 
-| 차수 | 날짜 | task | 모드 | +ep | ep index | orientation | person | 누적 T1 | 누적 T2 | 누적 합 |
-|---|---|---|---|---|---|---|---|---|---|---|
-| 1 | 2026-05-15 | 1 (doll) | FRESH | 10 | 0~9 | front (얼굴) | — | 10 | 0 | 10 |
-| 2 | 2026-05-15 | 1 (doll) | RESUME | 20 | 10~29 | front (얼굴) | — | 30 | 0 | 30 |
-| 3 | 2026-05-15 | 1 (doll) | RESUME | 20 | 30~49 | back (뒤통수) | — | 50 | 0 | 50 |
-| 4 | 2026-05-15 | 2 (can) | RESUME | 10 | 50~59 | front (문양) | 인혁이형 (흰옷) | 50 | 10 | 60 |
-| 5 | 2026-05-15 | 2 (can) | RESUME | 10 | 60~69 | front (문양) | 성래 (화각 외) | 50 | 20 | 70 |
-| 6 | 2026-05-15 | 2 (can) | RESUME | 20 | 70~89 | front (문양) | 성래 (화각 외) | 50 | 40 | 90 |
-| 7 | 2026-05-15 | 2 (can) | RESUME | 20 | 90~109 | back (성분표시) | 성래 (화각 외) | 50 | 60 | **110** |
+> 칼럼 안내: `위치분포`, `조명`, `배경` 은 2026-05-18 도입 — 1~7차는 빈 칸 (`-`). 8차부터 채움.
+
+| 차수 | 날짜 | task | 모드 | +ep | ep index | orientation | person | 위치분포 | 조명 | 배경 | 누적 T1 | 누적 T2 | 누적 합 |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| 1 | 2026-05-15 | 1 (doll) | FRESH | 10 | 0~9 | front (얼굴) | — | - | - | - | 10 | 0 | 10 |
+| 2 | 2026-05-15 | 1 (doll) | RESUME | 20 | 10~29 | front (얼굴) | — | - | - | - | 30 | 0 | 30 |
+| 3 | 2026-05-15 | 1 (doll) | RESUME | 20 | 30~49 | back (뒤통수) | — | - | - | - | 50 | 0 | 50 |
+| 4 | 2026-05-15 | 2 (can) | RESUME | 10 | 50~59 | front (문양) | 인혁이형 (흰옷) | - | - | - | 50 | 10 | 60 |
+| 5 | 2026-05-15 | 2 (can) | RESUME | 10 | 60~69 | front (문양) | 성래 (화각 외) | - | - | - | 50 | 20 | 70 |
+| 6 | 2026-05-15 | 2 (can) | RESUME | 20 | 70~89 | front (문양) | 성래 (화각 외) | - | - | - | 50 | 40 | 90 |
+| 7 | 2026-05-15 | 2 (can) | RESUME | 20 | 90~109 | back (성분표시) | 성래 (화각 외) | - | - | - | 50 | 60 | **110** |
 
 ### Orientation 합계
 
+> 2026-05-18 목표 조정: task 당 100 → **200 ep**. 전체 200 → **400 ep**. 사유: researcher 추정 (300~500ep) 의 중간 영역 진입으로 데이터 부족 가설 통계 신뢰도 ↑ + camera mismatch 확신 영역 도달 (자세한 근거는 [model_config.md](../../../../prof_computer/docs/model_config.md) §0 또는 본 사이클 대화).
+
 | task | 누적 / 목표 | front | back |
 |---|---|---|---|
-| task 1 (doll) | 50 / 100 | 30 (차 1·2) | 20 (차 3) |
-| task 2 (can) | 60 / 100 | 40 (차 4·5·6) | 20 (차 7) |
-| **전체** | **110 / 200** (59,752 frames) | 70 | 40 |
+| task 1 (doll) | 50 / **200** | 30 (차 1·2) | 20 (차 3) |
+| task 2 (can) | 60 / **200** | 40 (차 4·5·6) | 20 (차 7) |
+| **전체** | **110 / 400** (59,752 frames) | 70 | 40 |
 
-### Person 합계 (task 2 전용)
+### Person 합계 (task 2 전용 — task 1 도 8차부터 명시)
 
 | person | front | back | 합계 | 해당 차수 |
 |---|---|---|---|---|
 | 인혁이형 (흰옷) | 10 | 0 | 10 | 차 4 |
 | 성래 (화각 외) | 30 | 20 | 50 | 차 5·6·7 |
-| **합계** | 40 | 20 | **60 / 100** | — |
+| **합계** | 40 | 20 | **60 / 200** | — |
 
 > 1~4차 (2026-05-15 컨벤션 도입 전) 의 orientation·person 은 사용자가 사후 분류한 값으로 채움. 5차부터는 시연 시점에 명시 + 일관 유지.
 
@@ -339,7 +359,7 @@ jq '{total_episodes, total_frames, total_tasks}' ~/smolvla/.hf_cache/lerobot/Bab
 
 ## 다음 차수
 
-현재 task 1 누적 **50/100**, task 2 누적 **60/100** (전체 110/200).
+현재 task 1 누적 **50/200**, task 2 누적 **60/200** (전체 110/400). 목표 조정 사유: 2026-05-18 — researcher 추정 영역 (300~500ep) 진입 + camera mismatch 확신 영역 도달.
 
 ### 50개 시점 점검 — 완료 (2026-05-15)
 
@@ -351,35 +371,59 @@ jq '{total_episodes, total_frames, total_tasks}' ~/smolvla/.hf_cache/lerobot/Bab
 
 → **3개 항목 모두 clear. task 1 본 수집 계속 진행 가능.**
 
-### 진행 계획
+### 진행 계획 (400ep 목표 기준)
 
-> **명령은 orientation·person 과 무관하게 동일** (`--task N --episodes M`). 시연 시 물체 방향 / 사람을 표대로 통제 + 로그 entry 에 기록.
+> **명령은 orientation·person 과 무관하게 동일** (`--task N --episodes M`). 시연 시 물체 방향 / 사람 / 위치분포 / 조명 / 배경을 표대로 통제 + 로그 entry 에 기록 (8차부터 신규 다양화 칼럼 적용).
 
-#### Task 1 (doll) — 남은 +50
+#### Task 1 (doll) — 남은 +150 (50 → 200)
 
-현재 **front 30 / back 20**. 100 ep 시점 50/50 균형 목표 → 추가로 **front +20 / back +30** 필요.
+현재 **front 30 / back 20**. 200 ep 시점 100/100 균형 목표 → 추가로 **front +70 / back +80** 필요.
 
-| 차수 (예시) | 명령 | orientation | task 1 누적 (F/B) |
-|---|---|---|---|
-| ? | `--task 1 --episodes 20` | **back** (뒤통수) | 30F/40B = 70 |
-| ? | `--task 1 --episodes 20` | **front** (얼굴) | 50F/40B = 90 |
-| ? | `--task 1 --episodes 10` | **back** (뒤통수) | 50F/50B = **100** ✅ |
+권장 분할 전략 (예시 — 차수당 20ep 기준 ~8 차수):
 
-#### Task 2 (can) — 남은 +40
+| 차수 | 명령 | orientation | person | 위치분포 | 조명 | 배경 | task 1 누적 (F/B) |
+|---|---|---|---|---|---|---|---|
+| 8 | `--task 1 --episodes 20` | **back** | 본인 | 좌/중/우 골고루 | default | clean | 30F/40B = 70 |
+| 9 | `--task 1 --episodes 20` | **front** | 본인 | 좌/중/우 골고루 | default | clean | 50F/40B = 90 |
+| 10 | `--task 1 --episodes 20` | **back** | 인혁이형 | 좌/우 위주 | default | clean | 50F/60B = 110 |
+| 11 | `--task 1 --episodes 20` | **front** | 인혁이형 | 좌/우 위주 | 다른 시간대 | clean | 70F/60B = 130 |
+| 12 | `--task 1 --episodes 20` | **back** | 본인 | 중앙 위주 | default | 주변 사람 | 70F/80B = 150 |
+| 13 | `--task 1 --episodes 20` | **front** | 새 사람 D | 좌/중/우 골고루 | default | clean | 90F/80B = 170 |
+| 14 | `--task 1 --episodes 20` | **back** | 새 사람 D | 좌/우 위주 | default | clean | 90F/100B = 190 |
+| 15 | `--task 1 --episodes 10` | **front** | 본인 | 중앙 위주 | default | clean | 100F/100B = **200** ✅ |
 
-현재 **front 40 (인혁이형 10 + 성래 30) / back 20 (성래 20)**. 7차로 back 진입. 50/50 균형까지 **back +30 / front +10** 필요.
+→ task 1 최종 (예시): 본인 80 + 인혁이형 40 + 새 사람 D 40 + 본인 추가 40 = 200, F100/B100.
 
-| 차수 (예시) | 명령 | orientation | person | task 2 누적 |
-|---|---|---|---|---|
-| ? | `--task 2 --episodes 20` | **back** (성분표시) | 인혁이형 | 80 (F40/B40) |
-| ? | `--task 2 --episodes 10` | **back** (성분표시) | (새 사람 C) | 90 (F40/B50) |
-| ? | `--task 2 --episodes 10` | **front** (문양) | (새 사람 C) | **100** (F50/B50) ✅ |
+#### Task 2 (can) — 남은 +140 (60 → 200)
 
-→ task 2 최종 (예시): 인혁이형 30 (F10/B20) + 성래 50 (F30/B20) + C 20 (F10/B10) = 100, F50/B50.
+현재 **front 40 (인혁이형 10 + 성래 30) / back 20 (성래 20)**. 200 ep 시점 100/100 균형 목표 → 추가로 **front +60 / back +80** 필요.
 
-> 위 split 은 예시. **인혁이형 back 미수집 + 새 사람 추가** 두 가지가 핵심 — 사람×orientation cross 다양성 확보.
+권장 분할 전략 (예시):
+
+| 차수 | 명령 | orientation | person | 위치분포 | 조명 | 배경 | task 2 누적 |
+|---|---|---|---|---|---|---|---|
+| 16 | `--task 2 --episodes 20` | **back** | 인혁이형 | 좌/우 위주 | default | clean | 80 (F40/B40) |
+| 17 | `--task 2 --episodes 20` | **back** | 새 사람 C (화각 내) | 좌/중/우 골고루 | default | clean | 100 (F40/B60) |
+| 18 | `--task 2 --episodes 20` | **front** | 새 사람 C | 좌/중/우 골고루 | default | clean | 120 (F60/B60) |
+| 19 | `--task 2 --episodes 20` | **back** | 새 사람 D (화각 내) | 좌/우 위주 | 다른 시간대 | clean | 140 (F60/B80) |
+| 20 | `--task 2 --episodes 20` | **front** | 새 사람 D | 좌/중/우 골고루 | default | 주변 사람 | 160 (F80/B80) |
+| 21 | `--task 2 --episodes 20` | **front** | 인혁이형 | 좌/우 위주 | default | clean | 180 (F100/B80) |
+| 22 | `--task 2 --episodes 20` | **back** | 본인 (수신자 역) | 중앙 위주 | default | clean | **200** (F100/B100) ✅ |
+
+→ task 2 최종 (예시): 인혁이형 50 (F30/B20) + 성래 50 (F30/B20) + 새 사람 C 40 (F20/B20) + 새 사람 D 40 (F20/B20) + 본인 20 (F0/B20) = 200, F100/B100.
+
+> 위 split 은 예시. **인혁이형 back 미수집 + 새 사람 (C·D) 추가 + 본인 task 1 외 시연자 다양화 + 위치분포 의식적 명시** 가 핵심.
 >
 > 새 사람 추가 시 [수집 컨벤션 §2](#2-사람-정보-task-2-전용) 의 "현재 등록 인물" 표 갱신.
 >
-> ⚠️ **성래 화각 외 우려**: 5차 entry 참조. 새 사람 (C) 추가 시 **화각에 명확히 들어오는 위치**로 두면 instruction grounding 다양성 확보 측면에서 더 유리.
+> ⚠️ **성래 화각 외 우려**: 5차 entry 참조. 새 사람 (C·D) 추가 시 **화각에 명확히 들어오는 위치** 권장 — instruction grounding 다양성 확보.
+
+### 200ep 시점 중간점검 (권장)
+
+400ep 도달 *전* 에 200ep 시점 (= M1.5 와 동일 데이터 양 × 2) 에서 한번 *중간 학습 + Orin 추론* 권장. 의도:
+- 100ep → 200ep 변화에서 *성공률 변동 측정* — 데이터 양 효과 정량화
+- 200ep 결과가 0% 정체 → 400ep 까지 가는 *근거 강화*
+- 200ep 결과가 유의미 개선 → 400ep 도달 *기대치 calibration*
+
+단 *학습 비용 추가* (8h+) — 본인 결정 영역. 200ep 중간점검 없이 400ep 까지 한 번에 가도 무관.
 </content>

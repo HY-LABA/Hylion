@@ -1,12 +1,12 @@
 # 01_leftarm_v2_collection
 
-> 목표: leftarm_v2 학습용 dataset (2 task, 총 200 episodes) 을 dev 환경에서 수집·검증
+> 목표: leftarm_v2 학습용 dataset (2 task, 총 **400 episodes**) 을 dev 환경에서 수집·검증 — *2026-05-18 목표 200→400 조정*
 > 환경: DGX Spark 단일 노드 (수집 + Hub push), venv `~/smolvla/dgx/.arm_finetune`
 > 접근: devPC → `ssh dgx`
 > 코드 경로: DGX `~/smolvla/dgx/` (rsync 배포 기준)
 > 하드웨어: SO-101 좌측 follower + leader (calibration 완료 — DGX `docs/status.md` §2)
 > 로드맵: `realplaying.md` M1
-> 작성: 2026-05-14
+> 작성: 2026-05-14 (목표 갱신: 2026-05-18)
 
 ---
 
@@ -54,17 +54,19 @@
 - 제약: 좌측팔 calibration 파일 보존 (유효하면 재calibration 불필요). calibration 위치: `${HF_HOME}/lerobot/calibration/`.
 - 잔여 리스크: 우측팔 추가로 4 devices 환경 — `/dev/ttyACM*` enumeration 이 부팅마다 변동 가능 (DGX `status.md` §2 권고: serial 기반 udev rule). 수집 직전 재확인 필수.
 
-### [ ] TODO-03: leftarm_v2 데이터 수집 (200 episodes)
+### [ ] TODO-03: leftarm_v2 데이터 수집 (400 episodes — *2026-05-18 200→400 갱신*)
 
-- DOD: task ① 100 + task ② 100 = 200 episodes teleoperation 수집 완료 + HF Hub push 완료.
+- DOD: task ① **200** + task ② **200** = **400 episodes** teleoperation 수집 완료 + HF Hub push 완료.
+- 진행 상태 (2026-05-18 기준): 110/400 (task1 50, task2 60). 남은 차수 plan: [`collection_log.md §다음 차수`](smolVLA/dgx/docs/finetune/leftarm_v2/collection_log.md)
 - 구현 대상: 수집 명령/스크립트 (`lerobot-record` 기반, DGX `dgx/docs/data_collection.md` 절차 따름). 실제 수집은 사용자 physical 작업.
 - 테스트: PHYS_REQUIRED — 사용자가 직접 teleoperation 으로 수집 (차수별 resume 권장).
 - 제약: 그리퍼(motor id=6) overload 방지 — 종료 시 그리퍼 살짝 열고 끝내기 (leftarm_v1 overload 크래시 이력). 차수별 분할 수집 + 휴식.
 - 잔여 리스크: `push_to_hub` 크래시 가능 (leftarm_v1 이력 — disconnect 크래시로 push skip → 수동 `LeRobotDataset(...).push_to_hub(...)` 복구 필요). 수집 중 USB enumeration 변동.
+- 다양화 (2026-05-18 도입): 8차부터 위치분포·조명·배경·시연자 (task1 도) 명시 — [collection_log.md §추가 다양화 영역](smolVLA/dgx/docs/finetune/leftarm_v2/collection_log.md)
 
 ### [ ] TODO-04: leftarm_v2 dataset 검증
 
-- DOD: leftarm_v2 가 200 episodes (task 분포 100/100) 로 수집 완료됨이 확인되고, frame shape·dtype·fps 가 학습 입력으로 유효하며, HF Hub repo 와 로컬이 정합함.
+- DOD: leftarm_v2 가 **400 episodes (task 분포 200/200)** 로 수집 완료됨이 확인되고, frame shape·dtype·fps 가 학습 입력으로 유효하며, HF Hub repo 와 로컬이 정합함.
 - 구현 대상: 검증 점검 (meta/info.json 파싱, task 분포 카운트).
 - 테스트: `ssh dgx` 로 `meta/info.json` + task 분포 확인 (SSH_AUTO) + HF Hub repo 확인.
 - 제약: 없음.
