@@ -1025,3 +1025,58 @@
   - `README.md` — "실행 방법" 섹션 추가. `scripts/run_coordinator.sh`(venv +
     LD_LIBRARY_PATH + coordinator 한 줄 실행)와 `scripts/live_monitor.sh` 안내.
   - `scripts/live_monitor.sh` — 신규 추적. RAM/GPU/프로세스/데몬 상태 1초 갱신.
+
+### 2026-05-18 (Coordinator ↔ NUC bridge 양방향 연결 + 시간 기반 동작 종료)
+
+- 한 줄 요약:
+  - Jetson coordinator 가 BHL 라우트에서 NUC bridge 로 실제 TCP/NDJSON 송신하고
+    동작 종료 DONE 까지 blocking 대기하도록 연결. bridge 측은 `duration_sec`
+    기반 시간 타이머 + 같은 TCP 위에 DONE 회신 채널 추가.
+- 결정 사항 (가이드 참조: `nuc/bhl/Jetson_NUC_연결_가이드.md`):
+  - 운용 방식: **턴제(turn-based)**. 음성 → JSON → 시작 음성 → 다리 → DONE →
+    종료 음성 → 다음 wake word 순서. 동작 중 다른 행동 없음.
+  - 동작 종료 판단: **시간 기반**. `duration_sec` 필드를 action 에 추가.
+    bridge 가 그 시간 만료 시 STOP UDP 송신 + Jetson 에 DONE 회신.
+  - 비상 정지: 향후 "멈춰" wake-word-less listener 별도 PR (모델 학습 의뢰 중).
+    현재는 mock_coordinator stop_mid 시나리오로 stop intent 즉시 종료 경로만
+    검증 완료.
+- 수정/추가한 파일:
+  - `configs/schemas/action.schema.json` — `duration_sec`(number, 0~30) required
+    필드 추가.
+  - `nuc/bhl/bridge.py` — 시간 타이머 (`timer_loop`, `active_deadline`),
+    DONE 송신 (`send_done`/`finish_active_action`), stop·EMERGENCY·safety_off
+    즉시 종료, 새 동작 시작 (`start_active_action`) + keepalive 시 deadline 유지
+    로직. `DEFAULT_DURATION_SEC`/`MAX_DURATION_SEC` 환경변수 override.
+  - `jetson/core/bhl_client.py` — 신규. NUC bridge 와 TCP 양방향 NDJSON
+    클라이언트. 송신 워커(keepalive 10Hz) + DONE 수신 워커 + 재연결 + 모든
+    예외 격리. `set_command`/`clear`/`wait_for_done` API. `HYLION_BHL_HOST`,
+    `HYLION_BHL_PORT`, `HYLION_BHL_KEEPALIVE_HZ` env override.
+  - `jetson/core/coordinator.py` — `_dispatch_to_bhl` 함수 추가 (송신→DONE 대기
+    →clear). `_route_action` BHL 분기에서 호출. `main`에서 `BhlClient` 생성/
+    종료, `HYLION_BHL_DISABLE=1` 로 stub mode 가능. 기존 standby/greeting/
+    unknown 액션 빌더에 `duration_sec: 0.0` 추가.
+  - `jetson/core/llm/prompt.py` — `derive_full_action`에 `duration_sec`
+    필드 derive (move=3.0, 그 외=0.0). 현재는 harness-derived 고정값, 향후
+    LLM 출력에 추가하면 사용자 요청 강도 따라 동적 조절 가능.
+  - `nuc/bhl/tests/mock_coordinator.py` — DONE 수신 백그라운드 스레드
+    (`DoneReader`), `duration_sec` 시나리오 (walk/turn 5s, emergency 5s 등),
+    신규 `stop_mid` 시나리오. mock cmd 에 `duration_sec` 기본 포함.
+  - `nuc/bhl/Jetson_NUC_연결_가이드.md` — 신규. 비전공자 친화적인 작업 설명서.
+    용어 → 식당 비유 → 전체 흐름 → 컴포넌트 4개 → 안전장치 3중 → 작업 분해
+    → 검증 시나리오 → Q&A.
+- 검증 결과 (Windows 로컬, bridge + mock_bhl_receiver + mock_coordinator):
+  - `walk` 시나리오: cold_start (1.5s) → walk_forward 20Hz UDP → 2s 후 자동
+    STOP + DONE(`duration_elapsed`) 회신 확인. 끝-to-끝 OK.
+  - `stop_mid` 시나리오: walk 진행 중 stop intent → 즉시 STOP UDP + DONE
+    (`stop_command`) 회신 확인. 우선순위 분기 OK.
+  - UDP 측 모드 전환: `mode=2 RL_INIT` → `mode=3 RL_RUNNING` → `mode=0
+    vx=+0.500` → `mode=1 STOP` 정상.
+- 다음 환경에서 바로 할 일 (Jetson + NUC):
+  - Jetson 에서 `python -m jetson.core.coordinator` 실행해 실 마이크로 "앞으로
+    가" 테스트. `[BHL] TX` / `[BHL] DONE` 로그 + 음성 시작/종료 둘 다 나오는지.
+  - NUC IP 결정 후 `HYLION_BHL_HOST` env 설정 (기본 127.0.0.1).
+  - 비상정지용 "멈춰" wake word 모델 학습 의뢰. 산출물 `Stop_KR.tflite` 는
+    `checkpoints/wakeword/` 에 배치하고 `wake_word.py` 의 모델 목록에 추가.
+  - 4번/5번 (다른 팀원 영역): DGX 학습 정책의 명령 범위가 BHL 원본
+    `lin_vel_x∈[-0.5, 0.5]` 와 다르면 `BRIDGE_VEL_FORWARD` env 로 bridge 측
+    재튜닝.

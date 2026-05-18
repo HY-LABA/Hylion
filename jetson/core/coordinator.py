@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 from datetime import datetime, timezone
 from pathlib import Path
@@ -50,6 +51,7 @@ WHISPER_HALLUCINATION_PHRASES = frozenset({
 	"이 영상은 유료광고를 포함하고 있습니다",
 })
 
+from jetson.core.bhl_client import BhlClient
 from jetson.core.gesture_client import start_gesture_daemon
 from jetson.core.llm import build_llm_backend
 from jetson.core.network import is_online
@@ -59,6 +61,12 @@ from jetson.expression.microphone import record_to_wav, wav_has_speech
 from jetson.expression.mouth_servo import cleanup_gpio, MouthServoController
 from jetson.expression.speaker import DEFAULT_CLOVA_SPEAKER, build_tts_backend
 from jetson.expression.wake_word import build_wake_word_listener
+
+
+# BHL 동작 완료 알림 timeout 여유분(초). duration_sec + 이 값까지 대기.
+BHL_DONE_TIMEOUT_MARGIN_SEC = 2.0
+# duration_sec 누락/0 일 때 사용할 기본 대기 (BhlClient.wait_for_done 의 timeout 계산용).
+BHL_DEFAULT_DURATION_SEC = 3.0
 
 
 
@@ -122,6 +130,7 @@ def _build_standby_action(session_id: str, reason: str = "task_completed") -> di
 		"requires_bhl": False,
 		"gait_cmd": "none",
 		"gesture_name": "none",
+		"duration_sec": 0.0,
 		"state_current": "IDLE",
 		"safety_allowed": True,
 		"fallback_policy": reason,
@@ -155,6 +164,7 @@ def _build_unknown_action(session_id: str, reason: str = "no_speech", reply_text
 		"requires_bhl": False,
 		"gait_cmd": "none",
 		"gesture_name": "none",
+		"duration_sec": 0.0,
 		"state_current": "IDLE",
 		"safety_allowed": True,
 		"fallback_policy": reason,
@@ -201,18 +211,30 @@ def _build_turn_services(
 	return False, stt_backend, llm_backend, tts_backend
 
 
-def _route_action(action_json: dict) -> None:
+def _route_action(action_json: dict, bhl_client: BhlClient | None = None) -> None:
+	"""intent 별 executor 분기.
+
+	BHL 라우트는 bhl_client 가 주어지면 실제로 NUC bridge 로 송신하고 DONE 까지 대기.
+	bhl_client 가 None 이면 옛 동작(stdout 로그만) — 테스트/오프라인 디버깅용.
+	"""
 	intent = action_json.get("intent")
 	if intent == "pick_place":
 		print("[Executor] pick_place -> SMOLVLA executor route")
-	elif intent in {"move", "stop"}:
-		print("[Executor] move/stop -> BHL executor route")
-	elif intent == "chat":
+		sleep(0.2)
+		return
+
+	if intent in {"move", "stop"}:
+		if bhl_client is None:
+			print("[Executor] move/stop -> BHL executor route (bhl_client=None, stub)")
+			sleep(0.2)
+			return
+		_dispatch_to_bhl(action_json, bhl_client)
+		return
+
+	if intent == "chat":
 		print("[Executor] chat -> reply/TTS route")
 	else:
 		print("[Executor] no-op route")
-
-	# Phase 4 mock executor delay.
 	sleep(0.2)
 
 
@@ -240,6 +262,41 @@ def _play_gesture_if_any(action_json: dict, gesture_daemon) -> None:
 	else:
 		# 데몬 미가동/미준비/큐가득/데이터오류 — 전부 로그만, 대화 루프는 유지.
 		print(f"[Gesture] {gesture_name} -> 재생 불가: {msg}")
+
+
+def _dispatch_to_bhl(action_json: dict, bhl_client: BhlClient) -> None:
+	"""BHL 라우트 본체. 송신 → DONE 대기 → idle 복귀.
+
+	안전 원칙:
+	  - 모든 통신 예외를 흡수해서 coordinator main 흐름이 죽지 않게 함
+	  - DONE 못 받으면 timeout 으로 끝내고 음성 안내 (이 함수 호출자가 처리)
+	  - 마지막에 반드시 bhl_client.clear() 호출 (다음 명령이 자동 송신되지 않도록)
+	"""
+	action_id = action_json.get("action_id") or "unknown"
+	intent = action_json.get("intent")
+	duration = float(action_json.get("duration_sec") or BHL_DEFAULT_DURATION_SEC)
+	timeout = duration + BHL_DONE_TIMEOUT_MARGIN_SEC
+	# stop intent 는 bridge 가 즉시 DONE 회신하므로 짧은 timeout
+	if intent == "stop":
+		timeout = BHL_DONE_TIMEOUT_MARGIN_SEC
+
+	try:
+		bhl_client.set_command(action_json)
+		print(f"[BHL] TX action_id={action_id} intent={intent} gait={action_json.get('gait_cmd')} "
+		      f"duration={duration:.1f}s timeout={timeout:.1f}s")
+
+		got_done, reason = bhl_client.wait_for_done(action_id, timeout=timeout)
+		if got_done:
+			print(f"[BHL] DONE action_id={action_id} reason={reason}")
+		else:
+			print(f"[BHL] TIMEOUT action_id={action_id} (no DONE within {timeout:.1f}s)")
+	except Exception as exc:
+		print(f"[BHL] dispatch failed: {exc}")
+	finally:
+		try:
+			bhl_client.clear()
+		except Exception as exc:
+			print(f"[BHL] clear failed: {exc}")
 
 
 def _speak_reply_if_any(action_json: dict, stage: str, tts_backend, mouth_servo=None) -> None:
@@ -284,6 +341,7 @@ def _build_greeting_action(session_id: str) -> dict:
 		"requires_bhl": False,
 		"gait_cmd": "none",
 		"gesture_name": "none",
+		"duration_sec": 0.0,
 		"state_current": "IDLE",
 		"safety_allowed": True,
 		"fallback_policy": "greeting",
@@ -297,6 +355,7 @@ def run_live_pipeline(
 	whisper_language: str,
 	wakeword_listener,
 	gesture_daemon,
+	bhl_client: BhlClient | None = None,
 ) -> None:
 	session_id = f"sess-live-{uuid4().hex[:8]}"
 	# Conversation memory persists across wake-word re-activations within a single
@@ -462,7 +521,7 @@ def run_live_pipeline(
 				continue
 
 			# Non-chat, non-standby intent: execute action, then generate auto-standby
-			_route_action(action_json)
+			_route_action(action_json, bhl_client=bhl_client)
 
 			standby_action = _build_standby_action(session_id=session_id, reason=f"auto_after_{intent}")
 			_print_block("ACTION_JSON (AUTO-STANDBY)", standby_action)
@@ -527,6 +586,7 @@ def _startup_warm_up(args: argparse.Namespace) -> None:
 def main() -> None:
 	args = _parse_args()
 	wakeword_listener = None
+	bhl_client: BhlClient | None = None
 	# Spawn the gesture daemon first so its ~8-10s warm-up (torch import + arm
 	# connect, in the .hylion_arm venv) overlaps with model warm-up below.
 	# Failure is non-fatal — start_gesture_daemon() returns a disabled handle.
@@ -538,6 +598,15 @@ def main() -> None:
 			print("[Warm-up] Gesture daemon ... OK")
 		else:
 			print("[Warm-up] Gesture daemon ... 미준비 (gesture 비활성 상태로 계속)")
+
+		# NUC bridge 연결 클라이언트. NUC 가 꺼져 있어도 백그라운드에서 재연결 시도하므로
+		# coordinator 본체는 영향 없음. 명시적으로 비활성화하려면 HYLION_BHL_DISABLE=1.
+		if os.environ.get("HYLION_BHL_DISABLE") == "1":
+			print("[BHL] HYLION_BHL_DISABLE=1 -> BhlClient skipped (stub mode)")
+		else:
+			bhl_client = BhlClient()
+			bhl_client.start()
+
 		run_live_pipeline(
 			record_sec=args.record_sec,
 			preferred_keyword=args.preferred_keyword,
@@ -545,10 +614,16 @@ def main() -> None:
 			whisper_language=args.whisper_language,
 			wakeword_listener=wakeword_listener,
 			gesture_daemon=gesture_daemon,
+			bhl_client=bhl_client,
 		)
 	except KeyboardInterrupt:
 		print("Coordinator stopped by user.")
 	finally:
+		if bhl_client is not None:
+			try:
+				bhl_client.stop()
+			except Exception as exc:
+				print(f"[Cleanup] bhl_client stop failed: {exc}")
 		try:
 			gesture_daemon.stop()
 		except Exception as exc:

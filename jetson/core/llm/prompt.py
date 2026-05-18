@@ -283,6 +283,9 @@ def derive_full_action(
 		"requires_bhl": intent in {"move", "stop"},
 		"gait_cmd": gait_cmd,
 		"gesture_name": gesture_name if intent == "chat" else "none",
+		# duration_sec: bridge 가 동작을 얼마나 유지할지. 현재는 harness-derived (move=3s 고정).
+		# 사용자 요청 강도에 따른 동적 조절은 추후 CORE_FIELDS 에 추가하면서 활성화.
+		"duration_sec": 3.0 if intent == "move" else 0.0,
 		"state_current": _INTENT_STATE.get(intent, "IDLE"),
 		"safety_allowed": True,
 		"fallback_policy": fallback_policy,

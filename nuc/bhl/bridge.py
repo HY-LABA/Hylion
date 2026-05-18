@@ -7,8 +7,9 @@ bridge.py - Hylion Coordinator(JSON) -> BHL lowlevel(UDP 13-byte) 브리지
   - Jetson coordinator 가 TCP/NDJSON 으로 보내는 행동 결정을
   - BHL C 컨트롤러가 기대하는 13-byte little-endian UDP 패킷("<Bfff")으로 변환
   - watchdog / safety / cold-start 보장
+  - duration_sec 기반 시간 타이머: 동작 종료 시점에 자동 STOP + Jetson 에 DONE 회신
 
-자세한 사양: nuc/bhl/BHL_Bridge_Handoff.md
+자세한 사양: nuc/bhl/Jetson_NUC_연결_가이드.md
 """
 
 import json
@@ -21,6 +22,7 @@ import sys
 import threading
 import time
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from typing import Optional
 
 
@@ -45,6 +47,8 @@ WATCHDOG_TIMEOUT_S = 0.2     # 마지막 RX 이후 이 시간 넘으면 STOP. 20
 SEND_RATE_HZ = 20.0          # C joystick_loop polling 주기와 매칭(real_humanoid.cpp).
 COLD_START_INIT_WAIT_S = 1.5 # RL_INIT 진입 후 init_percentage 1.0 도달 보장 시간(1.0초 + 여유).
 COLD_START_RUNNING_SETTLE_S = 0.1  # RL_RUNNING 진입 후 안정화 짧은 대기.
+DEFAULT_DURATION_SEC = 3.0   # action_json 에 duration_sec 가 없거나 0 일 때 사용.
+MAX_DURATION_SEC = 30.0      # 안전 상한. 이보다 큰 값은 clamp.
 
 # ↓↓↓ TUNE: 로깅 ↓↓↓
 LOG_LEVEL = "INFO"           # DEBUG 로 바꾸면 매 패킷 송신 로그까지 나옴
@@ -85,6 +89,10 @@ class BridgeState:
     cold_start_done: bool = False
     running: bool = True
     client_connected: bool = False
+    # 현재 활성 동작
+    active_action_id: Optional[str] = None
+    active_deadline: Optional[float] = None  # monotonic 기준
+    active_conn: Optional[socket.socket] = None  # DONE 회신용
 
 
 state = BridgeState()
@@ -93,8 +101,12 @@ udp_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 log = logging.getLogger("bridge")
 
 
+def utc_now_iso() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
 # =============================================================================
-# JSON -> UDP 매핑 (섹션 6 결정 우선순위)
+# JSON -> UDP 매핑 (가이드 §6 결정 우선순위)
 # =============================================================================
 def map_json_to_packet(msg: dict) -> bytes:
     """coordinator 의 action JSON 한 건을 UDP 패킷으로 변환.
@@ -128,6 +140,17 @@ def map_json_to_packet(msg: dict) -> bytes:
     return NEUTRAL_PACKET
 
 
+def clamp_duration(value) -> float:
+    """LLM/스키마 외부에서 들어오는 duration_sec 을 안전 범위로 보정."""
+    try:
+        d = float(value)
+    except (TypeError, ValueError):
+        return DEFAULT_DURATION_SEC
+    if d <= 0:
+        return DEFAULT_DURATION_SEC
+    return min(d, MAX_DURATION_SEC)
+
+
 # =============================================================================
 # Cold start: IDLE -> RL_INIT -> RL_RUNNING
 # =============================================================================
@@ -157,6 +180,52 @@ def cold_start() -> None:
 
 
 # =============================================================================
+# Jetson 에 DONE 회신
+# =============================================================================
+def send_done(conn: Optional[socket.socket], action_id: Optional[str], reason: str) -> None:
+    """Jetson coordinator 에 동작 종료 알림. 같은 TCP 연결 위에 NDJSON 한 줄로.
+
+    실패해도 예외 전파 안 함 (브리지 본체가 죽지 않게).
+    """
+    if conn is None or action_id is None:
+        return
+    msg = {
+        "event": "done",
+        "action_id": action_id,
+        "reason": reason,
+        "timestamp": utc_now_iso(),
+    }
+    try:
+        line = (json.dumps(msg) + "\n").encode("utf-8")
+        conn.sendall(line)
+        log.info("TX DONE action_id=%s reason=%s", action_id, reason)
+    except OSError as e:
+        log.warning("send DONE failed: %s", e)
+
+
+def finish_active_action(reason: str) -> None:
+    """현재 활성 동작을 종료시키고 Jetson 에 DONE 회신.
+
+    호출 시점:
+      - 시간 타이머 만료 (timer_loop)
+      - 명시적 stop intent 수신 (handle_client)
+      - 안전 게이트 발동 시 (safety_allowed=False, EMERGENCY)
+    """
+    with state_lock:
+        action_id = state.active_action_id
+        conn = state.active_conn
+        had_active = action_id is not None
+        # 활성 클리어 + UDP 는 다음 사이클부터 STOP
+        state.active_action_id = None
+        state.active_deadline = None
+        state.current_packet = STOP_PACKET
+
+    if had_active:
+        log.info("FINISH action_id=%s reason=%s", action_id, reason)
+        send_done(conn, action_id, reason)
+
+
+# =============================================================================
 # TCP server
 # =============================================================================
 def tcp_server_loop() -> None:
@@ -183,19 +252,49 @@ def tcp_server_loop() -> None:
             # 새 연결은 항상 cold start 다시 진행
             state.cold_start_done = False
             state.current_packet = STOP_PACKET
+            state.active_conn = conn
+            state.active_action_id = None
+            state.active_deadline = None
 
         try:
             handle_client(conn)
         except Exception as e:
             log.exception(f"client handler crashed: {e}")
         finally:
-            conn.close()
+            # 끊김 시 진행 중 동작 종료 처리 (DONE 못 보냄 — 연결 이미 끊김)
             with state_lock:
                 state.client_connected = False
                 state.current_packet = STOP_PACKET
+                state.active_action_id = None
+                state.active_deadline = None
+                state.active_conn = None
+            try:
+                conn.close()
+            except OSError:
+                pass
             log.warning("client disconnected -> STOP, waiting for reconnect")
 
     srv.close()
+
+
+def start_active_action(msg: dict, conn: socket.socket) -> None:
+    """movement 명령 수신 시 활성 동작 시작 + 타이머 갱신."""
+    action_id = msg.get("action_id")
+    duration = clamp_duration(msg.get("duration_sec"))
+    packet = map_json_to_packet(msg)
+    deadline = time.monotonic() + duration
+
+    with state_lock:
+        state.current_packet = packet
+        state.last_rx_time = time.time()
+        state.active_action_id = action_id
+        state.active_deadline = deadline
+        state.active_conn = conn
+
+    log.info(
+        "START action_id=%s gait=%s duration=%.2fs",
+        action_id, msg.get("gait_cmd"), duration,
+    )
 
 
 def handle_client(conn: socket.socket) -> None:
@@ -223,7 +322,6 @@ def handle_client(conn: socket.socket) -> None:
                 msg = json.loads(line.decode("utf-8"))
             except (json.JSONDecodeError, UnicodeDecodeError) as e:
                 log.error(f"parse error: {e} (line={line[:120]!r})")
-                # 파싱 실패 시 이전 명령 유지. 죽지 않음.
                 continue
 
             # cold start 는 첫 유효 메시지 수신 시 한 번
@@ -232,20 +330,66 @@ def handle_client(conn: socket.socket) -> None:
             if need_cold_start:
                 cold_start()
 
-            packet = map_json_to_packet(msg)
-            with state_lock:
-                state.current_packet = packet
-                state.last_rx_time = time.time()
-
             log.info(
-                "RX action_id=%s gait=%s intent=%s state=%s safe=%s bhl=%s",
+                "RX action_id=%s gait=%s intent=%s state=%s safe=%s bhl=%s dur=%s",
                 msg.get("action_id"),
                 msg.get("gait_cmd"),
                 msg.get("intent"),
                 msg.get("state_current"),
                 msg.get("safety_allowed"),
                 msg.get("requires_bhl"),
+                msg.get("duration_sec"),
             )
+
+            # 안전 게이트: 진행 중이던 동작도 즉시 종료
+            if (not msg.get("safety_allowed", False)
+                    or msg.get("state_current") == "EMERGENCY"):
+                finish_active_action("safety_or_emergency")
+                continue
+
+            intent = msg.get("intent")
+            requires_bhl = bool(msg.get("requires_bhl", False))
+
+            # 명시적 stop: 진행 중이던 동작을 종료
+            if intent == "stop":
+                finish_active_action("stop_command")
+                continue
+
+            # BHL 무관 메시지: 무시 (coordinator 가 chat/standby 를 안 보내야 정상.
+            # 보냈더라도 active 동작은 그대로 두고 패킷 변경 없이 keepalive 만 처리)
+            if not requires_bhl or intent not in {"move"}:
+                with state_lock:
+                    state.last_rx_time = time.time()
+                continue
+
+            # movement 명령 — 새 동작 시작 (keepalive 도 같은 경로로 들어옴.
+            # action_id 가 같으면 deadline 유지하면서 패킷만 갱신, 다르면 새 동작으로 갈음)
+            with state_lock:
+                same_action = (state.active_action_id == msg.get("action_id"))
+            if same_action:
+                # keepalive — deadline 은 유지, 패킷/last_rx_time 만 갱신
+                with state_lock:
+                    state.current_packet = map_json_to_packet(msg)
+                    state.last_rx_time = time.time()
+            else:
+                # 새 동작 시작 (이전 동작이 있다면 그 동작은 자동 폐기, DONE 안 보냄
+                # — 같은 coordinator 가 새 명령 보낸 거라 굳이 DONE 줄 필요 없음)
+                start_active_action(msg, conn)
+
+
+# =============================================================================
+# 시간 타이머 (active_deadline 만료 감시)
+# =============================================================================
+def timer_loop() -> None:
+    """100ms 주기로 active_deadline 체크. 만료 시 finish_active_action."""
+    while state.running:
+        time.sleep(0.05)
+        with state_lock:
+            deadline = state.active_deadline
+        if deadline is None:
+            continue
+        if time.monotonic() >= deadline:
+            finish_active_action("duration_elapsed")
 
 
 # =============================================================================
@@ -310,7 +454,7 @@ def apply_env_overrides() -> None:
     """간단한 env 기반 오버라이드. CLI 인자 안 받고 systemd EnvironmentFile 으로 조절."""
     global TCP_LISTEN_HOST, TCP_LISTEN_PORT, UDP_TARGET_HOST, UDP_TARGET_PORT
     global WATCHDOG_TIMEOUT_S, SEND_RATE_HZ, LOG_LEVEL, LOG_FILE
-    global VEL_FORWARD_MPS, VEL_TURN_LEFT_RPS
+    global VEL_FORWARD_MPS, VEL_TURN_LEFT_RPS, DEFAULT_DURATION_SEC, MAX_DURATION_SEC
 
     TCP_LISTEN_HOST = os.environ.get("BRIDGE_TCP_HOST", TCP_LISTEN_HOST)
     TCP_LISTEN_PORT = int(os.environ.get("BRIDGE_TCP_PORT", TCP_LISTEN_PORT))
@@ -320,6 +464,8 @@ def apply_env_overrides() -> None:
     SEND_RATE_HZ = float(os.environ.get("BRIDGE_SEND_HZ", SEND_RATE_HZ))
     VEL_FORWARD_MPS = float(os.environ.get("BRIDGE_VEL_FORWARD", VEL_FORWARD_MPS))
     VEL_TURN_LEFT_RPS = float(os.environ.get("BRIDGE_VEL_TURN_LEFT", VEL_TURN_LEFT_RPS))
+    DEFAULT_DURATION_SEC = float(os.environ.get("BRIDGE_DEFAULT_DURATION_S", DEFAULT_DURATION_SEC))
+    MAX_DURATION_SEC = float(os.environ.get("BRIDGE_MAX_DURATION_S", MAX_DURATION_SEC))
     LOG_LEVEL = os.environ.get("BRIDGE_LOG_LEVEL", LOG_LEVEL)
     LOG_FILE = os.environ.get("BRIDGE_LOG_FILE") or None
 
@@ -341,18 +487,19 @@ def main() -> None:
     apply_env_overrides()
     setup_logging()
     log.info(
-        "config: tcp=%s:%d udp=%s:%d watchdog=%.3fs send=%.0fHz vF=%.2f vT=%.2f",
+        "config: tcp=%s:%d udp=%s:%d watchdog=%.3fs send=%.0fHz vF=%.2f vT=%.2f durDef=%.1f durMax=%.1f",
         TCP_LISTEN_HOST, TCP_LISTEN_PORT,
         UDP_TARGET_HOST, UDP_TARGET_PORT,
         WATCHDOG_TIMEOUT_S, SEND_RATE_HZ,
         VEL_FORWARD_MPS, VEL_TURN_LEFT_RPS,
+        DEFAULT_DURATION_SEC, MAX_DURATION_SEC,
     )
 
     signal.signal(signal.SIGINT, shutdown)
     signal.signal(signal.SIGTERM, shutdown)
 
-    t_tcp = threading.Thread(target=tcp_server_loop, name="tcp", daemon=True)
-    t_tcp.start()
+    threading.Thread(target=tcp_server_loop, name="tcp", daemon=True).start()
+    threading.Thread(target=timer_loop, name="timer", daemon=True).start()
 
     # UDP sender 를 main 스레드에서 돌려서 시그널 즉시 처리되게.
     udp_sender_loop()
