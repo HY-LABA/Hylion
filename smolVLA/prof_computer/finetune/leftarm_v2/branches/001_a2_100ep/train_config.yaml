@@ -1,8 +1,8 @@
 # prof_computer/leftarm_v2/train_config.yaml — 본 학습 (2A) 설정.
 #
-# DGX 의 dgx/finetune/leftarm_v2/config/train_config.yaml 의 PC 적응판:
+# 학습 설정 (PC 노드 단독 책임 — DGX 학습 잠정 중단, 2026-05-18):
 #   - 학습 방법론 (LoRA r=16, all-linear, batch 16, steps 20000) — DGX 와 동일.
-#     결정 근거: dgx/docs/finetune/leftarm_v2/model_config.md §3 (A2 채택).
+#     결정 근거: prof_computer/docs/model_config.md §3 (A2 채택).
 #   - num_workers — DGX 는 시도1 OOM 후 8→2. PC 는 VRAM·system RAM 분리 모델이라
 #     workers 가 GPU 영향 없음 → DGX 보다 늘려도 안전. 단 smoke test 결과 보고 결정.
 #   - video_backend: torchcodec 명시 — lerobot default 와 동일하나 명시.

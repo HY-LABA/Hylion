@@ -1,8 +1,9 @@
 """prof_computer/finetune/leftarm_v2/_lib.py — run_train.py 공용 헬퍼.
 
-dgx/finetune/leftarm_v2/_lib.py 의 구조 동일 복제. prof_computer 는 학습 전용이라
+dgx/finetune/leftarm_v2/_lib.py (수집 전용 헬퍼) 의 구조 동일 복제. prof_computer 는 학습 전용이라
 record/teleop 헬퍼 (load_configs, get_hardware, check_calibration, build_cameras_arg,
 resolve_robot_teleop) 는 dead code — 호출되지 않음. 구조 일관성 위해 유지.
+DGX 학습 잠정 중단 (2026-05-18) 후 prof_computer 가 학습 단독 책임.
 
 run_train.py 가 import 하는 건 die, expand_path 뿐.
 """

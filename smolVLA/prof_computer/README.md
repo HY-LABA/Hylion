@@ -5,7 +5,7 @@
 > 등록: 2026-05-16 · **M1.5 중간점검 학습 완주: 2026-05-17** (leftarm_v2 100ep subset, 75000 step)
 > 실측 사양: [02_hardware.md §6](../docs/storage/02_hardware.md) · 소프트웨어: [03_software.md §7](../docs/storage/03_software.md)
 >
-> **위치**: M1 (200ep 수집 중, 100ep 도달) → **M1.5 (현재 사이클, prof_computer 로 이관 — image 변환 폐기, video dataset 그대로 학습 성공)** → M2 (200ep 완성 후 본 학습, 미시작) → M3 (Orin 추론).
+> **위치**: M1 (**400ep** 수집 중, 110ep 도달 — 2026-05-18 목표 200→400 조정) → **M1.5 (완료 — prof_computer 이관, video dataset 그대로 학습 성공)** → M2 (400ep 완성 후 본 학습, 미시작) → M3 (Orin 추론).
 
 ## 1) 노드 정체성
 
@@ -20,7 +20,7 @@
 
 ## 2) DGX 와의 분담
 
-- **공유**: 데이터셋 (HF Hub) + lerobot upstream (`docs/reference/lerobot/`) + finetune config (`dgx/finetune/leftarm_v2/`)
+- **공유**: 데이터셋 (HF Hub) + lerobot upstream (`docs/reference/lerobot/`). DGX 의 *수집 config* (`dgx/finetune/leftarm_v2/{base,record}_config.yaml`) 는 *DGX 노드 한정* — 학습 config 는 prof_computer 측 (`prof_computer/finetune/leftarm_v2/config/`) 자체 보유 (2026-05-18 DGX 학습 잠정 중단 후 분리).
 - **분리**: venv 위치, 학습 산출물 (`~/prof_computer_runs/` vs DGX `~/smolvla/dgx/outputs/`), wandb run name (`_pc_` 접두로 구분)
 
 ## 3) DGX vs prof_computer — 메모리 모델 차이 (운영 핵심)
@@ -51,12 +51,21 @@ prof_computer/
 ├── scripts/
 │   ├── setup_env.sh                # WSL apt + venv + lerobot/torchcodec 설치
 │   ├── env_check.sh                # 학습 전 환경 검증
-│   └── run_train.sh                # dgx/finetune/leftarm_v2/run_train.py 호출 래퍼
+│   └── run_train.sh                # finetune/leftarm_v2/run_train.py 호출 래퍼 (선택)
 ├── finetune/
 │   └── leftarm_v2/
-│       └── README.md               # DGX config 공유 + PC 전용 차이만 기록
+│       ├── README.md               # 학습 entry 소개 + 분기 사용법
+│       ├── config/                 # 학습 config (DGX 분리 후 자체 보유)
+│       ├── run_train.py            # M1.5 원본 학습 entry
+│       └── run_train_camera_empty.py  # camera_empty 검증 분기 entry
 └── docs/
-    └── learning_log.md             # PC 학습 시도 기록 (DGX training_log 와 별도)
+    ├── model_config.md             # 학습 방법 매트릭스·hyperparameter (leftarm_v2/v3+ 공통)
+    └── leftarm_v2/                 # leftarm_v2 사이클 한정 자료
+        ├── learning_log.md         # PC 학습 시도 기록
+        ├── orin_a2_eval_2026-05-17.md       # A2 ckpt 추론 평가
+        ├── orin_base_eval_2026-05-17.md     # base smolvla_base 0-shot 평가
+        ├── research_empty_cameras_2026-05-18.md  # researcher 보고서
+        └── after_run_checklist.md  # 학습 직후 체크리스트
 ```
 
 > ⚠️ **upstream 옵션 B 일관**: prof_computer 도 `docs/reference/lerobot/` editable install 을 그대로 사용 — DGX 와 같은 정책. lerobot 코드 분기 없음.
@@ -98,6 +107,6 @@ prof_computer/
 ### 다음 사이클
 
 - [ ] **Orin 추론 검증** — `lerobot-record --policy.path=BaboGaeguri/leftarm_v2_A2_pc_2026-05-17 ...` 으로 시연장 정성 평가 (M3 영역 일부 선검증)
-- [ ] **M1 완성** — 잔여 100ep 수집 (현재 100/200 ep)
-- [ ] **M2 본 학습** — 200ep 완성 후 prof_computer 또는 (가능 시) DGX 에서 본 학습
+- [ ] **M1 완성** — 잔여 290ep 수집 (현재 110/400 ep, 2026-05-18 목표 200→400 조정)
+- [ ] **M2 본 학습** — 400ep 완성 후 prof_computer 에서 본 학습 (DGX 학습 잠정 중단 상태 유지 가정)
 - [ ] DGX 의 aarch64 ecosystem 정비 (torchcodec wheel 또는 FFmpeg 7) — backlog (장기)

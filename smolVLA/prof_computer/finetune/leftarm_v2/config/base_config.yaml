@@ -1,6 +1,6 @@
 # prof_computer/leftarm_v2/base_config.yaml — 셋업 컨텍스트 (학습 전용)
 #
-# DGX 의 dgx/finetune/leftarm_v2/config/base_config.yaml 의 PC 적응판:
+# 셋업 컨텍스트 (PC 노드 단독 책임 — DGX 학습 잠정 중단, 2026-05-18):
 #   - 식별·dataset·계정 — DGX 와 동일 (HF Hub 공유)
 #   - paths.output_root — prof_computer 로컬 경로
 #   - hardware/robot/teleop/cameras/calibration — prof_computer 는 SO-ARM 미연결,
