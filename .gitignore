@@ -209,8 +209,11 @@ marimo/_static/
 marimo/_lsp/
 __marimo__/
 
-# Ignore all Legacy folders and their contents
+# Ignore all Legacy folders and their contents (case-insensitive 매칭 — Windows 파일시스템 영향)
 Legacy/
+# Exception: smolVLA/dgx/legacy/ 는 DGX 학습 시도 보존 영역 (의도된 추적 대상 — 2026-05-18 도입)
+!smolVLA/dgx/legacy/
+!smolVLA/dgx/legacy/**
 
 .mp3
 .wav
