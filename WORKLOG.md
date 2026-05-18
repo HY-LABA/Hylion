@@ -1080,3 +1080,105 @@
   - 4번/5번 (다른 팀원 영역): DGX 학습 정책의 명령 범위가 BHL 원본
     `lin_vel_x∈[-0.5, 0.5]` 와 다르면 `BRIDGE_VEL_FORWARD` env 로 bridge 측
     재튜닝.
+
+### 2026-05-18 (e-stop wake-word 마무리)
+
+- 학습된 "stop" wake-word 모델이 `checkpoints/wakeword/stop.tflite` (+ `.onnx`)
+  로 도착함. `wake_word.py` / `coordinator.py` 의 e-stop 와이어링이 이전 세션
+  들에서 부분 적용된 상태였는데, 전체 흐름을 다시 검토해서 작동 가능한
+  최종 형태로 정리.
+- 동작 흐름 (move turn 기준):
+  1. coordinator 가 move action 을 BHL bridge 로 송신 직전,
+     `EmergencyStopListener.start(on_trigger)` 호출 — mic 점유.
+  2. listener 가 "stop" 검출하면 콜백이 EMERGENCY action 을
+     `bhl_client.set_command()` 로 푸시. bridge 의 `map_json_to_packet` 이
+     `state_current==EMERGENCY` 분기로 즉시 STOP UDP + 원래 action 의
+     DONE(`safety_or_emergency`) 회신.
+  3. coordinator 의 `wait_for_done` 이 풀리면서 `_dispatch_to_bhl` 이
+     `listener.stop()` → mic 즉시 해제.
+  4. `_route_action` 이 reason 을 반환하면 `run_live_pipeline` 이
+     standby reply 를 "비상정지했어요. 다음 지시를 기다릴게요." 로 교체.
+- 안전 원칙:
+  - listener 가 mic 을 점유하는 구간은 정확히 BHL move 실행 구간 →
+    녹음 루프 / main wake listener 와 mic 충돌 없음 (ALSA single-open
+    제약 회피).
+  - threshold 는 main wake 보다 낮은 0.4 (missed e-stop 이 false e-stop
+    보다 훨씬 위험하므로 false positive 쪽으로 살짝 치우치게).
+  - stop intent 자체는 e-stop listener 안 띄움 (이미 stop 명령이라 mic
+    점유 낭비).
+  - listener.available==False (모델/오디오 미가용) 면 dispatch 측이 자동
+    우회하고 move 는 e-stop 없이 정상 실행.
+- 수정/추가한 파일:
+  - `checkpoints/wakeword/stop.tflite`, `checkpoints/wakeword/stop.onnx`
+    — 학습 산출물 추가 (Git 추적).
+  - `jetson/expression/wake_word.py` — `EmergencyStopListener` 클래스 +
+    `build_emergency_stop_listener()`. `start(on_trigger)` per-call 콜백
+    인자 (각 dispatch 마다 다른 session_id closure 를 잡아야 해서 instance
+    에 저장하지 않음). `DEFAULT_ESTOP_MODEL`/`DEFAULT_ESTOP_THRESHOLD` 환경
+    변수 override.
+  - `jetson/core/coordinator.py` — `_build_emergency_stop_action()` (state
+    EMERGENCY + intent stop + requires_bhl true). `_dispatch_to_bhl` 시그
+    니처에 `estop_listener`/`session_id` 추가, set_command 직전 start,
+    wait_for_done 직후 stop, reason 반환. `_route_action` 이 reason 전파.
+    `run_live_pipeline` 이 reason==safety_or_emergency 면 standby reply
+    교체. `main()` 이 listener 생성 + 종료 cleanup.
+- 검증 (예정):
+  - Jetson 에서 `python -m jetson.core.coordinator` 실행, "앞으로 가" 로
+    move 시작 후 1~2 초 사이 "stop" 발화 → `[E-Stop]` 로그 +
+    `[BHL] DONE reason=safety_or_emergency` + "비상정지했어요" TTS.
+  - 동일 시나리오에서 stop 발화 없이 끝까지 가서 정상 종료 ("작업을
+    마쳤고…") 도 회귀 없는지.
+- 다음 환경에서 바로 할 일:
+  - 위 두 가지 실제 마이크 시나리오 검증 + 결과 본 파일에 기록.
+  - false trigger 잦으면 `HYLION_ESTOP_THRESHOLD` 로 0.45~0.5 까지 미세
+    조정.
+
+### 2026-05-18 (systemd user service + headless 토글 + 문서 갱신)
+
+- 한 줄 요약:
+  - 부팅 시 coordinator 자동 실행 (systemd user service) + 현장 배치용
+    GUI 토글 스크립트 + 전체 흐름 문서 (`docs/09`) 와 README 갱신.
+- 동기:
+  - 로봇에 Jetson 올린 뒤 모니터/키보드 없이 전원만 켜도 동작해야 함.
+  - "자동 실행 (B)" 과 "GUI on/off (A)" 는 직교 설정이라 따로 토글
+    가능하게. 평소 개발은 GUI on + B on, 현장 배치는 GUI off + B on.
+- 추가한 파일:
+  - `scripts/systemd/hylion-coordinator.service.in` — unit 템플릿.
+    install 시 `__PROJECT_ROOT__` 치환해서 `~/.config/systemd/user/` 에
+    설치. `ExecStartPre=sleep 5` (USB 마이크 안정화),
+    `Restart=on-failure`, `WantedBy=default.target`.
+  - `scripts/install-coordinator-service.sh` — 설치/제거 자동화.
+    `--uninstall` 지원. 첫 설치 때 `sudo loginctl enable-linger` 자동
+    호출 (이미 켜져 있으면 skip).
+  - `scripts/headless-on.sh` — `sudo systemctl set-default
+    multi-user.target`. 다음 부팅부터 GUI 안 뜸.
+  - `scripts/headless-off.sh` — `set-default graphical.target` 로 원복.
+  - 둘 다 idempotent (이미 같은 target 이면 skip + 메시지).
+- 변경한 파일:
+  - `docs/09_project_flow_overview.md` — 전면 갱신. 기준 시점 2026-05-05
+    → 2026-05-18. 누락돼 있던 BHL bridge 실연결, gesture daemon,
+    e-stop listener, online/offline LLM 분리, MeloTTS, run_coordinator.sh
+    env 자동 설정, 새 systemd 서비스, headless 토글 모두 반영. 시스템
+    토폴로지·라이프사이클·메인 루프·E-stop 흐름·파일 인벤토리·
+    환경변수 참조표·Mermaid 다이어그램 포함.
+  - `README.md` — "빠른 사용법" 으로 재구성: 수동 실행 / systemd 자동
+    실행 / GUI 토글 / 현장 배치 체크리스트. docs/09 로 cross-ref.
+- 검증 (이 세션, Jetson):
+  - 수동 설치 단계 (sudo 없는 부분만 자동화):
+    `mkdir -p ~/.config/systemd/user`, 템플릿 치환 후 unit 설치,
+    `systemctl --user daemon-reload && enable && start` 성공.
+    `systemctl --user status` → `active (running)`, PID 22025,
+    Memory 117M. ExecStartPre 통과, ONNX runtime + XNNPACK 로딩 확인.
+    gesture daemon 은 팔 미연결로 ConnectionError (예상대로 coordinator
+    본체는 영향 없음, non-fatal handle 반환).
+  - `headless-on.sh` / `headless-off.sh` 는 코드만 작성, 실행 안 함
+    (현장 배치 직전까지 GUI 유지).
+- 사용자가 직접 한 번 해야 할 것:
+  - `sudo loginctl enable-linger laba` — 로그인 없이 부팅 시 user
+    service 가 시작되게 하는 1회성 토글. 이 세션에서는 sudo 비번
+    프롬프트를 피해 자동화에서 빠짐.
+- 다음 환경에서 바로 할 일:
+  - linger 켠 뒤 `sudo reboot` 후 자동 실행 확인 (모니터/키보드 떼지
+    말고 한 번은 직접 보고).
+  - e-stop wake-word 실 마이크 시나리오 검증 (앞 항목과 동일).
+  - 현장 배치 시점에 `bash scripts/headless-on.sh && sudo reboot`.

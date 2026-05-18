@@ -1,0 +1,25 @@
+[Unit]
+# Hylion coordinator — wake-word + Whisper + gesture daemon + BHL bridge client.
+# install-coordinator-service.sh 가 __PROJECT_ROOT__ 를 실제 경로로 치환해서
+# ~/.config/systemd/user/hylion-coordinator.service 로 설치한다.
+Description=Hylion Coordinator (wake-word + Whisper + gesture + BHL bridge client)
+# 네트워크는 BHL bridge (NUC) 연결용. sound.target 은 system target 이라 user
+# unit 에서 직접 wait 가 안 되므로 ExecStartPre 로 USB 마이크 안정화 시간을 둔다.
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=__PROJECT_ROOT__
+# 부팅 직후엔 P5HD USB 마이크가 아직 enumerate 안 됐을 수 있어 잠깐 대기.
+# 필요시 sleep 값 조정.
+ExecStartPre=/bin/sleep 5
+ExecStart=/bin/bash __PROJECT_ROOT__/scripts/run_coordinator.sh
+Restart=on-failure
+RestartSec=5
+# 로그는 journalctl --user -u hylion-coordinator 로 본다.
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=default.target
