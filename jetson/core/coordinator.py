@@ -60,7 +60,7 @@ from jetson.core.stt.local_whisper import warm_up as warm_up_local_whisper
 from jetson.expression.microphone import record_to_wav, wav_has_speech
 from jetson.expression.mouth_servo import cleanup_gpio, MouthServoController
 from jetson.expression.speaker import DEFAULT_CLOVA_SPEAKER, build_tts_backend
-from jetson.expression.wake_word import build_wake_word_listener
+from jetson.expression.wake_word import build_emergency_stop_listener, build_wake_word_listener
 
 
 # BHL 동작 완료 알림 timeout 여유분(초). duration_sec + 이 값까지 대기.
@@ -134,6 +134,73 @@ def _build_standby_action(session_id: str, reason: str = "task_completed") -> di
 		"state_current": "IDLE",
 		"safety_allowed": True,
 		"fallback_policy": reason,
+	}
+
+
+def _build_emergency_action(session_id: str, after_intent: str = "") -> dict:
+	"""Post-emergency announce action — what the robot SAYS after an e-stop.
+
+	두 가지 진입로에서 같은 메시지를 재사용한다:
+	  1) e-stop wake-word 트리거 후 BHL DONE reason=="safety_or_emergency" 가
+	     돌아온 경우 (현재 _dispatch_to_bhl 경로).
+	  2) (예정) LLM 이 직접 intent="emergency" 를 내보내는 경우. 그 시점에
+	     action.schema.json 의 intent enum 에 "emergency" 를 추가하고 이 builder
+	     의 intent 필드를 "emergency" 로 갈아끼우면 됨. 그 외 필드는 그대로.
+
+	state_current/requires_bhl 은 _build_emergency_stop_action() (bridge 로 보내는
+	STOP 명령) 과 의도가 다르다. 그쪽은 EMERGENCY UDP packet 을 트리거하기 위한
+	control message 이고, 이쪽은 사용자에게 "비상정지 됐어요" TTS 만 하면 끝.
+	그래서 requires_bhl=False, state_current=IDLE.
+	"""
+	return {
+		"action_id": str(uuid4()),
+		"timestamp": datetime.now(timezone.utc).isoformat(),
+		"session_id": session_id,
+		"schema_version": "1.0",
+		"source": "wake_word",
+		"network_online": True,
+		"intent": "standby",  # schema 에 "emergency" 추가되면 그 때 변경
+		"target_object": "none",
+		"reply_text": "비상정지 했어요!",
+		"requires_smolvla": False,
+		"requires_bhl": False,
+		"gait_cmd": "none",
+		"gesture_name": "none",
+		"duration_sec": 0.0,
+		"state_current": "IDLE",
+		"safety_allowed": True,
+		"fallback_policy": f"emergency_after_{after_intent}" if after_intent else "emergency",
+	}
+
+
+def _build_emergency_stop_action(session_id: str) -> dict:
+	"""Action JSON sent to BHL bridge when the e-stop wake word fires.
+
+	The bridge's map_json_to_packet() checks state_current=="EMERGENCY" as a
+	top-priority STOP trigger (priority 2, right after safety_allowed=False),
+	and finish_active_action("safety_or_emergency") is invoked, which sends a
+	DONE for the currently-active move action. That DONE unblocks the
+	coordinator's wait_for_done() so this trigger does not need any direct
+	signal back to the main thread.
+	"""
+	return {
+		"action_id": str(uuid4()),
+		"timestamp": datetime.now(timezone.utc).isoformat(),
+		"session_id": session_id,
+		"schema_version": "1.0",
+		"source": "wake_word",
+		"network_online": True,
+		"intent": "stop",
+		"target_object": "none",
+		"reply_text": "비상정지했어요.",
+		"requires_smolvla": False,
+		"requires_bhl": True,
+		"gait_cmd": "stop",
+		"gesture_name": "none",
+		"duration_sec": 0.0,
+		"state_current": "EMERGENCY",
+		"safety_allowed": True,
+		"fallback_policy": "emergency_stop_wake_word",
 	}
 
 
@@ -211,31 +278,41 @@ def _build_turn_services(
 	return False, stt_backend, llm_backend, tts_backend
 
 
-def _route_action(action_json: dict, bhl_client: BhlClient | None = None) -> None:
+def _route_action(
+	action_json: dict,
+	bhl_client: BhlClient | None = None,
+	estop_listener=None,
+	session_id: str = "",
+) -> str | None:
 	"""intent 별 executor 분기.
 
 	BHL 라우트는 bhl_client 가 주어지면 실제로 NUC bridge 로 송신하고 DONE 까지 대기.
 	bhl_client 가 None 이면 옛 동작(stdout 로그만) — 테스트/오프라인 디버깅용.
+
+	Returns the BHL DONE reason if the action was dispatched to BHL and got a
+	response ("duration_elapsed" / "stop_command" / "safety_or_emergency" /
+	"timeout"), else None. Used by the caller to pick the standby reply
+	(emergency vs. normal completion).
 	"""
 	intent = action_json.get("intent")
 	if intent == "pick_place":
 		print("[Executor] pick_place -> SMOLVLA executor route")
 		sleep(0.2)
-		return
+		return None
 
 	if intent in {"move", "stop"}:
 		if bhl_client is None:
 			print("[Executor] move/stop -> BHL executor route (bhl_client=None, stub)")
 			sleep(0.2)
-			return
-		_dispatch_to_bhl(action_json, bhl_client)
-		return
+			return None
+		return _dispatch_to_bhl(action_json, bhl_client, estop_listener=estop_listener, session_id=session_id)
 
 	if intent == "chat":
 		print("[Executor] chat -> reply/TTS route")
 	else:
 		print("[Executor] no-op route")
 	sleep(0.2)
+	return None
 
 
 def _play_gesture_if_any(action_json: dict, gesture_daemon) -> None:
@@ -264,13 +341,28 @@ def _play_gesture_if_any(action_json: dict, gesture_daemon) -> None:
 		print(f"[Gesture] {gesture_name} -> 재생 불가: {msg}")
 
 
-def _dispatch_to_bhl(action_json: dict, bhl_client: BhlClient) -> None:
+def _dispatch_to_bhl(
+	action_json: dict,
+	bhl_client: BhlClient,
+	estop_listener=None,
+	session_id: str = "",
+) -> str | None:
 	"""BHL 라우트 본체. 송신 → DONE 대기 → idle 복귀.
 
 	안전 원칙:
 	  - 모든 통신 예외를 흡수해서 coordinator main 흐름이 죽지 않게 함
 	  - DONE 못 받으면 timeout 으로 끝내고 음성 안내 (이 함수 호출자가 처리)
 	  - 마지막에 반드시 bhl_client.clear() 호출 (다음 명령이 자동 송신되지 않도록)
+
+	estop_listener (옵션): "멈춰" 키워드를 background 에서 청취. 트리거되면
+	EMERGENCY action 을 bridge 로 보내 active move 를 즉시 finish 시킴.
+	bridge.finish_active_action("safety_or_emergency") 가 원래 action_id 의
+	DONE 을 회신하므로 wait_for_done() 이 자연스럽게 풀린다. listener 는 본
+	dispatch 함수가 mic 을 점유하지 않는 동안에만 도는 배타적 라이프사이클로
+	관리되어 메인 wake listener 와 mic 충돌이 없다.
+
+	Returns: BHL DONE reason ("duration_elapsed" / "stop_command" /
+	"safety_or_emergency"), TIMEOUT 시 "timeout", 통신 예외 시 "error".
 	"""
 	action_id = action_json.get("action_id") or "unknown"
 	intent = action_json.get("intent")
@@ -280,23 +372,78 @@ def _dispatch_to_bhl(action_json: dict, bhl_client: BhlClient) -> None:
 	if intent == "stop":
 		timeout = BHL_DONE_TIMEOUT_MARGIN_SEC
 
+	# move 중에만 e-stop wake 청취. stop intent 는 본질적으로 즉시 끝나므로
+	# 굳이 e-stop listener 를 띄울 필요 없음 (mic 점유만 낭비).
+	use_estop = estop_listener is not None and intent == "move" and getattr(estop_listener, "available", False)
+	# E-stop wake-word 가 잡혔는지 client-side 에서도 기억. bridge 가 죽어
+	# DONE 회신을 못 보내거나 늦어서 timeout 으로 빠지더라도, "사용자가 멈춰
+	# 라고 했다" 는 사실은 client 가 이미 알고 있으니 emergency UX (TTS,
+	# standby 메시지 분기) 는 그 사실 하나로 충분히 살릴 수 있다. 즉 bridge
+	# 의 done reason 과 별개로 client 가 reason 을 emergency 로 승격할 수 있게
+	# 한 플래그.
+	estop_fired = False
+	if use_estop:
+		def _on_estop() -> None:
+			# 콜백은 e-stop listener 스레드에서 실행됨. set_command 만 호출하면
+			# BhlClient 의 sender 스레드가 다음 keepalive 사이클에서 EMERGENCY 를
+			# 송신하고, bridge 가 finish_active_action 으로 원래 action_id 의
+			# DONE 을 보내 main thread 의 wait_for_done 이 풀린다. bridge 가
+			# 응답 안 해도 nonlocal estop_fired 플래그를 켜두어 아래쪽에서
+			# reason 을 emergency 로 승격한다.
+			nonlocal estop_fired
+			estop_fired = True
+			estop_action = _build_emergency_stop_action(session_id=session_id)
+			print(f"[E-Stop] sending EMERGENCY action_id={estop_action['action_id']} to bridge")
+			try:
+				bhl_client.set_command(estop_action)
+			except Exception as exc:
+				print(f"[E-Stop] set_command failed: {exc}")
+
+		try:
+			estop_listener.start(_on_estop)
+		except Exception as exc:
+			print(f"[E-Stop] listener start failed: {exc}")
+			use_estop = False
+
+	reason: str | None = None
 	try:
 		bhl_client.set_command(action_json)
 		print(f"[BHL] TX action_id={action_id} intent={intent} gait={action_json.get('gait_cmd')} "
-		      f"duration={duration:.1f}s timeout={timeout:.1f}s")
+		      f"duration={duration:.1f}s timeout={timeout:.1f}s estop={'on' if use_estop else 'off'}")
 
-		got_done, reason = bhl_client.wait_for_done(action_id, timeout=timeout)
+		got_done, done_reason = bhl_client.wait_for_done(action_id, timeout=timeout)
 		if got_done:
+			reason = done_reason or "duration_elapsed"
 			print(f"[BHL] DONE action_id={action_id} reason={reason}")
 		else:
+			reason = "timeout"
 			print(f"[BHL] TIMEOUT action_id={action_id} (no DONE within {timeout:.1f}s)")
 	except Exception as exc:
+		reason = "error"
 		print(f"[BHL] dispatch failed: {exc}")
 	finally:
+		# e-stop listener 정리 먼저 — mic 을 즉시 해제해서 다음 wake_word 사이클이
+		# ALSA "Device busy" 없이 stream 을 열 수 있게 한다.
+		if estop_listener is not None:
+			try:
+				estop_listener.stop()
+			except Exception as exc:
+				print(f"[E-Stop] listener stop failed: {exc}")
 		try:
 			bhl_client.clear()
 		except Exception as exc:
 			print(f"[BHL] clear failed: {exc}")
+
+	# Client-side e-stop 승격: 사용자가 "멈춰" 외친 사실은 bridge 응답과
+	# 무관하게 emergency 로 분류해야 한다. bridge 가 정상이라면 이미 reason ==
+	# "safety_or_emergency" 일 것이고 이 승격은 no-op. bridge 가 죽어
+	# timeout/error 로 떨어졌더라도 사용자 UX 측면에선 emergency 메시지가
+	# 들려야 함.
+	if estop_fired and reason != "safety_or_emergency":
+		print(f"[E-Stop] promoting client-side reason -> safety_or_emergency (bridge reason was {reason!r})")
+		reason = "safety_or_emergency"
+
+	return reason
 
 
 def _speak_reply_if_any(action_json: dict, stage: str, tts_backend, mouth_servo=None) -> None:
@@ -356,6 +503,7 @@ def run_live_pipeline(
 	wakeword_listener,
 	gesture_daemon,
 	bhl_client: BhlClient | None = None,
+	estop_listener=None,
 ) -> None:
 	session_id = f"sess-live-{uuid4().hex[:8]}"
 	# Conversation memory persists across wake-word re-activations within a single
@@ -521,10 +669,23 @@ def run_live_pipeline(
 				continue
 
 			# Non-chat, non-standby intent: execute action, then generate auto-standby
-			_route_action(action_json, bhl_client=bhl_client)
+			bhl_reason = _route_action(
+				action_json,
+				bhl_client=bhl_client,
+				estop_listener=estop_listener,
+				session_id=session_id,
+			)
 
-			standby_action = _build_standby_action(session_id=session_id, reason=f"auto_after_{intent}")
-			_print_block("ACTION_JSON (AUTO-STANDBY)", standby_action)
+			# Emergency stop overrides the standby reply so the user hears that the
+			# move was halted, not the generic "작업을 마쳤고..." completion line.
+			# 같은 EMERGENCY 메시지/액션 형태를 향후 LLM 출력 intent=="emergency"
+			# 분기에서도 재사용할 수 있도록 별도 _build_emergency_action() 으로 분리.
+			if bhl_reason == "safety_or_emergency":
+				standby_action = _build_emergency_action(session_id=session_id, after_intent=intent)
+				_print_block("ACTION_JSON (EMERGENCY)", standby_action)
+			else:
+				standby_action = _build_standby_action(session_id=session_id, reason=f"auto_after_{intent}")
+				_print_block("ACTION_JSON (AUTO-STANDBY)", standby_action)
 			_speak_reply_if_any(standby_action, stage=f"after_{intent}", tts_backend=tts_backend, mouth_servo=mouth_servo)
 			if AUTO_STANDBY_COOLDOWN_SEC > 0:
 				print(f"[Mode] standby cooldown for {AUTO_STANDBY_COOLDOWN_SEC:.1f}s before re-arming wake word.")
@@ -586,6 +747,7 @@ def _startup_warm_up(args: argparse.Namespace) -> None:
 def main() -> None:
 	args = _parse_args()
 	wakeword_listener = None
+	estop_listener = None
 	bhl_client: BhlClient | None = None
 	# Spawn the gesture daemon first so its ~8-10s warm-up (torch import + arm
 	# connect, in the .hylion_arm venv) overlaps with model warm-up below.
@@ -593,6 +755,11 @@ def main() -> None:
 	gesture_daemon = start_gesture_daemon()
 	try:
 		wakeword_listener = build_wake_word_listener()
+		# E-stop listener is built once and started/stopped per BHL move.
+		# Build is cheap (model is loaded lazily on the first start()), so a
+		# missing model file or audio stack only surfaces a one-line warning
+		# and the move executes without wake-word stop.
+		estop_listener = build_emergency_stop_listener()
 		_startup_warm_up(args)
 		if gesture_daemon.wait_ready(timeout=15.0):
 			print("[Warm-up] Gesture daemon ... OK")
@@ -615,6 +782,7 @@ def main() -> None:
 			wakeword_listener=wakeword_listener,
 			gesture_daemon=gesture_daemon,
 			bhl_client=bhl_client,
+			estop_listener=estop_listener,
 		)
 	except KeyboardInterrupt:
 		print("Coordinator stopped by user.")
@@ -628,6 +796,11 @@ def main() -> None:
 			gesture_daemon.stop()
 		except Exception as exc:
 			print(f"[Cleanup] gesture daemon stop failed: {exc}")
+		if estop_listener is not None:
+			try:
+				estop_listener.stop()
+			except Exception as exc:
+				print(f"[Cleanup] estop listener stop failed: {exc}")
 		if wakeword_listener is not None:
 			try:
 				wakeword_listener.close()
