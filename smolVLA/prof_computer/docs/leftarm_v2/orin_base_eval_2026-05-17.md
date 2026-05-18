@@ -128,4 +128,4 @@ A2 사이클 (orin_a2_eval_2026-05-17.md) 와 동일.
 - 가설 검증 사이클 전체: [learning_log.md §M1.5 추론 후 가설 분리 검증 사이클](learning_log.md)
 - 추론 entry (zero-shot 전용): `orin/inference/leftarm_base_inference.py`
 - 추론 wrapper subcommand: `bash ~/smolvla/orin/scripts/run_inference_leftarm_v2.sh zero-shot <task1|task2>`
-- A1·A2 4축 매트릭스 정의: `dgx/docs/finetune/leftarm_v2/model_config.md`
+- A1·A2 학습 방법 매트릭스 정의: [`prof_computer/docs/model_config.md`](../model_config.md)

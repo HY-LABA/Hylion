@@ -1,12 +1,12 @@
 # prof_computer — 학습 로그
 
 > 본 노드 (Windows 10 + WSL2 + RTX 3090) 의 fine-tune 시도별 실행 기록.
-> DGX 측 대칭 문서: [dgx/docs/finetune/leftarm_v2/training_log.md](../../dgx/docs/finetune/leftarm_v2/training_log.md).
-> 결정 근거: [dgx/docs/finetune/leftarm_v2/model_config.md](../../dgx/docs/finetune/leftarm_v2/model_config.md) — DGX 와 동일.
+> DGX 학습 시도 (legacy): [training_log.md](../../../dgx/legacy/train_trial_2026-05-17/docs/training_log.md) — 시도 1·2·3 모두 OOM (2026-05-15~16). DGX 학습 잠정 중단 사유: [legacy/train_trial_2026-05-17/README.md](../../../dgx/legacy/train_trial_2026-05-17/README.md).
+> 결정 근거: [model_config.md](../model_config.md) — leftarm_v2/v3+ 공통 학습 방법론.
 
 ---
 
-## 학습 사이클 개요 (DGX 와 공유)
+## 학습 사이클 개요
 
 | 항목 | 값 |
 |---|---|
@@ -14,9 +14,9 @@
 | 베이스 ckpt | `lerobot/smolvla_base` |
 | 방법 | LoRA r=16, target=all-linear |
 | 2A pass | 100 ep balanced subset (ep 0~99) · 20K steps |
-| 설정 위치 | [dgx/finetune/leftarm_v2/config/train_config.yaml](../../dgx/finetune/leftarm_v2/config/train_config.yaml) |
-| 실행 래퍼 | [dgx/finetune/leftarm_v2/run_train.py](../../dgx/finetune/leftarm_v2/run_train.py) |
-| PC 전용 차이 | [../finetune/leftarm_v2/README.md](../finetune/leftarm_v2/README.md) |
+| 설정 위치 | [config/train_config.yaml](../../finetune/leftarm_v2/config/train_config.yaml) |
+| 실행 래퍼 | [run_train.py](../../finetune/leftarm_v2/run_train.py) |
+| PC 노드 README | [finetune/leftarm_v2/README.md](../../finetune/leftarm_v2/README.md) |
 
 ---
 
@@ -187,7 +187,7 @@
 
 ### M1.5 중간점검 학습 (PC) — 2026-05-17 12:53 ~ 20:27 · ✅ COMPLETED (75000 step 완주)
 
-> **사이클 식별**: realplaying.md 의 **M1.5** ("데이터셋 학습 호환성 정비 — video decode 회피"). 원 결정은 image dataset 변환이었으나 prof_computer 로 이관 (사용자 결정 2026-05-16, [prof_train_setting.md](../../docs/storage/prof_train_setting.md)) 으로 video dataset 그대로 학습 시도. 100 ep subset 만 사용 (M1 잔여 100ep 미수집 상태 — 본 학습 = M2 는 200ep 완성 후 진행).
+> **사이클 식별**: realplaying.md 의 **M1.5** ("데이터셋 학습 호환성 정비 — video decode 회피"). 원 결정은 image dataset 변환이었으나 prof_computer 로 이관 (사용자 결정 2026-05-16, [prof_train_setting.md](../../../docs/storage/prof_train_setting.md)) 으로 video dataset 그대로 학습 시도. 100 ep subset 만 사용 (본 학습 = M2 는 **M1 완성 = 400ep** 후 진행 — 2026-05-18 목표 200→400 조정).
 >
 > M1.5 DOD ("100ep subset 학습 진입 → OOM 없이 첫 ckpt 도달") 초과 달성 — 75000 step 완주.
 
@@ -251,7 +251,7 @@
 
 ## DGX 결과와의 비교 표 (2026-05-17 본 학습 완주 후)
 
-| 차원 | DGX 시도 1·2 (`dgx/docs/finetune/leftarm_v2/training_log.md`) | PC 2A first pass |
+| 차원 | DGX 시도 1·2 (`legacy/train_trial_2026-05-17/docs/training_log.md`) | PC 2A first pass |
 |---|---|---|
 | 환경 | aarch64 + cu130 + Ubuntu 24.04 FFmpeg 6 | x86_64 + cu128 + Ubuntu 22.04 FFmpeg 4.4 |
 | video backend | pyav (torchcodec aarch64 ABI 불가) | **torchcodec 0.10.0** |
@@ -267,11 +267,12 @@
 
 → **prereq spec 02 가설 직접 검증**: torchcodec 정상 환경에서는 DGX 의 OOM 메커니즘 (pyav buffer leak × DataLoader workers × UMA 단일 풀) 가 발생 자체 불가. PC 노드가 DGX 의 aarch64 ecosystem 정비 (lerobot upstream 의 torchcodec aarch64 wheel 또는 PyTorch + FFmpeg ABI 정합) 전까지 학습 책임 대행.
 
-**다음 단계** (M2 진입은 M1 의 200ep 완성 후):
+**다음 단계** (M2 진입은 M1 의 **400ep** 완성 후 — 2026-05-18 목표 200→400 조정):
 
 - [x] **Orin 추론 smoke** — `lerobot-record --policy.path=BaboGaeguri/leftarm_v2_A2_pc_2026-05-17` 로 M1.5 결과의 정성 평가 → **2026-05-18 실시, 0/2 (단축), 0~20% 영역 확정**. 상세: [orin_a2_eval_2026-05-17.md](orin_a2_eval_2026-05-17.md)
-- [ ] **M1 잔여 100ep 수집 완료** (현재 100/200)
-- [ ] **M2 본 학습** — 200ep 완성 후 prof_computer 또는 DGX (ecosystem 정비 시) 에서 본 학습. yaml 의 `scheduler_decay_steps` 를 `steps` 와 동기화 권장 (본 사이클은 30k step 이후 lr 거의 0 — backlog 메모)
+- [ ] **M1 잔여 290ep 수집 완료** (현재 110/400)
+- [ ] **M2 본 학습** — 400ep 완성 후 prof_computer 에서 본 학습. yaml 의 `scheduler_decay_steps` 를 `steps` 와 동기화 권장 (본 사이클은 30k step 이후 lr 거의 0 — backlog 메모)
+- [ ] **선택: 200ep 시점 중간점검 학습** — M1.5 (100ep) 와 동일 setup 으로 1회 학습 + Orin 평가 → 데이터 양 효과 정량화 + 400ep 진입 가치 calibration
 - [ ] DGX 의 aarch64 ecosystem 정비 — backlog (장기)
 
 ---
@@ -329,17 +330,188 @@
 
 → **A1 (VLM frozen + Expert LoRA) 후퇴는 비추** 확정. 두 분기 모두 *데이터 확장이 1순위*. 학습 방법 조정 (LoRA r↑, scheduler decay 동기화 등) 은 *데이터 확장 후* 의 2순위 작업.
 
-#### wandb 분석 (메인 — 진행 시 채움)
+#### wandb 분석 (메인 — 2026-05-18 완료)
 
-> run `8les615t` (`leftarm_v2_2a_pc_2026-05-17_12-51-51`), WSL2 로컬 `~/prof_computer_runs/leftarm_v2_2a_pc_2026-05-17_12-51-51/wandb/run-20260517_125310-8les615t/`, wandb API key 위치 `.venv_arm_finetune/.env`.
+> run `8les615t` (`leftarm_v2_2a_pc_2026-05-17_12-51-51`). **wandb logged 메트릭 한계**: `train/{loss,lr,grad_norm,update_s,dataloading_s,samples,epochs,steps}` 만 logged — LoRA layer 별 weight norm 추적 X. → **ckpt 직접 분석으로 대체**: WSL2 `~/prof_computer_runs/leftarm_v2_2a_pc_2026-05-17_12-51-51/checkpoints/{001000, 037000, 075000}/pretrained_model/adapter_model.safetensors` 의 LoRA weight 비교.
 
-- 분석 메트릭 (후보):
-  - VLM LoRA layer 별 weight norm 학습 초기 vs 후기 차이
-  - expert LoRA 와의 상대적 변화량 (expert 가 더 크게 변하면 학습 신호가 expert 쪽 집중 신호)
-  - loss 곡선 inflection (수렴 시점이 VLM LoRA 변화량과 상관 있는지)
-- 분석 결과:
-- VLM LoRA 학습 기여도 판정 (큰 변화 / 미미 / 거의 0):
+**분석 방법**:
+- 3 시점 (init=step1000, mid=step37000, last=step75000) 의 `adapter_model.safetensors` 로딩
+- 17개 target module 의 LoRA weight 를 5개 그룹으로 분류:
+  - `EXPERT_io` (5): action_in_proj, action_out_proj, action_time_mlp_in/out, state_proj
+  - `EXPERT_lm` (112 lora_B): vlm_with_expert.lm_expert.* — expert 본체
+  - `VLM_vision` (72 lora_B): vlm_with_expert.vlm.*.vision_model.*
+  - `VLM_text` (113 lora_B): vlm_with_expert.vlm.*.text_model.* + lm_head
+  - `VLM_connector` (1 lora_B): vlm_with_expert.vlm.*.connector
+- per-group 평균: `|B|_init`, `|B|_mid`, `|B|_last` (lora_B 의 L2 norm — PEFT init 시 B=0 이라 학습량의 직접 proxy)
+- `|ΔB|_init→last` = ‖B_step75000 − B_step1000‖_F 평균
+- `rel_to_|A|` = ΔB / A norm (scale-normalized 학습량 — module 크기 영향 제거)
 
-#### 결정 (양쪽 완료 후)
+**결과 표**:
 
-> 위 판정 매트릭스 기반 + 사용자 + 메인 합의. 다음 사이클 spec Phase 1 시작 전 본 섹션 확정.
+| 그룹 | #tensors | \|B\|_init | \|B\|_mid | \|B\|_last | \|ΔB\|_init→last | rel_to_\|A\| |
+|---|---|---|---|---|---|---|
+| EXPERT_io | 5 | 0.211 | 0.877 | 0.908 | 0.858 | 0.352 |
+| **EXPERT_lm** | 112 | 0.309 | 1.517 | **1.553** | **1.453** | **0.494** |
+| VLM_connector | 1 | 0.240 | 1.290 | 1.326 | 1.260 | 0.238 |
+| VLM_text | 113 | 0.299 | 1.369 | 1.391 | 1.308 | 0.430 |
+| **VLM_vision** | 72 | 0.281 | 1.435 | **1.454** | **1.381** | **0.486** |
+
+**핵심 발견 3 가지**:
+
+1. **VLM LoRA 가 expert LoRA 와 거의 동등한 학습 신호를 받음** — VLM_vision rel_to_|A| = 0.486 vs EXPERT_lm 0.494. "VLM LoRA norm 거의 0" 가설은 **기각**. VLM 측 LoRA 가 실제로 강하게 학습됨.
+
+2. **수렴은 step 37000 에 이미 도달, 후반 38000 step 은 거의 정체** — 모든 그룹에서 |B|_mid → |B|_last 변화량 < 2%. loss 0.04 수렴과 정합. ([backlog 메모] scheduler_decay_steps=30000 < steps=75000 와 정확히 일치 — lr 0 영역에서 학습 안 됨이 ckpt 로도 증명).
+
+3. **VLM_vision 이 EXPERT_lm 다음으로 가장 강하게 학습됨** — 우리 환경 (파랑+노랑 인형·노란 캔·시연장 조명) 의 visual feature 에 vision encoder LoRA 가 적응한 신호. 사용자 우려 ("VLM 적응이 기여했을 것") 의 *부분 증거*.
+
+**VLM LoRA 학습 기여도 판정**: **큰 변화** (VLM 측이 expert 측과 동등 강도로 학습됨).
+
+**본인 우려에 대한 답**: "VLM LoRA 버리면 환경 인식 ↓ + action 매핑은 동일 학습" 우려가 **데이터로 강하게 뒷받침됨**. A1 (VLM frozen) 으로 후퇴 시 학습된 VLM 환경 적응을 통째로 버리게 됨 — A2 보다 더 나빠질 위험 *실재*.
+
+**단, 본 분석의 한계**: "VLM LoRA 가 학습됐다" 만 증명, "학습된 게 task 성능에 도움이 됐다" 는 증명 못함. VLM LoRA 가 *noise 적응* (시연장 조명 패턴 외우기 등) 만 했을 가능성 *완전 배제 불가*. → 사용자 0-shot 추론 결과가 결정적 (위 §결과 메모).
+
+#### 결정 (2026-05-18 확정)
+
+> 양쪽 작업 완료 — 매트릭스 4번째 행 (`base 완전 무반응 + VLM LoRA norm 큰 변화`) 적중. 사용자 우려가 데이터로 완전 확정.
+
+**작업 1 결과** (사용자, [orin_base_eval_2026-05-17.md](orin_base_eval_2026-05-17.md)): base smolvla_base 는 우리 환경 task1 instruction 에 *의미있는 동작 X* — A2 학습 모델보다도 더 형편없음. task2 는 task1 결과로 충분해 skip. **base 무반응 확정**.
+
+**작업 2 결과** (메인, 위 §wandb 분석): VLM_vision LoRA 가 EXPERT_lm 과 거의 동등 강도 (ΔB/A: 0.486 vs 0.494) 로 학습됨. **VLM LoRA 큰 변화 확정**.
+
+**종합 가설**: base VLM 으로는 우리 환경 인식 불가 + A2 학습이 VLM LoRA 를 강하게 사용해 환경 적응 기여. A2 의 약한 응답성 (헛스윙·캔 방향 이동) 은 그 VLM 적응이 실제 기여한 신호.
+
+**다음 사이클 권고 (확정)**:
+
+1. **데이터 확장 1순위** — M1 잔여 100ep 수집 (task1 +50 / task2 +40) + 다양성 보강 (다른 사람 / orientation 5:5 / 위치 분포 확대)
+2. **학습 방법 미세조정 2순위** (데이터 확장 후 별도 사이클) — A2 유지 + `lora.r: 16 → 32` / `scheduler_decay_steps=steps` 동기화 (M1.5 backlog 이미 잡힘, 후반 38k step 학습 정체의 직접 원인)
+3. **A1·B1·B2 모두 비추 (본 시점)** — A1 (VLM frozen) 은 학습된 환경 적응 폐기 → 본 데이터로 비추 확정. B1/B2 는 100ep 으론 과적합 위험 (model_config.md §2 매트릭스 그대로).
+
+→ 다음 사이클 spec Phase 1 진입 시 위 권고를 출발점으로 사용. orin_base_eval_2026-05-17.md §다음 사이클 입력 도 동일 결론.
+
+---
+
+### camera_empty 분기 학습 — 2026-05-18 · 🔄 진행 중
+
+> **배경**: M1.5 추론 0/2 결과 후 추가 가설 도출 — base smolvla 의 사전학습 분포 (3 cam) 와 우리 학습 분포 (2 cam) 의 *형식 mismatch* 가 0/2 의 *원인 후보* 일 가능성. 본인 우려 ([대화 2026-05-18](.)) 이 데이터로 뒷받침되어 *empty_cameras: 1 단일 변수 검증* 분기 개설.
+>
+> **검증 가설**: base smolvla 의 input_features 가 camera1/2/3 3 cam 으로 사전학습됨 (HF Hub `lerobot/smolvla_base/config.json` 확인). 우리 dataset = 2 cam (top→camera1, wrist→camera2). M1.5 ckpt 분석 결과 — `empty_cameras=0` 으로 학습되어 missing camera3 슬롯이 *zero-pad 도 안 됨* → vision encoder 가 2 cam 만 입력 받음 (base 의 3 cam attention 분포와 불일치). `empty_cameras: 1` 로 가면 missing camera3 슬롯을 -1 padded image + mask 0 으로 zero-fill → base 의 3 cam 형식 정합 회복.
+>
+> **단일 변수 비교**: M1.5 (empty_cameras=0, 0/2 단축) ↔ 본 분기 (empty_cameras=1, 결과 미정). 나머지 hyperparameter 100% 동일.
+
+#### 사전 검증 — base smolvla config 확인 (2026-05-18)
+
+- HF Hub `lerobot/smolvla_base/config.json` (WebFetch):
+  - `empty_cameras: 0`
+  - `input_features` = `observation.images.camera1`, `camera2`, `camera3` (3 cam)
+  - 각 camera shape = [3, 256, 256]
+- M1.5 ckpt `train_config.json` (직접 분석):
+  - `policy.empty_cameras: 0` (default 그대로)
+  - `policy.input_features` = camera1/2/3 모두 포함 (base config 상속)
+  - dataset 은 camera1, camera2 만 (rename_map 결과)
+  - → camera3 가 `missing_img_keys` 잡혔으나 `empty_cameras=0` 으로 `_prepare_images()` zero-pad loop 즉시 break → vision encoder 가 2 cam 만 입력
+
+#### 추가 사전 검증 — 다른 흔한 root cause 후보 배제 (2026-05-18, researcher 보고서 §6 검증 A/B 적용)
+
+> researcher 보고서 ([research_empty_cameras_2026-05-18.md](research_empty_cameras_2026-05-18.md)) 의 권고대로, *empty_cameras 가 *유일* 원인이 아닐* 가능성 대비 — community 의 흔한 함정 둘 (n_action_steps Hub 함정 + normalization stats infinity) 을 M1.5 ckpt 에서 직접 점검. *현 분기 학습 결과 해석 시* 이 둘이 *동시 원인 아님* 확정 후 진행하는 게 깔끔.
+
+**검증 A — M1.5 ckpt `config.json` 핵심 필드** (`prof_computer_runs/.../checkpoints/075000/pretrained_model/config.json`):
+
+| 항목 | 값 | 평가 |
+|---|---|---|
+| **`n_action_steps`** | **50** | ✅ **Hub 함정 회피** — 1 이었으면 chunking 무력화 + inference 매우 느림 (기존 researcher 보고서 §1-3 의 알려진 함정) |
+| `chunk_size` | 50 | ✅ 정합 |
+| `n_obs_steps` | 1 | ✅ smolvla default |
+| `empty_cameras` | 0 | (예상대로 — 본 분기에서 1 로 변경 검증 중) |
+| `input_features` | camera1/2/3 (3 cam) | (예상대로 — base 상속) |
+| `freeze_vision_encoder` | True | smolvla default (PEFT 경로는 별도 frozen 처리하므로 무관) |
+| `train_expert_only` | True | smolvla default (PEFT 경로는 별도 frozen 처리하므로 무관) |
+| `use_amp` | False | M1.5 결정대로 |
+
+→ **`n_action_steps` Hub 함정 *우리에겐 발생 안 함*** 확정. researcher 1순위 의심 root cause 후보 *배제*.
+
+**검증 B — normalization stats sanity** (`policy_preprocessor_step_5_normalizer_processor.safetensors`):
+
+- preprocessor 90 tensor + postprocessor 90 tensor 모두 NaN/Inf **없음**
+- `action.mean` = [-39, 67] / `action.std` = [8.1, 42.8] / `action.min/max` = [-97, 117] — SO-101 joint angle 정상 범위
+- `observation.images.top/wrist.mean = 0.45 / std = 0.226` — 두 카메라 모두 *동일* (ImageNet stats 사용, lerobot default, base smolvla 와 정합)
+- `task_index.mean = 0.57` — 110ep dataset 의 task1 50ep (45.5%) + task2 60ep (54.5%) 분포와 정합
+
+→ **normalization stats *완전 정상*** 확정. issue #2210 / Xavier O'Keefe Medium 의 *normalization stats infinity 함정* 우리에겐 발생 안 함. researcher 2순위 의심 root cause 후보 *배제*.
+
+**종합**: M1.5 0/2 의 *가장 흔한 두 함정* (n_action_steps + normalization stats) 모두 우리 ckpt 에서 *배제됨*. → camera slot mismatch (empty_cameras=0) 의 *상대 가중치 ↑* — 본 분기 학습이 *옳은 가설 검증* 가능성 강화. 단 분기 결과가 *여전히 0/2* 라면 *더 깊은 원인* (dataset 품질·workspace·추론 인프라 등 — researcher 보고서 §6 검증 C·D) 으로 진단 영역 옮겨야 함.
+
+#### 분리 entry 구조 (2026-05-18 신설)
+
+M1.5 원본 *완전 보존* + 별도 entry 3 파일:
+
+| 분기 | wrapper | config (본 학습) | config (smoke) | run prefix |
+|---|---|---|---|---|
+| M1.5 (원본) | `run_train.py` | `train_config.yaml` | `train_config_smoke.yaml` | `leftarm_v2_2a_pc_<ts>` |
+| **camera_empty** | `run_train_camera_empty.py` | `train_config_camera_empty.yaml` | `train_config_camera_empty_smoke.yaml` | `leftarm_v2_camera_empty_2a_pc_<ts>` |
+
+단일 변수 차이: yaml 의 `empty_cameras: 1` → CLI `--policy.empty_cameras=1`. 나머지 100% 동일.
+
+#### smoke 검증 — 2026-05-18 09:58 ~ 10:00 · ✅ PASSED
+
+- 명령: `python run_train_camera_empty.py train --pass smoke`
+- wandb run: `wandb.ai/babogaeguri-hanyang-university/leftarm_v2/runs/8bg2txw5`
+- output_dir: `~/prof_computer_runs/leftarm_v2_camera_empty_smoke_pc_2026-05-18_09-57-20`
+
+**핵심 검증 포인트**:
+
+| 항목 | 결과 | 비교 (M1.5 smoke 4) |
+|---|---|---|
+| `policy.empty_cameras=1` wandb config 반영 | ✅ 확인 | M1.5 = 0 |
+| 100 step 완주 | ✅ ~1분 | 동일 |
+| loss step 10 → 100 | 0.769 → 0.394 | M1.5 smoke 4 = 0.560 (본 분기 약간 빠른 강하) |
+| grad_norm steady | 0.79-1.00 | M1.5 smoke 4 = 0.79-1.01 (동등) |
+| update_s (steady) | 0.41-0.44 | M1.5 smoke 4 = 0.32-0.34 (본 분기 +0.05 ≈ 12% — camera3 zero-pad 추가 처리 영향 추정) |
+| dataloading_s | 0.004 | 동등 |
+| OOM | 없음 | 동등 |
+
+→ **본 학습 진입 안전 신호 모두 통과**.
+
+#### 본 학습 — 2026-05-18 10:02 ~ (진행 중) · 🔄 RUNNING
+
+- 명령: `python run_train_camera_empty.py train --pass 2a`
+- wandb run: `wandb.ai/babogaeguri-hanyang-university/leftarm_v2/runs/8jkr7edb`
+- output_dir: `~/prof_computer_runs/leftarm_v2_camera_empty_2a_pc_2026-05-18_10-01-11`
+- 예상 시간: 75000 × 0.41s ≈ **약 8시간 30분** (M1.5 의 7시간 34분 + camera3 zero-pad 처리 ~12% 오버헤드)
+- 평행 진행: 사용자 — 3번째 카메라 셋업 (다음 사이클 데이터 수집 준비)
+
+**진행 메트릭 (학습 도중 — 갱신 예정)**:
+
+| step | loss | grad_norm | lr | 시각 |
+|---|---|---|---|---|
+| 50 | 0.744 | 0.935 | 2.6e-6 | 10:03:19 |
+| 100 | 0.707 | 0.950 | 7.6e-6 | 10:03:43 |
+| (학습 완료 후 갱신) | | | | |
+
+**학습 후 채울 항목**:
+
+- [ ] 총 시간 / 완주 여부
+- [ ] 최종 loss (step 75000)
+- [ ] VRAM peak / system RAM 누수율
+- [ ] M1.5 학습 메트릭과의 비교 표
+- [ ] best ckpt 선정 (loss 곡선 분석)
+- [ ] HF Hub push: `BaboGaeguri/leftarm_v2_camera_empty_A2_pc_2026-05-18` (가칭)
+
+#### 다음 단계 — Orin 추론 비교 검증 (학습 완료 후)
+
+본 분기 ckpt vs M1.5 ckpt (`BaboGaeguri/leftarm_v2_A2_pc_2026-05-17`) 의 *동일 환경 + 동일 단축 평가 패턴* 비교:
+
+- 비교 방법: M1.5 추론 ([orin_eval_2026-05-17.md](orin_eval_2026-05-17.md)) 와 동일 — task1 front 1회 + task2 front 1회 = 단축 2 trial
+- 평가 시트: `orin_camera_empty_eval_2026-05-18.md` (신설 예정)
+- 결과 분기:
+  - **본 분기 추론이 M1.5 (0/2) 보다 *유의미 개선*** → camera 수 mismatch 가 0/2 의 원인 *부분 확정* → 다음 사이클 결정에 반영 (3번째 카메라 실제 활용 가치 ↑)
+  - **본 분기 추론이 M1.5 와 *비슷한 0/2***  → camera 수 mismatch 는 *부차적 요인*, 데이터 양·다양성이 주 병목 확정 → 다음 사이클 데이터 확장 1순위 유지
+  - **본 분기 추론이 M1.5 보다 *나쁨*** → empty_cameras: 1 의 zero-pad 가 *오히려 noise 입력* (가능성 낮음 — base 학습 분포에 zero-pad 포함됐다면 무해)
+
+#### 본 사이클 의의
+
+학습 결과와 무관하게 본 사이클이 확보하는 *방법론적 가치*:
+
+1. **단일 변수 비교 가능** — M1.5 와 hyperparameter 100% 동일, 단일 변수 (`empty_cameras`) 만 차이. 결과 해석 깔끔.
+2. **분리 entry 보존** — M1.5 원본 파일 미수정, 본 분기 *별도 entry* 신설. 회귀 위험 0.
+3. **base config 사전학습 분포 정합 검증** — base smolvla 의 *설계 의도* (3 cam 입력) 를 *우리가 그동안 무시했는지* 직접 측정. 결과 어느 쪽이든 *base 의 input_features 형식* 의 영향력 정량화.
+4. **다음 사이클 데이터 수집 방향 정보 ↑** — 3번째 카메라 실제 활용 가치 (vs zero-pad 충분) 검증 기준점 확보.

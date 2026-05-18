@@ -1,19 +1,21 @@
 # leftarm_v2 — 모델 구성 결정 (M2)
 
 > **목적**: leftarm_v2 fine-tune 의 학습 방법·hyperparameter 결정·근거를 한 곳에 정리. `config/train_config.yaml` 의 값이 *왜* 그 값인지의 정본.
-> **자매 문서**: [collection_log.md](collection_log.md) (수집 차수 기록), [../camera_and_codec.md](../camera_and_codec.md) (코덱·해상도). 설정 파일: [`dgx/finetune/leftarm_v2/config/train_config.yaml`](../../../finetune/leftarm_v2/config/train_config.yaml).
-> **작성**: 2026-05-15
+> **자매 문서**: [collection_log.md](../../dgx/docs/finetune/leftarm_v2/collection_log.md) (수집 차수 기록 — DGX 책임). 코덱 관련: [camera_and_codec.md](../../docs/storage/legacy/realplaying/train_troubleshooting/camera_and_codec.md) (legacy). 학습 설정: [`prof_computer/finetune/leftarm_v2/config/train_config.yaml`](../finetune/leftarm_v2/config/train_config.yaml).
+> **작성**: 2026-05-15 (원본: `dgx/docs/finetune/leftarm_v2/model_config.md`). 이관: 2026-05-18 (DGX 학습 잠정 중단 → prof_computer 가 학습 책임. [legacy/train_trial_2026-05-17/README.md](../../dgx/legacy/train_trial_2026-05-17/README.md) 참조).
 
 ---
 
-## 0) 개요 — 2 패스
+## 0) 개요 — 2 패스 (*2026-05-18 2B 목표 200→400ep 갱신*)
 
 `realplaying.md` M2 / spec `02_leftarm_v2_finetune.md` 의 2 패스 구조:
 
 | 패스 | dataset | hyperparameter 정책 | 목적 |
 |---|---|---|---|
 | **2A** | 100 ep balanced (subset P — task 1 [0..49] + task 2 [50..99]) | v1 검증값 그대로 + step 만 충분히 (사이클 검증에 충분한 수렴) | 사이클 검증 + 조기 성능 평가 |
-| **2B** | 200 ep 전체 (M1 완성 후) | 2A 관찰 결과 + 200ep 데이터 반영해 정밀 튜닝 (사용자 주도) | M2 최종 산출 |
+| **2B** | **400 ep 전체 (M1 완성 후 — 2026-05-18 200→400 갱신)** | 2A 관찰 결과 + 400ep 데이터 반영해 정밀 튜닝 (사용자 주도) | M2 최종 산출 |
+
+> **2B 목표 200→400ep 조정 사유 (2026-05-18)**: M1.5 추론 0/2 + researcher 보고서 ([leftarm_v2/research_empty_cameras_2026-05-18.md](leftarm_v2/research_empty_cameras_2026-05-18.md)) 의 데이터 양 추정 (300~500ep) 영역 진입 + camera mismatch 확신 영역 도달. 자세한 근거 [realplaying.md M1 변경 이력](../../realplaying.md).
 
 ---
 
@@ -28,23 +30,38 @@ fine-tune 시 어느 part 를 *얼마나* 학습시킬지가 핵심 결정.
 
 ---
 
-## 2) 학습 방법 4축 매트릭스
+## 2) 학습 방법 매트릭스 (2×3 = 6 옵션)
 
-[LoRA vs Full FT] × [VLM frozen vs trainable] = 4 옵션.
+[VLM frozen / LoRA / Full FT] × [expert LoRA / Full FT] = 6 옵션. *2026-05-18 확장* — 원 4 옵션 (A1/A2/B1/B2) 의 대각 외 오프-대각 옵션 (C1/C2) 추가, *VLA 의미 보존 여부* 축 도입.
 
-| 옵션 | VLM | expert | trainable params (대략) | 메모리/시간 | dataset 적응 | 100ep 적합 |
-|---|---|---|---|---|---|---|
-| A1 | frozen | LoRA (adapter only) | ~3M | 가장 작음 | expert 만 (color·환경 미적응) | ✅ paper 권장 |
-| **A2** | LoRA (adapter only) | LoRA (adapter only) | ~6–12M | 작음 | 부분 (LoRA 로 약간) | ✅ **v1 검증, 채택** |
-| B1 | frozen | full FT (base weight) | ~150M | 중간 | expert 만 | ⚠️ 가능하나 무거움 |
-| B2 | full FT | full FT | ~600M | 큼 | 전체 | ❌ 100ep 과적합 위험 |
+| 옵션 | VLM | expert | trainable (대략) | 메모리/시간 | VLA 의미 보존 | 100ep 적합 | 비고 |
+|---|---|---|---|---|---|---|---|
+| A1 | frozen | LoRA | ~3M | 가장 작음 | ❌ (ACT 화) | ⚠️ paper 권장이나 본 환경 비추 | base 0-shot 우리 환경 무반응 ([learning_log.md §M1.5 추론 후 가설 분리 검증](leftarm_v2/learning_log.md)) — frozen 시 환경 적응 0, expert 가 base VLM representation 위에 매핑만 학습 → 사실상 instruction-conditioned ACT. *2026-05-18 비추 확정* |
+| **A2** | LoRA | LoRA | ~6–12M | 작음 | ✅ 부분 (LoRA r=16) | ✅ **v1 검증, 채택** | M1.5 실측: VLM_vision LoRA 학습량 = EXPERT_lm 과 동등 (ΔB/A 0.486 vs 0.494) — VLM 적응 *실제 작동*. 결과 0% (단축) — *데이터 양 병목* |
+| B1 | frozen | Full FT | ~150M | 중간 | ❌ (ACT 화) | ⚠️ 가능하나 무거움 | A1 의 expert 확장판. VLA 의미 폐기 + 100ep 과적합 위험. lerobot 표준 entry 로 *config 만으로는 불가* — PEFT wrap 이 base 전체 frozen + adapter 만 trainable 강제 ([pretrained.py:303](../../docs/reference/lerobot/src/lerobot/policies/pretrained.py#L303)) |
+| B2 | Full FT | Full FT | ~600M | 큼 | ✅ 최대 | ❌ 100ep 과적합 위험 + RTX 3090 24GB OOM | 200ep + DGX 환경 후 영역 |
+| **C1** | LoRA | Full FT | ~156M | 큼 (24GB 경계) | ⚠️ VLM 측 LoRA 만 살아 *부분 약화* | ⚠️ 코드 수정 필요 | "VLM 적응 유지 + expert capacity ↑". 본 시점 가장 가치 ↑ 후보였으나 lerobot 표준 entry 로 *config 만 불가* (B1 과 동일 이유) — 신규 학습 entry + lerobot 코드 우회 필요. *Phase 1 spec 영역* |
+| C2 | Full FT | LoRA | ~456M | 큼 (24GB 경계) | ✅ VLM 최대 + expert 약 | ⚠️ 코드 수정 + VLM Full FT 100ep 과적합 위험 | wandb 결과 (VLM_text rel_to_\|A\|=0.430 이미 충분 학습) 로 *추가 가치 의문*. 시간 비용 ↑. 본 시점 비추 |
+
+> **VLA 의미 보존 축의 의미**: VLM frozen 분기 (A1/B1) 는 *smolVLA 라는 VLA framework 의 가치 (사전학습 multimodal representation + action 의 통합 학습)* 가 사라지고 사실상 *vision-conditioned action policy = ACT 류* 가 됨. 본 프로젝트가 smolVLA 를 base 로 선택한 이유 자체와 배치되는 분기.
 
 > **LoRA 의 의미**: base weight 는 frozen, 각 linear layer 에 low-rank adapter (`A·B` matrix, rank=16) 만 trainable. `target_modules: all-linear` = 모델 내 *모든* linear layer 에 adapter 부착 (VLM linear + expert linear 둘 다). 따라서 **A2 는 expert 도 LoRA** (Full FT 가 아님).
 
 ### trade-off 분석
 
-- **VLM frozen vs trainable**: SmolVLA paper 표준 권장은 frozen (사전학습 VLM 의 일반화 능력 보존). 그러나 **우리 task 는 단일 환경(시연장) 에서 잘 동작이 목적**이라 일반화 중요도 ↓ — VLM 이 우리 데이터(파랑+노랑 인형 · 노란 캔 · 특정 사람) 에 적응하는 게 task 성능에 유리. 단 100ep 으론 VLM 전체 adapt 가 noise 학습 갈 위험 → **LoRA 로 부분 adapt 가 균형**.
-- **LoRA vs Full FT**: 100ep / 60k frames 는 Full FT 의 600M parameter 를 안정적으로 학습시키기엔 부족 (과적합 위험). LoRA 는 trainable params 가 1–2% 수준이라 100ep 도 안전.
+- **VLM frozen vs trainable** (*2026-05-18 갱신*): SmolVLA paper 표준 권장은 frozen — *일반화 능력 보존*. 그러나 본 환경에서:
+  - base 0-shot 추론 무반응 (사용자 검증, [orin_base_eval_2026-05-17.md](leftarm_v2/orin_base_eval_2026-05-17.md)) → base VLM 만으로 우리 환경 인식 X
+  - A2 학습 후 ckpt 분석 → VLM LoRA 가 실제 학습됨 (위 표 비고)
+  - VLM frozen 분기는 *환경 적응 능력 0 + VLA 의미 폐기* → 본 환경 비추
+  - → **VLM 측 학습 신호는 살리는 게 필수** (LoRA 또는 Full FT)
+- **LoRA vs Full FT**: 100ep / 60k frames 는 Full FT 600M (B2) 을 안정 학습시키기엔 부족 (과적합) + RTX 3090 24GB OOM. LoRA 는 trainable params 1–2% 수준이라 100ep 도 안전. *중간 옵션 C1 (expert 만 Full FT)* 은 가치 ↑ 후보지만 lerobot 코드 우회 필요 — 별도 spec 영역.
+- **C1/C2 의 lerobot 표준 entry 불가 이유**: [pretrained.py:303](../../docs/reference/lerobot/src/lerobot/policies/pretrained.py#L303) 의 `wrap_with_peft()` 가 `for p in self.parameters(): p.requires_grad_(False)` 로 *모든* base param 강제 frozen → LoRA adapter 만 trainable. expert base weight 도 같이 frozen 됨. expert 만 별도 unfreeze 하려면 *lerobot upstream 코드 우회 (Category A read-only)* 또는 신규 학습 entry 필요.
+
+### 다음 사이클 결정 (2026-05-18)
+
+- **현 100ep 그대로 의미 있는 자율 학습 분기 = A2 + r=32** (capacity ↑ 단일 변수). 큰 도약 어려움 — 근본 병목은 데이터 양.
+- **C1 진입은 별도 spec 필요** — 신규 학습 entry 작성 + PEFT manual wrap + expert param unfreeze + lr group 분리.
+- **데이터 확장 (M1 잔여 100ep + 다양성) 이 1순위** — 학습 방법 조정은 그 다음.
 
 ---
 
@@ -69,7 +86,7 @@ fine-tune 시 어느 part 를 *얼마나* 학습시킬지가 핵심 결정.
 
 ## 4) 2A hyperparameter 상세
 
-[`config/train_config.yaml`](../../../finetune/leftarm_v2/config/train_config.yaml) 의 각 값과 근거:
+[`config/train_config.yaml`](../finetune/leftarm_v2/config/train_config.yaml) 의 각 값과 근거:
 
 | 항목 | 값 | 근거 |
 |---|---|---|
@@ -85,7 +102,7 @@ fine-tune 시 어느 part 를 *얼마나* 학습시킬지가 핵심 결정.
 | `wandb_enable` | `true` | v1 동일. entity·project 는 `base_config.accounts` (BaboGaeguri / leftarm_v2). |
 | `device` | `cuda` | DGX GB10 명시. auto-select 의존 회피 (v1 동일). |
 | `push_to_hub` | `false` | 체크포인트 자동 Hub push 차단 — DGX→Orin 수동 전송 흐름 (v1 동일). |
-| `rename_map` | 자동 생성 | `base_config.cameras` 키 순서로 `{top:camera1, wrist:camera2}` 매핑. smolvla 가 `observation.images.cameraN` 키를 기대 — 누락 시 `Key not found` 에러 (v1 의 [`../leftarm_v1/training.md`](../leftarm_v1/training.md) §7 트러블슈팅 확인). |
+| `rename_map` | 자동 생성 | `base_config.cameras` 키 순서로 `{top:camera1, wrist:camera2}` 매핑. smolvla 가 `observation.images.cameraN` 키를 기대 — 누락 시 `Key not found` 에러 (v1 의 [`leftarm_v1/training.md`](../../dgx/docs/finetune/leftarm_v1/training.md) §7 트러블슈팅 확인). |
 | `optimizer` / `lr` | lerobot smolvla 기본 | `use_policy_training_preset=true` (default) — smolvla 의 preset optimizer/scheduler 자동 사용. 2A 변수 최소화. 2B 에서 필요 시 조정. |
 | `dataset_return_uint8` | `true` | **DGX UMA 메모리 안정**. float32 → uint8 (IPC·prefetch buffer 메모리 1/4). lerobot 이 GPU 에서 float 변환 → 정확도 영향 0. v1 default (false) 에서 변경. |
 | `prefetch_factor` | `1` (시도 1: 2) | 시도 1 OOM 후 추가 축소. `num_workers × prefetch = 2 × 1 = 2 batch` buffer (X' 의 1/8). |
@@ -154,10 +171,15 @@ task 2 back 이 현재 20ep 뿐이라 진짜 50:50 (25:25) 을 만들려면 추�
 
 ### 2A — 미실행 (대기)
 
-- run name: `leftarm_v2_2a_<timestamp>` (예정)
-- 명령: `python run_train.py train --pass 2a` 또는 동등 (run_train.py 작성 시 확정 — spec 02 TODO-01)
-- 산출물 경로: `~/smolvla/dgx/outputs/leftarm_v2_2a_<timestamp>/`
-- 결과 (학습 완료 후 기입): steps · 최종 loss · wandb run URL · ckpt size · throughput · **system memory peak (UMA / MemAvailable 비율)** · **data_load_time vs step_time 비율** · **GPU utilization** · 이슈
+> ⚠️ **본 entry 는 2026-05-15 DGX 학습 계획 시점 작성**. 실제 진행 사실:
+> - DGX 시도 1·2·3 (2026-05-15~16): 모두 OOM 사망 — [legacy/train_trial_2026-05-17/docs/training_log.md](../../dgx/legacy/train_trial_2026-05-17/docs/training_log.md)
+> - prof_computer M1.5 학습 (2026-05-17): 100ep × 75000 step 완주, loss 0.04 — [leftarm_v2/learning_log.md §M1.5](leftarm_v2/learning_log.md)
+> - 본 §7 entry 의 *상세 결과 갱신* 은 다음 사이클에서 정리 (현 시점 outdated).
+
+- run name: `leftarm_v2_2a_<timestamp>` (예정 → prof_computer 가 `leftarm_v2_2a_pc_<ts>` 로 실제 실행)
+- 명령: `python run_train.py train --pass 2a` (prof_computer/finetune/leftarm_v2/)
+- 산출물 경로: `~/prof_computer_runs/leftarm_v2_2a_pc_<timestamp>/` (prof_computer M1.5 실측 경로)
+- 결과 (학습 완료 후 기입): steps · 최종 loss · wandb run URL · ckpt size · throughput · **VRAM peak (RTX 3090 24GB 대비)** · **data_load_time vs step_time 비율** · **GPU utilization** · 이슈
 - Orin smoke 추론 결과 (spec 02 TODO-03 후 기입): task 1·2 각각 정성 메모
 
 ### 2B — 미실행 (M1 완성 후 진입)
