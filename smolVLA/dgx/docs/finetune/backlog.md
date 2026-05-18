@@ -68,6 +68,46 @@
   ```
 - **영향**: 메모리 / CPU 낭비 방지. 본 학습 / 수집에는 직접 영향 없지만 누적되면 부담
 
+### 🔥 [ ] base_config.yaml hardware.{follower,leader}_port — `/dev/ttyACMx` → **시리얼 by-id 경로**로 전환
+
+- **발견**: 2026-05-18 — 하루 동안 `/dev/ttyACMx` 매핑이 3회 변동
+  - 13:50 (3일 휴지 후): follower ACM2→ACM1, leader ACM1→ACM0 → base_config 갱신
+  - 20:48 (Orin 추론 후 재연결): follower ACM1↔ACM0 swap, leader ACM0↔ACM1 swap → base_config 또 갱신
+  - 매 swap 마다 새 세션 진입 시 텔레옵·수집 명령이 잘못된 포트로 실행될 위험
+- **트리거**: USB enumeration 순서는 부팅·USB 이벤트·외부 디바이스 연결 (Orin 추론용 케이블 이동 등) 에 따라 swap 가능. 시리얼 번호는 보드별 고유라 안정. `/dev/serial/by-id/` 심볼릭 링크는 udev 가 시리얼로 생성해서 *재부팅·재연결에도 유효*
+- **현재 컨벤션**: `base_config.yaml` 의 `hardware.follower_port` / `hardware.leader_port` 가 `/dev/ttyACMx` 직접 표기 → 매 swap 마다 사용자 수동 갱신 필요. *null=에러* 가드는 있지만 *잘못된 ACM 으로 가리킨 경우* 는 잡지 못함 (예: ACM1 에 leader 가 있을 때 follower_port=ACM1 로 적혀있어도 통신 시도 → calibration mismatch / 모터 ID 충돌로 늦게 발견)
+- **권장 컨벤션** (메모리 [project_smolvla_arm_serial_mapping](../../../.claude/projects/-home-laba/memory/project_smolvla_arm_serial_mapping.md) §How to apply 일관):
+  ```yaml
+  hardware:
+    follower_port: /dev/serial/by-id/usb-1a86_USB_Single_Serial_5B42138563-if00
+    leader_port:   /dev/serial/by-id/usb-1a86_USB_Single_Serial_5B42138566-if00
+    camera_top_index: 0     # 카메라는 hub 위치 기반이라 enumeration 변동 적음 — 유지
+    camera_wrist_index: 2
+  ```
+  - 좌측 팔 시리얼 (현재 base_config 대상): follower `5B42138563`, leader `5B42138566`
+  - 우측 팔 시리얼 (gesture 작업용): follower `5AE6082773`, leader `5AE6056701`
+- **시리얼 확인 방법** (한 줄):
+  ```bash
+  ls -la /dev/serial/by-id/ | grep USB_Single_Serial
+  # 결과 예: usb-1a86_USB_Single_Serial_5B42138563-if00 -> ../../ttyACM0
+  #         (시리얼 → 현재 ttyACMx 매핑 한눈에)
+  ```
+  - 또는 `lerobot-find-port` (인터랙티브 — 케이블 뽑았다 꽂아 매핑 확정)
+  - 부팅마다 변동 가능한 ACM 번호 대신 *시리얼이 진실의 원천*
+- **조치**:
+  1. `dgx/finetune/leftarm_v2/config/base_config.yaml` 의 `hardware.follower_port` / `leader_port` 를 by-id 경로로 교체
+  2. `_lib.py` 의 `get_hardware` 가 by-id 경로도 정상 처리하는지 검증 (`os.path.expanduser` + `Path` 만 거치므로 그대로 동작 예상)
+  3. (선택) `check_port_and_camera_index.py` 가 시리얼 ↔ ACM 매핑을 출력하도록 보강
+  4. `base_config.yaml` 주석 갱신: "`/dev/ttyACMx` 직접 표기는 swap 위험" 안내 추가
+- **영향**:
+  - 매 swap 마다 base_config 수동 갱신 → 0 (자동 안정)
+  - 잘못된 ACM 으로 가리켜 *런타임 늦게 발견* 되는 사고 회피
+  - 같은 base_config 가 다른 노드 (gesture 작업용 우측 팔도 같은 패턴) 에도 그대로 적용 가능
+- **위험 / 검토 필요**:
+  - lerobot 의 `--robot.port` 인자가 symlink 경로를 정상 resolve 하는지 확인 (대부분 OK 추정, 1차례 dry-run 검증 필요)
+  - by-id 경로가 길어 yaml 가독성 약간 ↓ (단 anchor 로 분리해 정리 가능)
+- **우선순위 🔥 사유**: 하루에 매핑 3회 swap → 다음 세션 (혹은 Orin 추론 끝나고 돌아올 때마다) 같은 시나리오 반복 예상. 현재 14차까지 진행했으나 향후 15차 이후 동일 swap 으로 시간 낭비 가능
+
 ### 💡 [ ] check_hardware.sh 에 카메라 ↔ 노드 매핑 자동 출력 추가
 
 - **발견**: 2026-05-11, data_collection.md §2 에서 `v4l2-ctl --list-devices` 를 별도 실행해서 매핑 확인

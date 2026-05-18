@@ -5,7 +5,7 @@
 dataset:                          # → lerobot-record --dataset.*
   fps: 30
   episode_time_s: 60              # 상한값 — →키로 일찍 종료. pick-place 실길이 12~15s 예상
-  reset_time_s: 7                 # episode 간 리셋 시간 (7차에서 15→7 단축, 시연 숙달 반영)
+  reset_time_s: 5                 # episode 간 리셋 시간 (7차에서 15→7 단축, 시연 숙달 반영)
   video: true
   vcodec: h264_nvenc               # GPU NVENC 코덱 — Walking RL 미가동 시 채택 (libsvtav1 CPU 병목 회피, camera_and_codec.md §3)
   streaming_encoding: true

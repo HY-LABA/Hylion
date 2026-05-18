@@ -505,11 +505,24 @@ def main():
         print("[WARNING] n_action_steps=1 감지 — 50 으로 강제 적용 (prof_train_setting §7-5 trap)", file=sys.stderr)
     policy.config.n_action_steps = args.n_action_steps
 
-    # empty_cameras: camera3 미제공 환경 처리
-    # prod-test cycle 1 분석: camera3 없이도 추론 동작 예상 (empty_cameras=0 → missing camera 무시)
-    # 학습 ckpt 의 config 에 empty_cameras 값 확인 후 로그 출력
+    # empty_cameras: ckpt config.json 값을 policy.config 에 강제 적용.
+    # LoRA adapter 만 로드 시 base smolvla_base 의 default (=0) 가 들어와 학습 분포 (camera_empty 분기 = 1)
+    # 와 mismatch 발생 → 추론 신뢰도 저하. ckpt config.json 의 값을 ground truth 로 사용.
     measured_empty = getattr(policy.config, "empty_cameras", None)
-    print(f"[policy.config] empty_cameras 실측값 = {measured_empty} (camera3 없는 환경 — 이상 시 =1 로 수동 수정)")
+    ckpt_config_path = Path(ckpt_dir_str) / "config.json"
+    ckpt_empty_cameras = None
+    if ckpt_config_path.exists():
+        with open(ckpt_config_path) as f:
+            ckpt_empty_cameras = json.load(f).get("empty_cameras")
+    if ckpt_empty_cameras is not None and ckpt_empty_cameras != measured_empty:
+        print(
+            f"[policy.config] empty_cameras {measured_empty} ≠ ckpt config.json {ckpt_empty_cameras} "
+            f"→ 학습 분포 정합 위해 {ckpt_empty_cameras} 강제 적용"
+        )
+        policy.config.empty_cameras = ckpt_empty_cameras
+        measured_empty = ckpt_empty_cameras
+    else:
+        print(f"[policy.config] empty_cameras = {measured_empty} (ckpt config.json = {ckpt_empty_cameras})")
 
     preprocess, postprocess = make_pre_post_processors(
         policy.config,

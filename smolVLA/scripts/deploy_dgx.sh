@@ -23,6 +23,7 @@ rsync -avz --delete \
     --exclude 'outputs' \
     --exclude 'gestures/*/' \
     --exclude 'finetune/*/config/base_config.yaml' \
+    --exclude 'finetune/*/config/record_config.yaml' \
     --exclude '__pycache__' \
     --exclude '*.pyc' \
     --exclude '*.egg-info' \
@@ -34,6 +35,15 @@ rsync -avz --delete \
 #       인덱스)은 DGX 세션마다 직접 갱신하는 로컬 값. --delete rsync 가 repo 의 null
 #       템플릿으로 덮어쓰지 않도록 제외. 안정값 필드(robot/teleop/cameras/calibration/
 #       paths/accounts) 변경 시엔 해당 파일만 수동 rsync 필요. (사용자 결정 2026-05-14)
+# 참고: 'finetune/*/config/record_config.yaml' — reset_time_s + record_opts (display_data,
+#       play_sounds) 등 *시연 환경 의존* 필드가 DGX 세션마다 현장 갱신됨 (2026-05-18 시연 시
+#       reset_time_s 7→5 단축 현장 조정 사례). devPC 의 값으로 DGX 의 현장 값을 덮지 않도록 제외.
+#       dataset/tasks 등 *글로벌 캠페인 정의* 영역을 devPC 에서 변경한 경우엔 해당 파일만
+#       수동 scp 로 DGX 에 적용 필요. (사용자 결정 2026-05-18)
+#
+# ⚠️ TRADE-OFF: 위 두 yaml 의 *글로벌 필드* (instruction, target_episodes, vcodec, fps 등) 를
+#    devPC 에서 변경 시 *deploy 만으로는 DGX 반영 안 됨* — 수동 scp 또는 DGX 에서 직접 수정 필요.
+#    devPC 에서 변경 시 본 스크립트 끝의 echo 안내 참조.
 
 echo "[deploy-dgx] docs/reference/lerobot/ → ${DGX_HOST}:${DGX_DEST}/docs/reference/lerobot/"
 echo "[deploy-dgx]   (editable 설치 대상 — 약 수백 MB, 최초 1회는 시간이 걸립니다)"
@@ -51,3 +61,8 @@ echo "  ssh dgx"
 echo "  bash ~/smolvla/dgx/scripts/setup_finetune_env.sh"
 echo "  source ~/smolvla/dgx/.arm_finetune/bin/activate"
 echo "  bash ~/smolvla/dgx/scripts/smoke_test.sh"
+echo ""
+echo "[deploy-dgx] ⚠ base_config.yaml / record_config.yaml 은 deploy 에서 제외됨 (현장 보호)."
+echo "             글로벌 필드 (instruction·target_episodes·vcodec 등) 를 devPC 에서 수정한 경우:"
+echo "             scp smolVLA/dgx/finetune/leftarm_v2/config/record_config.yaml \\"
+echo "                 dgx:/home/laba/smolvla/dgx/finetune/leftarm_v2/config/record_config.yaml"

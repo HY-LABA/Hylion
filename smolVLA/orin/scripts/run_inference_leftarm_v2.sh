@@ -254,7 +254,7 @@ cmd_live() {
         --cameras "top:${TOP_IDX},wrist:${WRIST_IDX}" \
         --gate-json "${CONFIG_DIR}" \
         --n-action-steps 50 \
-        --max-steps 50
+        --max-steps 1000
 }
 
 # ── Subcommand: zero-shot ─────────────────────────────────────────────────────

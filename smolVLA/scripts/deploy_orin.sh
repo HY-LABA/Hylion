@@ -18,11 +18,19 @@ echo "[deploy] ${SRC} → ${ORIN_HOST}:${ORIN_DEST}/"
 rsync -avz --delete \
     --exclude '.hylion_arm' \
     --exclude 'calibration' \
+    --exclude 'checkpoints/' \
+    --exclude 'config/ports.json' \
+    --exclude 'config/cameras.json' \
     --exclude '__pycache__' \
     --exclude '*.pyc' \
     --exclude '*.egg-info' \
     --exclude '.git' \
     "$SRC" "${ORIN_HOST}:${ORIN_DEST}/"
+# 참고: 'checkpoints/' — Orin 측에 HF Hub 에서 다운로드한 학습 ckpt 자산이 살아있음. repo 는
+#       checkpoints/README.md (구조) 만 추적. --delete 가 Orin 의 실 ckpt 를 삭제하지 않도록 보호.
+# 참고: 'config/ports.json' + 'config/cameras.json' — Orin 측 실측 하드웨어 값 (follower_port, camera index)
+#       을 devPC 의 null template 으로 덮어쓰지 않도록 보호. dgx 의 base_config.yaml 보호 패턴과 동일.
+#       (2026-05-18 incident: 이 보호 부재로 dry-run 차단 발생 — BACKLOG #1 + ANOMALIES 기록.)
 
 echo "[deploy] 완료. Orin에서 초기 설치가 필요하면:"
 echo "  ssh orin"
