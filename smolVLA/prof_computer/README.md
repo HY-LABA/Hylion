@@ -60,12 +60,14 @@ prof_computer/
 │       └── run_train_camera_empty.py  # camera_empty 검증 분기 entry
 └── docs/
     ├── model_config.md             # 학습 방법 매트릭스·hyperparameter (leftarm_v2/v3+ 공통)
-    └── leftarm_v2/                 # leftarm_v2 사이클 한정 자료
+    └── leftarm_v2/                 # leftarm_v2 사이클 한정 자료 (학습 측)
         ├── learning_log.md         # PC 학습 시도 기록
-        ├── orin_a2_eval_2026-05-17.md       # A2 ckpt 추론 평가
-        ├── orin_base_eval_2026-05-17.md     # base smolvla_base 0-shot 평가
-        ├── research_empty_cameras_2026-05-18.md  # researcher 보고서
+        ├── research_empty_cameras_2026-05-18.md   # researcher 보고서 (empty_cameras 가설 검증)
+        ├── lerobot_smolvla_training_best_practice.md  # researcher 보고서 (학습 모범 사례)
         └── after_run_checklist.md  # 학습 직후 체크리스트
+
+# Orin 추론 평가는 별도 — smolVLA/orin/docs/leftarm_v2/{a2,base,camera_empty}_eval_*.md
+# 노드 책임 분리: 학습 자료 = prof_computer / 추론 평가 = orin (2026-05-19 정리)
 ```
 
 > ⚠️ **upstream 옵션 B 일관**: prof_computer 도 `docs/reference/lerobot/` editable install 을 그대로 사용 — DGX 와 같은 정책. lerobot 코드 분기 없음.

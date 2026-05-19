@@ -50,7 +50,7 @@ fine-tune 시 어느 part 를 *얼마나* 학습시킬지가 핵심 결정.
 ### trade-off 분석
 
 - **VLM frozen vs trainable** (*2026-05-18 갱신*): SmolVLA paper 표준 권장은 frozen — *일반화 능력 보존*. 그러나 본 환경에서:
-  - base 0-shot 추론 무반응 (사용자 검증, [orin_base_eval_2026-05-17.md](leftarm_v2/orin_base_eval_2026-05-17.md)) → base VLM 만으로 우리 환경 인식 X
+  - base 0-shot 추론 무반응 (사용자 검증, [base_eval_2026-05-17.md](../../orin/docs/leftarm_v2/base_eval_2026-05-17.md)) → base VLM 만으로 우리 환경 인식 X
   - A2 학습 후 ckpt 분석 → VLM LoRA 가 실제 학습됨 (위 표 비고)
   - VLM frozen 분기는 *환경 적응 능력 0 + VLA 의미 폐기* → 본 환경 비추
   - → **VLM 측 학습 신호는 살리는 게 필수** (LoRA 또는 Full FT)

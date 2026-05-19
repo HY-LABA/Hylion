@@ -10,14 +10,14 @@
 |---|---|
 | 평가 대상 ckpt | [`BaboGaeguri/leftarm_v2_camera_empty_A2_pc_2026-05-18`](https://huggingface.co/BaboGaeguri/leftarm_v2_camera_empty_A2_pc_2026-05-18) |
 | ckpt 형태 | LoRA adapter 45MB (base: `lerobot/smolvla_base`) |
-| 학습 메타 요약 | 100ep subset (ep 0~99) · LoRA r=16 all-linear · batch 4 fp32 · **75,000 step** · final loss 0.130 · 9시간 22분. **단일 변수 차이**: `empty_cameras: 1` (M1.5 A2 = 0). 나머지 100% 동일. 상세: [`learning_log.md` §camera_empty 분기 학습](learning_log.md#camera_empty-분기-학습--2026-05-18) |
+| 학습 메타 요약 | 100ep subset (ep 0~99) · LoRA r=16 all-linear · batch 4 fp32 · **75,000 step** · final loss 0.130 · 9시간 22분. **단일 변수 차이**: `empty_cameras: 1` (M1.5 A2 = 0). 나머지 100% 동일. 상세: [`learning_log.md` §camera_empty 분기 학습](../../../prof_computer/docs/leftarm_v2/learning_log.md#camera_empty-분기-학습--2026-05-18) |
 | 평가일 | 2026-05-18 |
 | 평가자 | 사용자 (1인) |
 | 평가 환경 | 실 Orin + 좌측 SO-101 아암 + 시연장 (M1.5 평가와 동일 셋업) |
 | **사이클 비고** | **단축 비교 평가** — 본 분기 (camera_empty) + M1.5 (A2 재다운로드) 동일 패턴 동시 검증. 사유: 첫 trial 결과 두 모델 모두 형편없음 + 차이 없음 → 정량 평가 자체 무의미 결론. **empty_cameras 가설 root cause 아님 확정** → 데이터 확장 우선순위 결정. |
 | spec | (없음 — 사용자 자율 ad-hoc 검증 사이클, `realplaying.md` M1.5 후속) |
 | plan | (없음 — Phase 1·2 생략, walkthrough 직진) |
-| 선행 사이클 보고서 | [`orin_a2_eval_2026-05-17.md`](orin_a2_eval_2026-05-17.md) (M1.5 A2) · [`orin_base_eval_2026-05-17.md`](orin_base_eval_2026-05-17.md) (zero-shot base) · [`research_empty_cameras_2026-05-18.md`](research_empty_cameras_2026-05-18.md) (가설 근거) |
+| 선행 사이클 보고서 | [`a2_eval_2026-05-17.md`](a2_eval_2026-05-17.md) (M1.5 A2) · [`base_eval_2026-05-17.md`](base_eval_2026-05-17.md) (zero-shot base) · [`research_empty_cameras_2026-05-18.md`](../../../prof_computer/docs/leftarm_v2/research_empty_cameras_2026-05-18.md) (가설 근거) |
 
 ---
 
@@ -164,7 +164,7 @@
 | 동작 부드러움 | 양호 (모터·하드웨어 정상) | 양호 (동일) | **동일** |
 | 정책 *판단력* 한계 | 도달 단계 일부, 짚기·완료 단계 응답성 부재 | 도달 단계 일부, 짚기·완료 단계 응답성 부재 | **동일 패턴** |
 
-### 학습 메트릭 비교 (참고 — [`learning_log.md` §M1.5 vs 002 비교 표](learning_log.md#m15-001-와의-비교--empty_cameras-단일-변수만-차이))
+### 학습 메트릭 비교 (참고 — [`learning_log.md` §M1.5 vs 002 비교 표](../../../prof_computer/docs/leftarm_v2/learning_log.md#m15-001-와의-비교--empty_cameras-단일-변수만-차이))
 
 | 학습 지표 | M1.5 (001) | 002 (camera_empty) | 차이 |
 |---|---|---|---|
@@ -178,7 +178,7 @@
 
 ### 가설 검증 결론
 
-> [`research_empty_cameras_2026-05-18.md`](research_empty_cameras_2026-05-18.md) 의 가설 — *`empty_cameras=0` (base 의 3 cam 형식과 우리 2 cam dataset 의 mismatch) 가 M1.5 의 0/2 root cause* 일 가능성.
+> [`research_empty_cameras_2026-05-18.md`](../../../prof_computer/docs/leftarm_v2/research_empty_cameras_2026-05-18.md) 의 가설 — *`empty_cameras=0` (base 의 3 cam 형식과 우리 2 cam dataset 의 mismatch) 가 M1.5 의 0/2 root cause* 일 가능성.
 
 | 결론 | 근거 |
 |---|---|
@@ -216,7 +216,7 @@
 
 ## 부가 발견 — 추론 인프라 이슈 (본 사이클 부수 산출)
 
-> [`docs/work_flow/specs/ANOMALIES.md`](../../../docs/work_flow/specs/ANOMALIES.md) §02_leftarm_v2_finetune #8·#9·#10 정식 기록. 본 사이클에서 발견된 *인프라 차원* 이슈.
+> [`docs/work_flow/specs/ANOMALIES.md`](../../../../docs/work_flow/specs/ANOMALIES.md) §02_leftarm_v2_finetune #8·#9·#10 정식 기록. 본 사이클에서 발견된 *인프라 차원* 이슈.
 
 | # | 영역 | 발견 | 처리 |
 |---|---|---|---|
@@ -242,4 +242,4 @@
 
 ### 다음 사이클 입력 (Phase 1 spec 작성 시 활용)
 
-본 보고서 + `orin_a2_eval_2026-05-17.md` + `research_empty_cameras_2026-05-18.md` 3 문서가 *데이터 확장 사이클* 의 출발점. 다음 spec 작성 시 메인 Claude 가 본 보고서의 §"M2 본 학습 진입 가치 판단" 우선순위 4 영역을 직접 입력으로 사용.
+본 보고서 + `a2_eval_2026-05-17.md` + `research_empty_cameras_2026-05-18.md` 3 문서가 *데이터 확장 사이클* 의 출발점. 다음 spec 작성 시 메인 Claude 가 본 보고서의 §"M2 본 학습 진입 가치 판단" 우선순위 4 영역을 직접 입력으로 사용.
