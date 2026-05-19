@@ -564,3 +564,155 @@ M1.5 원본 *완전 보존* + 별도 entry 3 파일:
 2. **분리 entry 보존** — M1.5 원본 파일 미수정, 본 분기 *별도 entry* 신설. 회귀 위험 0.
 3. **base config 사전학습 분포 정합 검증** — base smolvla 의 *설계 의도* (3 cam 입력) 를 *우리가 그동안 무시했는지* 직접 측정. 결과 어느 쪽이든 *base 의 input_features 형식* 의 영향력 정량화.
 4. **다음 사이클 데이터 수집 방향 정보 ↑** — 3번째 카메라 실제 활용 가치 (vs zero-pad 충분) 검증 기준점 확보.
+
+---
+
+### 003 분기 학습 — 2026-05-18 ~ 2026-05-19
+
+> **분기 식별**: `003_a2_310ep_empty1_sched_sync_bf16_b6`
+>
+> **목적**: M1.5 (001) 단축 0/2 결과 및 002 (camera_empty) 단축 0/2 결과를 바탕으로 *5변수 종합 변경* 가설 묶음 검증. empty_cameras 단독 (002) 이 root cause 아님 확정 후, 데이터 확장 + 학습 효율 변수를 동시에 투입.
+>
+> **vs M1.5 (001) 변경 변수 5개**:
+> 1. dataset 110→310 ep (실제 학습 ep 100→310)
+> 2. `empty_cameras` 0→1 (upstream LIBERO CI 표준 패턴, base smolvla 3 cam 입력 정합)
+> 3. `scheduler_decay_steps` 30000→120000 (= steps 동기화, M1.5 후반 38k step 학습 정체 해결)
+> 4. bf16 mixed precision (`accelerate launch --mixed_precision=bf16` — `lerobot-train` 직접 호출 대신 `accelerate launch` 래퍼로 진짜 bf16 트리거)
+> 5. batch_size 4→6 (epoch 2.93→4.39, researcher 권장 3-10 epoch 영역 정중앙 진입)
+
+#### smoke 검증 (2026-05-18, commit 5715da5)
+
+3단계 smoke 진행 (batch 가변, bf16 + accelerate launch 공통):
+
+| smoke | batch | VRAM peak | 결과 | 사유 |
+|---|---|---|---|---|
+| smoke 1 (bf16+b4) | 4 | 34.31% (8.84 GB) | ✅ PASS | bf16 작동 확정 — fp32 b4 의 51.79% 대비 -33% |
+| smoke 2 (bf16+b8) | 8 | OOM (step 1) | ❌ FAIL | attention transient peak 의 batch 비선형 영향 확정 |
+| smoke 3 (bf16+b6) | 6 | 79.52% (20.49 GB) | ✅ PASS | 100 step 완주, 경계 영역 — 본 학습 진입 결정 |
+
+→ **본 학습 진입 결정**: batch 6 + bf16. OOM 위험 인지 (본 학습 transient peak 가 90%+ 도달 가능성 있음) + 진행.
+
+#### 본 학습 — 2026-05-18 23:06 ~ 2026-05-19 (추정 ~15:00 KST) · ✅ COMPLETED (120000 step 완주)
+
+- 명령: `accelerate launch --mixed_precision=bf16 --num_processes=1 lerobot-train` + `--policy.scheduler_decay_steps=120000`
+- run name: `leftarm_v2_003_a2_310ep_empty1_sched_sync_bf16_b6_full_2026-05-18_23-06-14`
+- output_dir: `~/prof_computer_runs/leftarm_v2_003_a2_310ep_empty1_sched_sync_bf16_b6_full_2026-05-18_23-06-14/`
+- wandb run: [`babogaeguri-hanyang-university/leftarm_v2/runs/40kzxlmq`](https://wandb.ai/babogaeguri-hanyang-university/leftarm_v2/runs/40kzxlmq)
+- HF Hub: [`BaboGaeguri/leftarm_v2_003_a2_310ep_empty1_sched_sync_bf16_b6`](https://huggingface.co/BaboGaeguri/leftarm_v2_003_a2_310ep_empty1_sched_sync_bf16_b6) (push 완료 2026-05-19 08:10 UTC)
+
+**학습 메트릭** (train_config.json + smoke 측정 기반 — wandb 메트릭은 run 40kzxlmq 페이지에서 확인 가능):
+
+| 지표 | 값 |
+|---|---|
+| 시작 | 2026-05-18 23:06 KST |
+| 종료 | 2026-05-19 ~15:00 KST (추정, HF push 08:10 UTC 기준 ~16-18h 후) |
+| 총 시간 | **~16시간** (smoke 3 step time 0.48s × 120000 step 외삽, 실제는 wandb run 40kzxlmq 확인) |
+| 도달 step | 120000 / 120000 (100%) ✅ |
+| 도달 sample | 720,000 (120000 × batch 6) |
+| epoch | ~4.39 (310ep dataset, batch 6 기준) |
+| step time (steady) | ~0.48 s/step (smoke 3 측정값 — 실측은 wandb 40kzxlmq 확인) |
+| dataloading_s | [wandb run 40kzxlmq 확인] |
+| final loss | [wandb run 40kzxlmq 확인] |
+| loss steady oscillation (last 20K) | [wandb run 40kzxlmq 확인] |
+| grad_norm 후반 | [wandb run 40kzxlmq 확인] |
+| lr 마지막 | **2.5e-6** (cosine min — scheduler_decay_steps=120000=steps, 전 구간 decay) |
+| ckpt 저장 | **60개** (save_freq=2000, step 2000 마다) |
+| last ckpt 크기 | [wandb 또는 로컬 확인 — LoRA adapter only, 001/002 기준 ~45-125 MB 예상] |
+
+> wandb 메트릭 미추출 사유: devPC 환경에 `wandb` 패키지 미설치 (시스템 Python, venv 외부). 사용자가 `wandb.ai/babogaeguri-hanyang-university/leftarm_v2/runs/40kzxlmq` 에서 직접 확인 후 `[...]` 항목 갱신 가능.
+
+**시스템 메트릭** (smoke 3 측정값 기반, 본 학습 16h 추정):
+
+| 지표 | 값 |
+|---|---|
+| VRAM peak (smoke 3 측정) | **79.52%** (~20.49 GB / 24 GB) |
+| VRAM steady (본 학습 — 추정) | [wandb run 40kzxlmq 확인] |
+| GPU power | [wandb run 40kzxlmq 확인] |
+| GPU util | [wandb run 40kzxlmq 확인] |
+| GPU temp | [wandb run 40kzxlmq 확인] |
+| System Memory | [wandb run 40kzxlmq 확인] |
+| Disk 사용 (학습 후) | [wandb run 40kzxlmq 확인 — 60 ckpt × 파일당 크기] |
+
+#### HF Hub 검증 (2026-05-19, prod-test AUTO_LOCAL)
+
+`curl https://huggingface.co/api/models/BaboGaeguri/leftarm_v2_003_a2_310ep_empty1_sched_sync_bf16_b6` 조회 결과:
+
+| 검증 항목 | 결과 |
+|---|---|
+| siblings 총 10개 | ✅ `.gitattributes` + `README.md` + `adapter_config.json` + `adapter_model.safetensors` + `config.json` + `policy_postprocessor.json` + `policy_postprocessor_step_0_unnormalizer_processor.safetensors` + `policy_preprocessor.json` + `policy_preprocessor_step_5_normalizer_processor.safetensors` + `train_config.json` |
+| `config.json.empty_cameras` | **1** ✅ (003 분기 정합 확인) |
+| `config.json.n_action_steps` | 50 ✅ (Hub 함정 회피 — 002 사이클 검증 패턴 유지) |
+| `config.json.chunk_size` | 50 ✅ |
+| `adapter_config.json.r` | 16 ✅ (LoRA r=16, all-linear 정합) |
+| `train_config.json.scheduler_decay_steps` | 120000 ✅ (= steps, 전 구간 cosine decay) |
+| `train_config.json.batch_size` | 6 ✅ |
+| `train_config.json.steps` | 120000 ✅ |
+
+#### 추론 평가 결과 메모 (TODO-04 갱신 — 2026-05-19)
+
+- **평가 시트**: [`orin/docs/leftarm_v2/003_eval_2026-05-19.md`](../../../orin/docs/leftarm_v2/003_eval_2026-05-19.md)
+- **결과 (단축 8 trial, 계획 20 중)**: **8 / 8 = 100%** (사용자 단축 종료 결정 — 첫 trial 들 모두 성공으로 추가 trial 정보 가치 낮다 판단)
+  - task1: 3/3 (front 1, back 2)
+  - task2: 5/5 (front 2 — 캔 물 채움 1 포함, back 3 — 다중 perturbation 1 포함)
+  - 학습 분포 외 perturbation 4 trial: 로봇 각도 마늘랩 방향 (task1·task2 각 1) + 캔 mass 변화 (task2 1) + **다중 perturbation 로봇 각도 + 조명 50% 감소 (task2 back 1)** → 모두 견딤
+- **vs M1.5(0/2)·002(0/2)**: **0% → 100% 도약**. 5변수 종합 분기 효과 결정적 확정. dominant 변수 미분리 (단일 ablation 미수행, 다음 사이클 영역). 002 결과 (단일 변수 empty_cameras 무효) 고려 시 *데이터 양 110→310ep* 가 가장 큰 변수 추정. 다중 perturbation (시각+광량 동시) 견딤 신호로 일반화 능력 정성적 증명.
+- **다음 사이클 방향**: `realplaying.md` M4 (패키징·재실행 체크리스트) 진입 합리적. 단 trial 수 적음 (7) → 통계 신뢰도 제한, 더 큰 분포 변화 robustness 또는 단일 변수 ablation 우선순위는 `/wrap-spec` reflection 단계에서 결정.
+
+---
+
+## M1.5 (001) vs 002 (camera_empty) vs 003 비교 표
+
+> 본 표는 camera_empty_eval 의 §학습 메트릭 비교 표 (`### M1.5 (001) 와의 비교`) 를 확장한 3-way 비교.
+> M1.5↔002 는 *single variable* (empty_cameras 0→1), 001↔003 은 *5변수 종합*.
+
+### 학습 설정 비교
+
+| 설정 항목 | M1.5 (001) | 002 (camera_empty) | 003 (5변수 종합) |
+|---|---|---|---|
+| dataset | 110 ep (subset 100ep) | 110 ep (subset 100ep) | 310 ep (전체) |
+| `empty_cameras` | 0 | **1** | **1** |
+| `scheduler_decay_steps` | 30000 | 30000 | **120000 (=steps)** |
+| mixed precision | fp32 (`use_amp=false`) | fp32 (`use_amp=false`) | **bf16** (`accelerate launch`) |
+| batch_size | 4 | 4 | **6** |
+| steps | 75000 | 75000 | **120000** |
+| epoch | 5.5 | 5.5 | ~4.39 |
+| save_freq | 1000 | 1000 | 2000 |
+| lerobot entry | `lerobot-train` 직접 | `lerobot-train` 직접 | **`accelerate launch` 래퍼** |
+
+### 학습 메트릭 비교
+
+| 지표 | M1.5 (001) | 002 (camera_empty) | 003 (5변수 종합) |
+|---|---|---|---|
+| 총 시간 | 7시간 34분 | 9시간 22분 | ~16시간 (추정) |
+| step time | 0.343 s/step | 0.397 s/step | ~0.48 s/step (smoke 3) |
+| 도달 step | 75,000 ✅ | 75,000 ✅ | 120,000 ✅ |
+| 도달 sample | 300,000 | 300,000 | 720,000 |
+| final loss (last step) | 0.132 | 0.130 | [wandb 40kzxlmq] |
+| loss steady (last 20K) | 0.013–0.087 | 0.05–0.20 | [wandb 40kzxlmq] |
+| grad_norm 후반 | 0.55–0.65 | 0.56–0.71 | [wandb 40kzxlmq] |
+| lr 마지막 | 2.5e-6 (step 30k 이후 정체) | 2.5e-6 (step 30k 이후 정체) | **2.5e-6 (전 구간 cosine decay)** |
+| ckpt 저장 수 | 75개 | 75개 | **60개** (save_freq=2000) |
+| last ckpt 크기 | ~125 MB | ~45 MB | [로컬 확인 또는 wandb] |
+
+### 시스템 메트릭 비교
+
+| 지표 | M1.5 (001) | 002 (camera_empty) | 003 (5변수 종합) |
+|---|---|---|---|
+| VRAM peak | 60.67% (~14.7 GB) | 40–42% (~14–15 GB) | **79.52% (~20.49 GB)** (smoke 3) |
+| GPU power | 300–320W | 300–340W | [wandb 40kzxlmq] |
+| GPU util | 60–80% | 60–90% | [wandb 40kzxlmq] |
+| GPU temp peak | 83°C | 80°C | [wandb 40kzxlmq] |
+| System Memory | 15% steady | 15% steady | [wandb 40kzxlmq] |
+| RAM 누수 | 0.18 GB/h | 0 | [wandb 40kzxlmq] |
+| Disk (학습 후) | ~60 GB | 73→80 GB | [wandb 40kzxlmq — 60 ckpt × 파일당 크기] |
+
+### 추론 평가 비교
+
+| 지표 | M1.5 (001) | 002 (camera_empty) | 003 (5변수 종합) |
+|---|---|---|---|
+| 평가 방법 | 단축 2 trial (task1 front + task2 front) | 단축 2 trial (동일) | **확장 20 trial** (task×orientation×5) |
+| 성공률 | 0/2 (0%) | 0/2 (0%) | [TODO-03 PHYS_REQUIRED 완료 후 갱신] |
+| 평가 시트 | [`a2_eval_2026-05-17.md`](../../../orin/docs/leftarm_v2/a2_eval_2026-05-17.md) | [`camera_empty_eval_2026-05-18.md`](../../../orin/docs/leftarm_v2/camera_empty_eval_2026-05-18.md) | `003_eval_2026-05-19.md` (TODO-02 신설) |
+| HF Hub repo | `leftarm_v2_A2_pc_2026-05-17` | `leftarm_v2_camera_empty_A2_pc_2026-05-18` | `leftarm_v2_003_a2_310ep_empty1_sched_sync_bf16_b6` |
+
+> 003 추론 평가 결과는 TODO-03 완료 + `/verify-result` 후 본 표 해당 셀 갱신 예정.

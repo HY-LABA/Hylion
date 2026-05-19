@@ -18,8 +18,10 @@
 | 06 | [06_dgx_venv_setting.md](06_dgx_venv_setting.md) | DGX Spark 학습·배포 환경 세팅 기록 (venv `~/smolvla/dgx/.arm_finetune`, PyTorch 2.10.0+cu130, lerobot editable, TODO-09b smoke 실측치, §9 DGX→Orin 체크포인트 sync 절차 — TODO-10b 완료 시 실측치 누적) |
 | 07 | [07_orin_structure.md](07_orin_structure.md) | orin/ 디렉터리 구조·기능 책임 매트릭스 + 마이그레이션 계획 (04 사이클 기준 — 추론 전용 책임 명확화) — 구 08 |
 | 08 | [08_dgx_structure.md](08_dgx_structure.md) | dgx/ 디렉터리 구조·기능 책임 매트릭스 (04 사이클 기준; 06 결정으로 학습 + 데이터 수집 두 책임 흡수 반영은 X2 todo 에서 처리) — 구 09 |
+| 09 | [09_orin_config_policy.md](09_orin_config_policy.md) | `orin/config/*.json` git 추적 정책 — null template + Orin 실측값 정본 + `deploy_orin.sh --exclude` (spec 03 TODO-05 결정 2026-05-19) |
 
 > 2026-05-14 삭제: `09_demo_site_mirroring.md` (시연장 미러링 가이드 + §7 실측), `10_orin_config_policy.md` (orin/config git 추적 정책), `11_smolvla_model_decision.md` (SmolVLA 모델 선정 근거). 새 계획 수립 시 관련 내용 재검토 예정. git 히스토리에서 복구 가능.
+> 2026-05-19 09 재신설: `09_orin_config_policy.md` — orin/config git 정책 (spec 03 TODO-05 결정, 옛 10 의 주제 영역과 동일하나 fresh start 후 새 결정).
 
 ### 비-번호 (주제별)
 

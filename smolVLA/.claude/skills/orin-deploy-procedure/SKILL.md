@@ -39,6 +39,22 @@ rsync ... \
 - code-tester 가 deploy 스크립트 수정 본 검토 시 위 exclude 미포함 발견 → Recommended 항목으로 지적
 - 신규 사용자 환경 의존 파일 추가 시 본 표 + 해당 deploy 스크립트 동시 갱신 (Coupled File 패턴)
 
+## 환경 차단 vs task 미완 자율 분류 (03_leftarm_v2_eval_003_branch 도출)
+
+배포·검증 중 다음 환경 차단 상황에서는 *task 미완* 이 아닌 *환경 차단* 으로 분류:
+
+| 환경 차단 유형 | 자율 처리 |
+|---|---|
+| SSH 차단 (네트워크 분리·Orin 전원 꺼짐) | 완료 가능 영역 (devPC 측 파일 작성·HF Hub 원격 검증) 만 처리 → Orin 실행 영역은 `NEEDS_USER_VERIFICATION` (PHYS_REQUIRED 위임) 으로 전환 |
+| 도구 미설치 (wandb·curl 등) | 추출 가능한 데이터 (설정 파일·API 조회) 만 채움 → 미추출 항목은 `[마커]` 표시 + 사용자 후속 채움 경로 명시 |
+| JS 렌더링 페이지 (WebFetch 불가) | 정적 API endpoint (HF Hub API, wandb API) 로 대체 시도 → 대체 불가 시 마커 처리 |
+
+**판단 기준**: "지금 이 환경에서 이 작업을 할 수 없는 이유가 *코드·설계 문제* 인가 vs *실행 환경 부재* 인가?"
+- 코드·설계 문제 → task 미완 (code-tester MAJOR_REVISIONS, prod-test FAIL 경로)
+- 실행 환경 부재 → 환경 차단 (가능한 부분만 완료 + 나머지 위임)
+
+code-tester · prod-test-runner 는 본 분류를 확인 후 verdict 발급. 환경 차단 사례는 verdict 사유에 명시.
+
 ## SSH 설정
 
 - `~/.ssh/config` 에 `orin`, `dgx` alias 등록 가정

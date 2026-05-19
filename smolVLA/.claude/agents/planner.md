@@ -128,6 +128,19 @@ todo 가 *새 추론 entry 작성* 또는 *기존 entry 의 학습 ckpt 교체* 
 
 **적용 범위 조절**: 추론 entry *신규 작성* 또는 *ckpt 교체* 시만 의무. 단순 스크립트 래핑 변경 시는 권고 수준.
 
+#### 6-c. PHYS_REQUIRED 포함 spec 의 환경 사전 정비 점검 (03_leftarm_v2_eval_003_branch 도출)
+
+spec 의 검증 큐 후보에 `SSH_AUTO` 또는 `PHYS_REQUIRED` 항목이 있으면, plan 작성 시 다음 사전 정비 점검을 Group 1 에 포함하거나 awaits_user 로 처리:
+
+1. **SSH 연결 확인**: `ssh -G orin | grep -E 'hostname|user'` + `ping -c 1 -W 2 <orin_ip>` 으로 도달 가능 여부 확인
+   - 차단 시 → 사용자에게 연결 경로 확인 (네트워크 설정 / Orin 전원) 또는 SSH_AUTO 항목을 PHYS_REQUIRED 로 상향 분류
+2. **`~/.ssh/config` 정합 확인**: 현 네트워크 환경에서 alias (`ssh orin`) 가 올바른 IP 로 연결되는지
+   - SSID 추정 기반 분기 (`Match exec "iwgetid -r | grep -q ..."`) 대신 ping 도달성 기반 분기 권장 (devPC SSID ↔ Orin 실 IP 매핑 보장 X 환경 대응)
+
+본 점검이 필요한 경우 plan §확인 필요 가정 에 명시. 점검 결과가 차단이면 해당 SSH_AUTO 항목을 PHYS_REQUIRED 로 상향 분류하고 사용자 위임 명령 시퀀스를 plan §Phase 3 검증 큐 후보 에 포함.
+
+**도입 사유** (03_leftarm_v2_eval_003_branch 2026-05-19): 시연장 이동 중 `~/.ssh/config` 의 SSID 기반 분기 깨짐 → ad-hoc 패치 필요. spec dispatch 전 사전 점검 시 약 15분 디버깅 시간 절약 가능.
+
 ### 7. `context/plan.md` 작성
 
 ## 산출물 형식 — `context/plan.md`
