@@ -1210,3 +1210,32 @@
 - 다음 환경에서 바로 할 일:
   - e-stop 모델 파일명 변경 후 실제 wake-word 트리거 1회 검증.
   - NUC 쪽 `nuc/IMU/` 벤더 번들은 git 미추적 — 필요 시 별도 전달.
+
+### 운영 흐름 2단계 분리 — preflight 추가 (2026-05-20)
+
+- 오늘 변경 요약:
+  - 부팅 시 코디네이터 자동 실행을 취소. 이 Jetson 에서
+    `install-coordinator-service.sh --uninstall` 실행 →
+    `hylion-coordinator.service` disable + unit 파일 삭제.
+    install 스크립트·unit 템플릿·headless 토글은 삭제하지 않고
+    "옵션(무인 배치용)" 으로 강등.
+  - 운영을 2단계로 분리: ① 환경 점검(preflight) ② 작동 시작
+    (run_coordinator.sh). 부팅만으로는 코디네이터가 안 뜨고, 노트북에서
+    SSH 로 들어와 점검을 마친 뒤 사람이 작동을 시작한다.
+  - 신규 `scripts/preflight.sh` — 코디네이터를 띄우지 않고 venv/모델/
+    마이크·스피커/NUC bridge/Ollama·MeloTTS/gesture venv·SO-ARM/네트워크·
+    API 키/서비스 충돌을 점검. [OK]/[WARN]/[FAIL] 요약, FAIL 시 exit 1.
+    키 점검은 실제 코드 기준(GROQ=환경변수, Clova=.env Naver_Clova_*).
+  - `README.md` — "환경 설정 / 작동" 2단계 흐름으로 재작성,
+    systemd 자동 실행·headless 를 옵션 섹션으로 이동.
+  - `docs/09_project_flow_overview.md` — §0 토폴로지·§1 라이프사이클·
+    §3 인벤토리·§5 운영·§7.2 캡션·§8 요약을 2단계 모델로 갱신.
+- 테스트 결과: `bash scripts/preflight.sh` 실행 — PASS (13 OK / 5 WARN /
+  0 FAIL, exit 0). WARN 은 스피커·NUC bridge·SO-ARM 미연결(시연 당일
+  하드웨어 연결 시 해소).
+- 수정 파일 목록: `scripts/preflight.sh`(신규), `README.md`,
+  `docs/09_project_flow_overview.md`, `WORKLOG.md`.
+- 다음 환경에서 바로 할 일:
+  - 시연 당일: SSH 접속 → `preflight.sh` 로 FAIL 0 확인 →
+    `test_wakeword.sh` 간단 테스트 → `run_coordinator.sh` 작동 시작.
+  - 무인 배치가 필요해지면 `install-coordinator-service.sh` 로 옵션 B 설치.

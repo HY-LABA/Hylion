@@ -1,9 +1,14 @@
 # Hylion 프로젝트 전체 흐름 & 구조
 
-기준 시점: 2026-05-18
+기준 시점: 2026-05-20
 기준 브랜치: `e1`
 주 진입점: [scripts/run_coordinator.sh](../scripts/run_coordinator.sh) →
 [jetson/core/coordinator.py](../jetson/core/coordinator.py)
+
+운영 모델: 부팅 시 자동 실행하지 않는다. 사람이 SSH 로 들어와
+[scripts/preflight.sh](../scripts/preflight.sh) 로 환경을 점검한 뒤
+`run_coordinator.sh` 로 작동을 시작한다 (§1·§5). 무인 배치용 systemd 자동
+실행은 옵션으로만 남겨둠 (§5).
 
 ---
 
@@ -13,7 +18,7 @@
 ┌─────────────────────────── Jetson (Orin) ──────────────────────────────┐
 │                                                                        │
 │  systemd --user                                                        │
-│   └─ hylion-coordinator.service  (B 서비스, 부팅 자동 실행)            │
+│   └─ hylion-coordinator.service  (B 서비스 · 옵션, §5 참고)            │
 │        └─ scripts/run_coordinator.sh                                   │
 │             └─ python -m jetson.core.coordinator                       │
 │                  ├─ wake_word listener  ("Hey Hyleon" tflite)          │
@@ -54,54 +59,58 @@
 
 ---
 
-## 1. 부팅 ~ 정지 라이프사이클
+## 1. 라이프사이클 — 환경 점검 → 작동 시작 → 정지
+
+평소 운영은 부팅 자동 실행이 아니다. 사람이 SSH 로 들어와 점검하고 작동을
+시작한다. (무인 배치용 자동 실행 옵션은 §5.)
 
 ```
 [전원 ON]
     │
     ▼
 systemd 부팅 → graphical.target 또는 multi-user.target
-    │                                       │
-    │ (헤드리스 모드: A 켜졌을 때)          │ (개발 모드: A 꺼졌을 때)
-    │                                       │
-    ▼                                       ▼
-multi-user.target (텍스트 콘솔)        graphical.target (GDM, GUI)
-    │                                       │
-    └───────────────────┬───────────────────┘
-                        │
-                        ▼
-            systemd --user 가 user@1000 세션 시작
-            (linger=yes 라서 로그인 없이도 시작됨)
-                        │
-                        ▼
-            hylion-coordinator.service 시작
-                ExecStartPre=sleep 5         ← USB 마이크 안정화
-                ExecStart=run_coordinator.sh
-                        │
-                        ▼
-            run_coordinator.sh
-                ├─ LD_LIBRARY_PATH = libcusparseLt 포함
-                ├─ env: HYLION_WAKEWORD_DEVICE_KEYWORD=P5HD
-                ├─ env: HYLION_ESTOP_THRESHOLD=0.3 (튜닝중)
-                └─ exec python -m jetson.core.coordinator
-                        │
-                        ▼
-            coordinator.main()
-                ├─ gesture_daemon subprocess fork (15s 대기)
-                ├─ BhlClient.start() (NUC bridge TCP 연결, keepalive)
-                ├─ wake_word listener 빌드
-                ├─ Whisper warm_up
-                └─ run_live_pipeline()
-                        │
-                        ▼
-                  (메인 루프: §2)
-                        │
-                        ▼
-            KeyboardInterrupt / systemctl stop
-                ├─ wake_word.close()
-                ├─ bhl_client.stop()
-                ├─ gesture_daemon.stop() (Unix socket 종료 신호)
-                └─ cleanup_gpio()
+    │
+    ▼
+로그인 프롬프트에서 대기 — 코디네이터는 아직 안 뜸
+    │
+    │   ◀── 노트북에서 SSH 접속:  ssh <user>@<jetson-ip> ; cd ~/Hylion
+    ▼
+┌─ 1단계: 환경 설정 / 점검 ───────────────────────────────┐
+│  bash scripts/preflight.sh                              │
+│    venv · libcusparseLt · wake-word 모델                │
+│    P5HD 마이크 · 스피커 · NUC bridge TCP                 │
+│    Ollama · MeloTTS · gesture venv · SO-ARM             │
+│    네트워크 · API 키 · 서비스 충돌                       │
+│    → [ OK ]/[WARN]/[FAIL] 요약, FAIL 있으면 exit 1      │
+│  bash scripts/test_wakeword.sh ...   (간단 기능 테스트)  │
+└─────────────────────────────────────────────────────────┘
+    │  점검 통과 (FAIL 0 개) 확인
+    ▼
+┌─ 2단계: 작동 시작 ──────────────────────────────────────┐
+│  bash scripts/run_coordinator.sh                        │
+│    ├─ LD_LIBRARY_PATH = libcusparseLt 포함              │
+│    ├─ env: HYLION_WAKEWORD_DEVICE_KEYWORD=P5HD           │
+│    ├─ env: HYLION_BHL_HOST / _PORT                      │
+│    └─ exec python -m jetson.core.coordinator            │
+└─────────────────────────────────────────────────────────┘
+    │
+    ▼
+coordinator.main()
+    ├─ gesture_daemon subprocess fork (15s 대기)
+    ├─ BhlClient.start() (NUC bridge TCP 연결, keepalive)
+    ├─ wake_word listener 빌드
+    ├─ Whisper warm_up
+    └─ run_live_pipeline()
+    │
+    ▼
+(메인 루프: §2)
+    │
+    ▼
+Ctrl+C (KeyboardInterrupt)
+    ├─ wake_word.close()
+    ├─ bhl_client.stop()
+    ├─ gesture_daemon.stop() (Unix socket 종료 신호)
+    └─ cleanup_gpio()
 ```
 
 ---
@@ -220,15 +229,16 @@ ALSA single-open 충돌 회피). threshold 0.3~0.4 (false negative 가 false pos
 ```
 Hylion/
 ├─ scripts/                              ◀ 운영 진입점/관리 스크립트
-│  ├─ run_coordinator.sh                 ✅ 표준 런처 (venv + env + exec)
-│  ├─ install-coordinator-service.sh     ✅ systemd user 서비스 설치/제거
-│  ├─ headless-on.sh                     ✅ GUI 끄기 (multi-user.target)
-│  ├─ headless-off.sh                    ✅ GUI 켜기 (graphical.target)
-│  ├─ live_monitor.sh                    ✅ RAM/GPU/프로세스 모니터 (1s)
+│  ├─ preflight.sh                       ✅ 1단계: 환경 점검 (코디 안 띄움)
+│  ├─ run_coordinator.sh                 ✅ 2단계: 작동 시작 런처 (venv+env+exec)
 │  ├─ test_wakeword.sh / .py             ✅ 마이크+wakeword 격리 테스트
+│  ├─ live_monitor.sh                    ✅ RAM/GPU/프로세스 모니터 (1s)
+│  ├─ install-coordinator-service.sh     ⚠ 옵션 B: 자동 실행 설치/제거 (무인 배치)
+│  ├─ headless-on.sh                     ⚠ 옵션 A: GUI 끄기 (multi-user.target)
+│  ├─ headless-off.sh                    ⚠ 옵션 A: GUI 켜기 (graphical.target)
 │  ├─ deploy_jetson.sh / deploy_nuc.sh   ❌ 빈 파일 (미사용)
 │  └─ systemd/
-│     └─ hylion-coordinator.service.in   ✅ unit 템플릿 (PROJECT_ROOT 치환)
+│     └─ hylion-coordinator.service.in   ⚠ 옵션 B: unit 템플릿 (PROJECT_ROOT 치환)
 │
 ├─ jetson/
 │  ├─ core/                              ◀ 메인 런타임
@@ -341,57 +351,81 @@ USB Mic ─► wake_word(tflite) ─► record_to_wav ─► Whisper STT
 
 ---
 
-## 5. 운영 (systemd / headless)
+## 5. 운영 (preflight / systemd / headless)
 
-### 5.1 두 가지 직교 설정
+### 5.1 운영은 2단계 — "환경 점검" 과 "작동 시작" 분리
 
-| 설정 | 무엇? | 기본값 | 토글 방법 |
+부팅만으로는 코디네이터가 뜨지 않는다. 노트북에서 SSH 로 들어와 점검을 마치고
+사람이 작동을 시작한다.
+
+```
+1단계 · 환경 점검                     2단계 · 작동 시작
+ssh <user>@<jetson-ip>                bash scripts/run_coordinator.sh
+cd ~/Hylion                              └─ Ctrl+C 로 종료
+bash scripts/preflight.sh
+bash scripts/test_wakeword.sh ...
+   └─ FAIL 0 개 확인 후 ───────────▶
+```
+
+- `preflight.sh` — 코디네이터를 띄우지 않고 venv·모델·마이크·NUC·데몬을 점검.
+  `[FAIL]` 이 하나라도 있으면 종료코드 1, 고치기 전엔 작동 보류.
+- `run_coordinator.sh` — 작동 시작 전용 런처 (venv + env + exec).
+
+### 5.2 직교 옵션 두 가지 (A: GUI · B: 자동 실행)
+
+| 옵션 | 무엇? | 기본값 | 토글 방법 |
 |---|---|---|---|
 | **A. GUI 모드** | 부팅 시 GDM/그래픽 세션 띄울지 | `graphical.target` (켜짐) | `scripts/headless-on.sh` / `headless-off.sh` |
-| **B. 자동 실행** | coordinator 를 부팅 시 자동 띄울지 | systemd user service (켜짐, 2026-05-18~) | `scripts/install-coordinator-service.sh [--uninstall]` |
+| **B. 자동 실행** | coordinator 를 부팅 시 자동 띄울지 | **꺼짐 — 수동 2단계가 기본** | `scripts/install-coordinator-service.sh [--uninstall]` |
 
-B 는 A 와 독립적으로 동작. GUI 가 떠있어도 백그라운드에서 돌고, GUI 가 꺼져있어도
-linger 덕분에 그대로 돈다.
+A·B 는 서로 독립. 평소 시연은 B 를 끈 채 §5.1 의 2단계로 운영한다. B 는 모니터·
+키보드·노트북 없이 전원만으로 기동해야 하는 무인 배치에서만 설치한다 — 이 경우
+preflight 점검을 사람이 거치지 못하므로 하드웨어/연결이 확실할 때만 쓸 것.
 
-### 5.2 systemd 의존 관계
+### 5.3 (옵션 B) systemd 의존 관계
+
+`install-coordinator-service.sh` 로 B 를 설치했을 때만 해당:
 
 ```
 [부팅]
   └─ systemd (system)
        ├─ default.target = graphical.target  또는  multi-user.target  ◀ A
-       ├─ sound.target / network-online.target / …
        │
-       └─ user@1000.service          (linger=yes 라서 로그인 없이 시작)
+       └─ user@1000.service          (linger=yes 라야 로그인 없이 시작)
             └─ systemd --user
-                 └─ hylion-coordinator.service  ◀ B
+                 └─ hylion-coordinator.service  ◀ B (옵션, 설치 시에만)
                       ExecStartPre=sleep 5
                       ExecStart=/bin/bash scripts/run_coordinator.sh
                       Restart=on-failure
                       WantedBy=default.target
 ```
 
-`sudo loginctl enable-linger laba` 가 켜져 있어야 부팅 시 자동 실행됨.
+B 미설치(기본 상태)면 부팅이 로그인 프롬프트에서 멈추고, 사람이 SSH 로 §5.1
+2단계를 수행한다.
 
-### 5.3 조작 명령 빠른 참조
+### 5.4 조작 명령 빠른 참조
 
 ```
-# 서비스
-systemctl --user status hylion-coordinator         # 상태
-systemctl --user restart hylion-coordinator        # 재시작
-systemctl --user stop hylion-coordinator           # 정지 (다음 부팅 때 다시 뜸)
-journalctl --user -u hylion-coordinator -f         # 실시간 로그
+# ── 평소 운영 (수동 2단계) ───────────────────────────────
+ssh <user>@<jetson-ip> && cd ~/Hylion
+bash scripts/preflight.sh                          # 1단계: 환경 점검
+bash scripts/test_wakeword.sh \
+     checkpoints/wakeword/Hey_Hyleon.tflite         #         간단 기능 테스트
+bash scripts/run_coordinator.sh                    # 2단계: 작동 시작 (Ctrl+C 종료)
+bash scripts/live_monitor.sh                       # (별도 터미널) RAM/GPU 모니터
 
-# 설치/제거
-bash scripts/install-coordinator-service.sh        # 설치 + 활성화 + 시작
-bash scripts/install-coordinator-service.sh --uninstall
-
-# GUI 모드 토글 (현장 배치 / 개발 복귀)
-bash scripts/headless-on.sh && sudo reboot         # GUI 끄기 + 재부팅
+# ── GUI 모드 토글 (옵션 A) ──────────────────────────────
+bash scripts/headless-on.sh  && sudo reboot        # GUI 끄기 + 재부팅
 bash scripts/headless-off.sh && sudo reboot        # GUI 다시 켜기 + 재부팅
 
-# 수동 실행 (디버깅) — 서비스 먼저 stop 필수
-systemctl --user stop hylion-coordinator
-bash scripts/run_coordinator.sh
+# ── 무인 배치용 자동 실행 (옵션 B) ──────────────────────
+bash scripts/install-coordinator-service.sh        # 설치 + 활성화 + 시작
+sudo loginctl enable-linger $USER                  # 로그인 없이 부팅 시 시작
+bash scripts/install-coordinator-service.sh --uninstall   # 해제 (수동 운영 복귀)
+systemctl --user status  hylion-coordinator        # 상태
+systemctl --user restart hylion-coordinator        # 재시작
+systemctl --user stop    hylion-coordinator        # 정지
+journalctl --user -u hylion-coordinator -f         # 실시간 로그
 ```
 
 ---
@@ -486,7 +520,10 @@ flowchart LR
     TTS -. HTTPS .-> CLOVA
 ```
 
-### 7.2 부팅 → coordinator 시작 (라이프사이클 시퀀스)
+### 7.2 부팅 → coordinator 시작 (옵션 B · 자동 실행 시퀀스)
+
+> 이 시퀀스는 **옵션 B(systemd 자동 실행)를 설치했을 때만** 해당. 기본(수동
+> 2단계: preflight → run) 흐름은 §1 참고.
 
 전원 인가 후 어떤 순서로 무엇이 뜨는지. linger 가 꺼져 있으면 `user@1000` 단계에서
 멈춰 hylion-coordinator 가 아예 안 뜸.
@@ -690,8 +727,9 @@ flowchart TD
   `bhl_client` / `gesture_client`. + NUC `bridge.py`. + smolVLA `gesture_daemon.py`.
 - **계약 레이어**: `configs/schemas/action.schema.json` (`gesture_name`,
   `duration_sec` 포함) 가 LLM 프롬프트와 검증, NUC bridge 패킷 매핑 모두에 사용됨.
-- **운영 레이어 (2026-05-18 추가)**: systemd user service + headless 토글 →
-  로봇에 올리면 전원만 켜도 자동 진입.
+- **운영 레이어**: `preflight.sh` 환경 점검 → `run_coordinator.sh` 작동 시작의
+  수동 2단계가 기본 (§5.1). systemd 자동 실행(옵션 B)·headless 토글(옵션 A)은
+  무인 배치용 옵션으로만 남김.
 - **여전히 스텁**: `perception/*`, `arm/*` (gesture 는 smolVLA 측 따로 있음),
   `safety/*` (e-stop 는 wake_word.py 안에 살아있음), `comm/{nuc,orin,mock_bridge}.py`
   (현재는 bhl_client/bridge.py 가 자체 NDJSON 처리).

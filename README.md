@@ -8,34 +8,85 @@ Non-ROS2 (UDP/TCP 기반) 파이프라인. 표준 진입점은 Jetson 의
 
 ---
 
-## 빠른 사용법
+## 운영 흐름 — "환경 설정"과 "작동"을 분리
 
-### 1) 평소 실행 (수동)
+Hylion 은 **두 단계로 나눠서** 운영한다. 부팅하자마자 코디네이터가 자동으로 뜨지
+않는다 — 사람이 점검을 마치고 명시적으로 작동을 시작한다.
 
-수동으로 한 번 띄울 때:
+1. **1단계 · 환경 설정 / 점검** — 노트북에서 SSH 로 Jetson 에 들어와,
+   하드웨어 · venv · 모델 · 네트워크 · NUC 연결이 정상인지 확인. 코디네이터(메인
+   루프)는 아직 띄우지 않는다.
+2. **2단계 · 작동 시작** — 점검이 모두 통과하면 코디네이터를 띄운다.
+
+> 무인 배치(모니터·키보드·노트북 없이 전원만으로 기동)가 필요한 경우에만
+> 아래 "[(옵션) 부팅 시 자동 실행](#옵션-부팅-시-자동-실행--무인-배치용)" 을 쓴다.
+
+### 1단계: 환경 설정 / 점검 (시연 전)
+
+노트북에서 Jetson 으로 SSH 접속:
+
+```bash
+ssh <jetson-user>@<jetson-ip>
+cd ~/Hylion
+```
+
+환경 점검 — **코디네이터를 띄우지 않고** venv/모델/마이크/스피커/NUC 연결/데몬을
+한 번에 확인:
+
+```bash
+bash scripts/preflight.sh
+```
+
+- `[FAIL]` 이 하나라도 있으면 고치기 전에는 2단계로 넘어가지 말 것 (종료코드 1).
+- `[WARN]` 은 그 기능만 제한됨 (예: NUC 연결 없으면 다리 동작만 불가, 대화·팔은
+  정상) — 시연 범위에 필요한 항목인지 판단해서 진행.
+
+간단 기능 테스트 — 마이크 + wake word 가 실제로 잡히는지 격리 확인:
+
+```bash
+bash scripts/test_wakeword.sh checkpoints/wakeword/Hey_Hyleon.tflite
+```
+
+### 2단계: 작동 시작
+
+점검이 끝나고 이상 없으면 코디네이터를 띄운다:
 
 ```bash
 bash scripts/run_coordinator.sh
 ```
 
 이 스크립트가 venv 활성화 + `LD_LIBRARY_PATH` + 마이크/e-stop env 까지 다 처리.
+"Hey Hyleon" 으로 응답을 확인하고, 종료는 `Ctrl+C`.
 옵션은 그대로 전달됨. 예: `bash scripts/run_coordinator.sh --whisper-model-size base`.
 
-가동 중 RAM/GPU/프로세스 상태는 다른 터미널에서:
+가동 중 RAM/GPU/프로세스 상태는 다른 터미널(또는 별도 SSH 세션)에서:
 
 ```bash
 bash scripts/live_monitor.sh
 ```
 
-(Ollama / MeloTTS / NUC BHL bridge 데몬은 각자의 systemd 로 띄워둔 상태여야 함.)
+> Ollama / MeloTTS / NUC BHL bridge 데몬은 각자의 systemd 로 미리 떠 있어야 함.
+> `preflight.sh` 의 §4·§5 가 이를 점검해준다.
 
-### 2) 자동 실행 (systemd user service, 권장)
+---
 
-부팅 시 자동으로 띄우려면 한 번만 설치:
+## (옵션) 부팅 시 자동 실행 — 무인 배치용
+
+평소 시연은 위 2단계 수동 흐름을 쓴다. **모니터·키보드·노트북 없이 전원만으로**
+기동해야 하는 무인 배치 상황에서만 systemd user service 를 설치한다.
 
 ```bash
 bash scripts/install-coordinator-service.sh
 sudo loginctl enable-linger $USER       # 로그인 없이도 부팅 시 시작
+```
+
+설치하면 부팅 시 코디네이터가 자동으로 뜬다. 단 이 경우 `preflight.sh` 점검을
+사람이 거치지 못하므로, 하드웨어/연결이 확실할 때만 쓸 것.
+
+자동 실행 해제 (다시 수동 운영으로 — 권장 기본 상태):
+
+```bash
+bash scripts/install-coordinator-service.sh --uninstall
 ```
 
 설치 후 조작:
@@ -43,22 +94,18 @@ sudo loginctl enable-linger $USER       # 로그인 없이도 부팅 시 시작
 ```bash
 systemctl --user status hylion-coordinator         # 상태
 systemctl --user restart hylion-coordinator        # 재시작
-systemctl --user stop hylion-coordinator           # 정지 (다음 부팅 때 다시 뜸)
+systemctl --user stop hylion-coordinator           # 정지
 journalctl --user -u hylion-coordinator -f         # 실시간 로그
 ```
 
-제거:
-
-```bash
-bash scripts/install-coordinator-service.sh --uninstall
-```
-
 > **주의**: 서비스가 도는 상태에서 `bash scripts/run_coordinator.sh` 를 또 띄우면
-> 마이크/포트 충돌. 수동 실행할 때는 먼저 `systemctl --user stop hylion-coordinator`.
+> 마이크/포트 충돌. `preflight.sh` §9 가 이 충돌을 잡아준다. 수동 실행 전 먼저
+> `systemctl --user stop hylion-coordinator`.
 
-### 3) GUI 모드 토글 (현장 배치 ↔ 개발)
+## (옵션) GUI 모드 토글
 
-GUI 와 자동 실행은 서로 독립. 현장에 올릴 때만 GUI 끄고, 디버깅할 때만 다시 켜면 됨.
+GUI 를 끄면 GPU/RAM 이 절약된다. SSH 로 운영하므로 **필수는 아니지만**, 시연
+안정성을 위해 끄고 싶으면:
 
 ```bash
 bash scripts/headless-on.sh  && sudo reboot       # GUI 끄기 (multi-user.target)
@@ -70,36 +117,6 @@ bash scripts/headless-off.sh && sudo reboot       # GUI 다시 켜기 (graphical
 ```bash
 sudo systemctl isolate multi-user.target           # 즉시 GUI 끔
 sudo systemctl isolate graphical.target            # 즉시 GUI 켬
-```
-
----
-
-## 현장 배치 체크리스트
-
-로봇에 Jetson 올리고 모니터/키보드 떼는 시나리오:
-
-```bash
-# 1. systemd 서비스 설치 (한 번만)
-bash scripts/install-coordinator-service.sh
-sudo loginctl enable-linger $USER
-
-# 2. 수동 실행으로 동작 확인
-systemctl --user stop hylion-coordinator
-bash scripts/run_coordinator.sh           # Hey Hyleon → 응답 확인
-# Ctrl+C 종료
-systemctl --user start hylion-coordinator
-
-# 3. GUI 끄기
-bash scripts/headless-on.sh
-
-# 4. 재부팅 — 이때부터 모니터/키보드 없이 전원만 켜면 자동 진입
-sudo reboot
-```
-
-GUI 다시 보고 싶으면 SSH 로 들어와서:
-
-```bash
-bash scripts/headless-off.sh && sudo reboot
 ```
 
 ---
