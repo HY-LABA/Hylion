@@ -1182,3 +1182,31 @@
     말고 한 번은 직접 보고).
   - e-stop wake-word 실 마이크 시나리오 검증 (앞 항목과 동일).
   - 현장 배치 시점에 `bash scripts/headless-on.sh && sudo reboot`.
+
+### 2026-05-20
+
+- 오늘 변경 요약:
+  - e-stop wake-word 모델 파일명 정정: `hailion_stop` → `hyleon_stop`.
+    `checkpoints/wakeword/hyleon_stop.onnx` / `.tflite` 추가,
+    `jetson/expression/wake_word.py` 의 `DEFAULT_ESTOP_MODEL_PATH` 를
+    새 파일명으로 수정.
+  - `scripts/run_coordinator.sh` — e-stop 튜닝용 env 두 개
+    (`HYLION_ESTOP_THRESHOLD`, `HYLION_WAKEWORD_DEBUG_SCORES`) 제거.
+    튜닝이 끝나 코드 기본값으로 복귀, 콘솔 출력 정리.
+  - `docs/09_project_flow_overview.md` — 7장 다이어그램 섹션 전면 확장
+    (시스템 토폴로지·부팅 시퀀스·메인 턴 흐름·BHL+E-stop 시퀀스·
+    데이터 흐름·systemd 의존 그래프 6종 Mermaid).
+  - 문서 정리: `docs/06_smolvla_collection_schema.md` 삭제,
+    `docs/11_bhl_reference_flow.md` 추가.
+  - `.gitignore` — `nuc/bhl/Berkeley-Humanoid-Lite-main/*` 제외 추가.
+    `nuc/IMU/` 벤더 IMU SDK 번들(zip/dll/pack/pdf/stp 등 ~213MB)도
+    제외하되 `nuc/IMU/BHL_IMU_통합_가이드.md` 한 파일만 추적.
+- 테스트 결과: 이 세션은 파일 정리/문서 작업 위주, 별도 테스트 미실행.
+- 수정 파일 목록: `.gitignore`, `WORKLOG.md`, `docs/09_project_flow_overview.md`,
+  `jetson/expression/wake_word.py`, `scripts/run_coordinator.sh`,
+  `docs/06_smolvla_collection_schema.md`(삭제), `docs/11_bhl_reference_flow.md`(신규),
+  `checkpoints/wakeword/hyleon_stop.{onnx,tflite}`(신규),
+  `nuc/IMU/BHL_IMU_통합_가이드.md`(신규).
+- 다음 환경에서 바로 할 일:
+  - e-stop 모델 파일명 변경 후 실제 wake-word 트리거 1회 검증.
+  - NUC 쪽 `nuc/IMU/` 벤더 번들은 git 미추적 — 필요 시 별도 전달.

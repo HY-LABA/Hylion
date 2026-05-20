@@ -35,13 +35,6 @@ export HYLION_WAKEWORD_DEVICE_KEYWORD="${HYLION_WAKEWORD_DEVICE_KEYWORD:-P5HD}"
 export HYLION_WAKEWORD_SAMPLE_RATE="${HYLION_WAKEWORD_SAMPLE_RATE:-44100}"
 export HYLION_MIC_SAMPLE_RATE="${HYLION_MIC_SAMPLE_RATE:-44100}"
 
-# E-stop 튜닝: "stop" 모델이 0.4 에서는 잘 안 잡혀서 0.3 으로 낮춤. 동시에
-# WAKEWORD_DEBUG_SCORES=0.1 이상의 prediction 을 콘솔에 찍어, 사용자가 자기
-# 발화로 어느 점수까지 나오는지 보고 최종 threshold 를 정할 수 있게 함.
-# 튜닝 끝나면 두 변수 모두 launcher 에서 제거해서 출력 정리.
-export HYLION_ESTOP_THRESHOLD="${HYLION_ESTOP_THRESHOLD:-0.3}"
-export HYLION_WAKEWORD_DEBUG_SCORES="${HYLION_WAKEWORD_DEBUG_SCORES:-0.1}"
-
 # --preferred-keyword 도 P5HD 로 (record_to_wav 의 device picker 가 같은 마이크
 # 잡도록). 사용자가 명시적으로 인자를 넘기면 그쪽이 우선됨.
 if [[ "$*" != *"--preferred-keyword"* ]]; then

@@ -44,7 +44,7 @@ DEFAULT_DEBUG_SCORE_FLOOR = float(os.getenv("HYLION_WAKEWORD_DEBUG_SCORES", "0")
 # wait_for_done() with start()/stop() on this listener). The main "Hey Hyleon"
 # listener and this e-stop listener never share the mic — they're mutually
 # exclusive in time, so no ALSA contention.
-DEFAULT_ESTOP_MODEL_PATH = str(PROJECT_ROOT / "checkpoints" / "wakeword" / "hailion_stop.tflite")
+DEFAULT_ESTOP_MODEL_PATH = str(PROJECT_ROOT / "checkpoints" / "wakeword" / "hyleon_stop.tflite")
 DEFAULT_ESTOP_MODEL = os.getenv("HYLION_ESTOP_MODEL", DEFAULT_ESTOP_MODEL_PATH)
 # Threshold defaults lower than the main wake (0.5) because a missed e-stop is
 # strictly worse than a false trigger — a false stop just halts a move that

@@ -218,3 +218,9 @@ third_party/*
 data/tts_ref/*
 docs/BHL/*
 docs/Legacy/*
+nuc/bhl/Berkeley-Humanoid-Lite-Lowlevel-main/*
+nuc/bhl/Berkeley-Humanoid-Lite-main/*
+
+# nuc/IMU: 벤더 IMU SDK 번들(zip/dll/pack/pdf/stp 등 ~213MB) 제외, 통합 가이드만 추적
+nuc/IMU/*
+!nuc/IMU/BHL_IMU_통합_가이드.md
