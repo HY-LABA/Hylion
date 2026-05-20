@@ -1,0 +1,37 @@
+[Unit]
+Description=Hylion BHL Bridge (Coordinator JSON -> BHL UDP joystick)
+Documentation=file:///opt/hylion/nuc/bhl/BHL_Bridge_Handoff.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+# 사용자/그룹은 설치 시 변경. NUC 의 실제 계정으로.
+User=nuc
+Group=nuc
+
+# 설치 경로. /opt 가 싫으면 ~/Hylion 로 바꾸고 ProtectHome 도 yes -> false.
+WorkingDirectory=/opt/hylion/nuc/bhl
+ExecStart=/usr/bin/python3 -u /opt/hylion/nuc/bhl/bridge.py
+
+# 환경 변수로 튜닝 (있으면 로드)
+EnvironmentFile=-/etc/default/hylion-bridge
+
+# 자동 재시작
+Restart=always
+RestartSec=2
+
+# 로그는 journald 로 (journalctl -u hylion-bridge -f 로 확인)
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=hylion-bridge
+
+# 가벼운 hardening (UDP/TCP 만 쓰므로 충분히 제약)
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=true
+# 브리지가 /var/log 에 쓸 일 없으면 ReadWritePaths 도 비워둠
+
+[Install]
+WantedBy=multi-user.target
