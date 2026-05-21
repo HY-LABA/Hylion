@@ -1,46 +1,47 @@
 # prof_computer/leftarm_v2/train_config_camera_empty.yaml — empty_cameras 검증 분기 본 학습 config.
 #
-# train_config.yaml (M1.5 본 학습) 의 *완전 복제 + empty_cameras: 1 단일 차이*.
+# 001 (A2 baseline, 100ep) train_config.yaml 의 *완전 복제 + empty_cameras: 1 단일 차이*.
 # 모든 hyperparameter 동일 — 단일 변수 비교 가능.
+# (시기 맥락: leftarm_v2 era · M1.5 마일스톤 사후 — realplaying.md 참조)
 #
-# 차이 한 줄: `empty_cameras: 1` (M1.5 = 미명시 = default 0)
+# 차이 한 줄: `empty_cameras: 1` (001 = 미명시 = default 0)
 # 검증 가설: base smolvla 의 camera1/2/3 3 cam 설계와 정합 회복 → vision encoder 가 3 cam 형식 입력
-# 비교 대상: M1.5 ckpt (run_train.py + train_config.yaml, 0/2 단축 평가)
+# 비교 대상: 001 ckpt (branches/001_a2_100ep/, 0/2 단축 평가)
 #
 # 출처:
 #   - base smolvla config (HF Hub lerobot/smolvla_base/config.json): empty_cameras=0, input_features=camera1/2/3
 #   - lerobot 코드 (configuration_smolvla.py:49, modeling_smolvla.py:448-454): empty_cameras 만큼 -1 padded 가짜 image 생성
-#   - 본 사이클 분석 (M1.5 ckpt train_config.json): input_features=camera1/2/3 모두 포함, dataset 은 camera1/2 만, empty_cameras=0 으로 camera3 zero-pad 도 안 됨
+#   - 001 ckpt 분석 (train_config.json): input_features=camera1/2/3 모두 포함, dataset 은 camera1/2 만, empty_cameras=0 으로 camera3 zero-pad 도 안 됨
 
-policy_path: lerobot/smolvla_base    # M1.5 동일
-method: lora                         # M1.5 동일 (A2)
+policy_path: lerobot/smolvla_base    # 001 동일
+method: lora                         # 001 동일 (A2)
 lora:
-  target_modules: all-linear         # M1.5 동일
-  r: 16                              # M1.5 동일
-batch_size: 4                        # M1.5 동일 (RTX 3090 24GB)
-use_amp: false                       # M1.5 동일 (smoke 3 bf16 효과 없음 확인)
-steps: 75000                         # M1.5 동일 (5 epoch on batch 4, 60k frames)
-num_workers: 4                       # M1.5 동일
-save_freq: 1000                      # M1.5 동일
-log_freq: 50                         # M1.5 동일
-wandb_enable: true                   # M1.5 동일
-device: cuda                         # M1.5 동일
-push_to_hub: false                   # M1.5 동일
+  target_modules: all-linear         # 001 동일
+  r: 16                              # 001 동일
+batch_size: 4                        # 001 동일 (RTX 3090 24GB)
+use_amp: false                       # 001 동일 (smoke 3 bf16 효과 없음 확인)
+steps: 75000                         # 001 동일 (5 epoch on batch 4, 60k frames)
+num_workers: 4                       # 001 동일
+save_freq: 1000                      # 001 동일
+log_freq: 50                         # 001 동일
+wandb_enable: true                   # 001 동일
+device: cuda                         # 001 동일
+push_to_hub: false                   # 001 동일
 
-dataset_return_uint8: true           # M1.5 동일
-prefetch_factor: 2                   # M1.5 동일
-persistent_workers: false            # M1.5 동일
+dataset_return_uint8: true           # 001 동일
+prefetch_factor: 2                   # 001 동일
+persistent_workers: false            # 001 동일
 
-video_backend: torchcodec            # M1.5 동일 (PC 환경 정상)
+video_backend: torchcodec            # 001 동일 (PC 환경 정상)
 
 # ── 본 분기의 단일 변수 ────────────────────────────────────────
 # base smolvla 의 3 cam (camera1/2/3) 설계와 정합.
 # 우리 dataset = 2 cam (top→camera1, wrist→camera2) → camera3 슬롯 missing.
 # empty_cameras=1 → _prepare_images() 가 missing camera3 를 -1 padded image + mask 0 으로 zero-fill.
-# = vision encoder 가 3 cam 형식 입력 받음 (M1.5 의 2 cam 만 vs 본 분기의 3 cam 형식).
+# = vision encoder 가 3 cam 형식 입력 받음 (001 의 2 cam 만 vs 본 분기의 3 cam 형식).
 empty_cameras: 1
 
-# 2A dataset subset — M1.5 와 동일 (100ep balanced).
+# 2A dataset subset — 001 과 동일 (100ep balanced).
 dataset_subset_2a:
   episode_ranges_inclusive:
     - [0, 99]                        # = list(range(0, 100)) — 100 ep balanced

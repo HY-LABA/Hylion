@@ -6,7 +6,8 @@
   - 데이터: 100ep balanced subset (task1 ep 0~49 + task2 ep 50~99)
   - 서브: 없음 (baseline)
 
-본 분기 = M1.5 (2026-05-17) 원본 학습 entry. 명명 컨벤션: prof_computer/finetune/leftarm_v2/README.md §명명 규칙.
+본 분기 = A2 baseline (100ep) 원본 학습 entry. 명명 컨벤션: prof_computer/finetune/leftarm_v2/README.md §명명 규칙.
+시기 맥락: leftarm_v2 era · M1.5 마일스톤 (2026-05-17) — realplaying.md 참조.
 
 사용 (분기 디렉터리에서 직접 실행):
   source <prof_computer>/.venv_arm_finetune/bin/activate

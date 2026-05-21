@@ -6,15 +6,15 @@
   - 데이터: 310ep (M1 진행분, DGX 가 2026-05-18 12:21 UTC push 완료)
   - 서브:
     * empty1 = empty_cameras: 1 (upstream LIBERO CI 표준 패턴, base smolvla 3 cam 입력 형식 정합)
-    * sched_sync = scheduler_decay_steps = steps (M1.5 후반 정체 backlog 해결)
+    * sched_sync = scheduler_decay_steps = steps (001 후반 정체 backlog 해결)
 
-vs 001 (M1.5 baseline) 변경 변수 3개:
+vs 001 (A2 baseline, 100ep) 변경 변수 3개:
   1) dataset 110→310 (실제 학습 ep 100→310)
   2) empty_cameras 0→1
   3) scheduler_decay_steps 30000→120000 (= steps 동기화)
 
 upstream 정합 근거: prof_computer/docs/leftarm_v2/research_empty_cameras_2026-05-18.md §3-2 (LIBERO CI 패턴)
-scheduler 동기화 근거: prof_computer/docs/leftarm_v2/learning_log.md §wandb 분석 (M1.5 후반 LoRA weight 변화 < 2%)
+scheduler 동기화 근거: prof_computer/docs/leftarm_v2/learning_log1.md §wandb 분석 (001 후반 LoRA weight 변화 < 2%)
 
 사용 (분기 디렉터리에서 직접 실행):
   source <prof_computer>/.venv_arm_finetune/bin/activate
@@ -22,7 +22,7 @@ scheduler 동기화 근거: prof_computer/docs/leftarm_v2/learning_log.md §wand
   python run_train.py train --pass smoke           # 100 step + 100ep subset 검증
   python run_train.py train --pass full            # 120000 step + 310ep 전체 본 학습 (~13h)
   python run_train.py train --pass full --dry-run  # 명령만 출력
-  python run_train.py train --pass 2a              # 비교용 100ep subset (M1.5 동일 데이터 영역)
+  python run_train.py train --pass 2a              # 비교용 100ep subset (001 과 동일 데이터 영역)
 
 공용 자원 (상위 디렉터리):
   - _lib.py (die, expand_path)
@@ -34,8 +34,8 @@ scheduler 동기화 근거: prof_computer/docs/leftarm_v2/learning_log.md §wand
 
 학습 산출: ~/prof_computer_runs/<run_name>/  (run_name prefix: leftarm_v2_003_<pass>_pc_<ts>)
 비교 대상:
-  - 001 (branches/001_a2_100ep/) — M1.5 baseline, 100ep, empty=0, decay=30000
-  - 002 (branches/002_a2_100ep_empty1/) — M1.5 + empty=1, 100ep
+  - 001 (branches/001_a2_100ep/) — A2 baseline, 100ep, empty=0, decay=30000
+  - 002 (branches/002_a2_100ep_empty1/) — 001 + empty=1, 100ep
 결정 근거: prof_computer/docs/model_config.md
 """
 import argparse
@@ -92,7 +92,7 @@ def cmd_train(args, base, train):
     # ── pass 별 dataset subset ──
     # 본 분기는 pass 3 종류:
     #   smoke : 100 step + 100ep subset (빠른 환경 검증)
-    #   2a    : 본 학습 step + 100ep subset (M1.5 와 데이터 영역 동일 — 비교용, 거의 사용 X)
+    #   2a    : 본 학습 step + 100ep subset (001 과 데이터 영역 동일 — 비교용, 거의 사용 X)
     #   full  : 본 학습 step + 310ep 전체 (003 의 핵심 — 데이터 확장 효과 측정)
     if args.pass_name in ("smoke", "2a"):
         sub = train.get("dataset_subset_2a") or {}
@@ -180,7 +180,7 @@ def cmd_train(args, base, train):
     if episodes is not None:
         cmd.append(f"--dataset.episodes={_format_episodes_arg(episodes)}")
 
-    # ── PEFT (LoRA) — M1.5 와 동일 ──
+    # ── PEFT (LoRA) — 001 과 동일 ──
     if train["method"] == "lora":
         lora = train.get("lora") or {}
         if "target_modules" not in lora or "r" not in lora:

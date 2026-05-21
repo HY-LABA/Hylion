@@ -7,7 +7,7 @@
 #     workers 가 GPU 영향 없음 → DGX 보다 늘려도 안전. 단 smoke test 결과 보고 결정.
 #   - video_backend: torchcodec 명시 — lerobot default 와 동일하나 명시.
 #                    DGX 가 aarch64 + cu130 으로 torchcodec ABI 깨졌던 게
-#                    PC (x86_64 + cu128) 에선 해결 (learning_log.md 셋업 1 검증).
+#                    PC (x86_64 + cu128) 에선 해결 (learning_log1.md 셋업 1 검증).
 #
 # smoke test 용 변형: train_config_smoke.yaml (steps=100, save_freq=50).
 
@@ -42,7 +42,7 @@ persistent_workers: false            # workers 재시작 비용 < memory leak �
 
 # video backend — lerobot default 와 동일하나 명시 (학습 결과의 환경 의존성 추적용).
 # DGX 는 torchcodec ABI 깨져서 pyav fallback 강제 → buffer leak 사고.
-# PC 는 torchcodec 0.10 정상 import 확인 (learning_log.md 셋업 1).
+# PC 는 torchcodec 0.10 정상 import 확인 (learning_log1.md 셋업 1).
 video_backend: torchcodec
 
 # 2A dataset subset — run_train.py 가 episode index 리스트로 expand 해 전달.

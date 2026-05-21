@@ -3,19 +3,20 @@
 
 분기 식별: 002_a2_100ep_empty1
   - 매트릭스: A2 (LoRA r=16, target=all-linear)
-  - 데이터: 100ep balanced subset (M1.5 와 동일)
+  - 데이터: 100ep balanced subset (001 과 동일)
   - 서브: empty1 (`empty_cameras=1` — base smolvla 의 3 cam 입력 형식 정합)
+  - 시기 맥락: leftarm_v2 era · M1.5 마일스톤 사후 (realplaying.md 참조)
 
-검증 가설 (2026-05-18):
+검증 가설:
   - base smolvla 의 config 가 camera1/2/3 3 cam 으로 사전학습됨 (HF Hub config.json 확인)
   - 우리 dataset = top, wrist 2 cam (rename → camera1, camera2)
-  - M1.5 학습 시 camera3 슬롯이 `missing_img_keys` 잡혔으나 `empty_cameras=0` 이라
+  - 001 학습 시 camera3 슬롯이 `missing_img_keys` 잡혔으나 `empty_cameras=0` 이라
     `_prepare_images()` 의 zero-pad loop 즉시 break → vision encoder 가 2 cam 만 입력 받음
   - = base 3 cam 분포와 *형식 mismatch*
   - empty_cameras=1 로 두면 missing camera3 슬롯을 -1 padded image + mask 0 으로 zero-fill →
     base 의 3 cam 형식 정합 회복
 
-본 분기 = 001_a2_100ep (M1.5 원본) 과 *단일 변수 (empty_cameras 0→1)* 만 차이.
+본 분기 = 001_a2_100ep (baseline) 과 *단일 변수 (empty_cameras 0→1)* 만 차이.
 
 사용 (분기 디렉터리에서 직접 실행):
   source <prof_computer>/.venv_arm_finetune/bin/activate
@@ -33,7 +34,7 @@
   - train_config_smoke.yaml (smoke 100 step)
 
 학습 산출: ~/prof_computer_runs/<run_name>/  (run_name prefix: leftarm_v2_camera_empty_<pass>_pc_<ts>)
-비교 대상: branches/001_a2_100ep/ (M1.5 원본)
+비교 대상: branches/001_a2_100ep/ (A2 baseline, 100ep)
 결정 근거: prof_computer/docs/model_config.md + prof_computer/docs/leftarm_v2/research_empty_cameras_2026-05-18.md
 """
 import argparse
@@ -105,7 +106,7 @@ def cmd_train(args, base, train):
     output_root = expand_path(base["paths"]["output_root"], "paths.output_root")
     accounts = base.get("accounts") or {}
 
-    # ── run name + output_dir — camera_empty 분기 prefix 로 M1.5 와 식별 분리 ──
+    # ── run name + output_dir — 002 분기 prefix 로 001 과 식별 분리 ──
     ts = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     run_name = f"leftarm_v2_camera_empty_{args.pass_name}_pc_{ts}"
     output_dir = output_root / run_name
@@ -126,7 +127,7 @@ def cmd_train(args, base, train):
                     for i, name in enumerate(cam_names)]
     rename_map_str = "{" + ", ".join(f'"{k}":"{v}"' for k, v in rename_pairs) + "}"
 
-    # ── lerobot-train 명령 구성 — --policy.empty_cameras 추가가 M1.5 와의 단일 차이 ──
+    # ── lerobot-train 명령 구성 — --policy.empty_cameras 추가가 001 과의 단일 차이 ──
     b = lambda x: str(x).lower()
     cmd = [
         "lerobot-train",
@@ -158,7 +159,7 @@ def cmd_train(args, base, train):
     if episodes is not None:
         cmd.append(f"--dataset.episodes={_format_episodes_arg(episodes)}")
 
-    # ── PEFT (LoRA) — M1.5 와 동일 ──
+    # ── PEFT (LoRA) — 001 과 동일 ──
     if train["method"] == "lora":
         lora = train.get("lora") or {}
         if "target_modules" not in lora or "r" not in lora:

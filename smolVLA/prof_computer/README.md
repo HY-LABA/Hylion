@@ -56,12 +56,13 @@ prof_computer/
 │   └── leftarm_v2/
 │       ├── README.md               # 학습 entry 소개 + 분기 사용법
 │       ├── config/                 # 학습 config (DGX 분리 후 자체 보유)
-│       ├── run_train.py            # M1.5 원본 학습 entry
+│       ├── run_train.py            # 001 분기 원본 학습 entry
 │       └── run_train_camera_empty.py  # camera_empty 검증 분기 entry
 └── docs/
     ├── model_config.md             # 학습 방법 매트릭스·hyperparameter (leftarm_v2/v3+ 공통)
     └── leftarm_v2/                 # leftarm_v2 사이클 한정 자료 (학습 측)
-        ├── learning_log.md         # PC 학습 시도 기록
+        ├── learning_log1.md        # PC 학습 시도 기록 (M1.5~003 아카이브, 2026-05-21 freeze)
+        ├── learning_log2.md        # PC 학습 시도 기록 (현행 — 004+ 사이클)
         ├── research_empty_cameras_2026-05-18.md   # researcher 보고서 (empty_cameras 가설 검증)
         ├── lerobot_smolvla_training_best_practice.md  # researcher 보고서 (학습 모범 사례)
         └── after_run_checklist.md  # 학습 직후 체크리스트
@@ -78,37 +79,118 @@ prof_computer/
 - 새 hyperparameter 후보를 DGX 본 학습 전에 빠르게 실험
 - 동일 dataset 으로 DGX 와 결과 비교
 
-## 7) 진행 상황 (2026-05-17 첫 사이클 완주)
+## 7) 명명 3-계층 + 시간 라벨 (cold start 시 첫 1독)
 
-### 셋업 + 검증 (2026-05-16)
+본 프로젝트의 학습 관련 명명은 *3개 영구 계층* + *별도 시간 라벨* 로 분리된다. 새로 합류하는 사람·AI 가 헷갈리지 않도록 *반드시 본 § 먼저 읽고* 다른 문서 진입.
 
-- [x] `.wslconfig` 작성 (`C:\Users\admin\.wslconfig` — memory=48GB)
-- [x] 02_hardware / 03_software 에 prof_computer 등록
-- [x] `scripts/setup_env.sh` 작성 + 실행 — apt + Python 3.12 (deadsnakes) + lerobot[smolvla,training,peft] + torchcodec 0.10
-- [x] HF + wandb 로그인 (`.env` 자동 source)
-- [x] dry-run + smoke test (4회):
-  - smoke 1 (batch 16 fp32) → ❌ CUDA OOM
-  - smoke 2 (batch 8 fp32) → ✅ 통과, VRAM 94.82%
-  - smoke 3 (batch 8 bf16) → ⚠️ bf16 효과 없음 확인
-  - smoke 4 (batch 4 fp32) → ✅ VRAM 51.79%, 본 학습 진입 결정
+```
+┌────────────────────────────────────────────────────────────────────────────┐
+│ ⏱ 시간 라벨 (era + 마일스톤)  ← 영구 계층 외부, 분기 식별에 사용 금지         │
+│   leftarm_v2 era · M1 / M1.5 / M2 / M3 / M4                                │
+│   "현 era 동안의 *작업 일정* 분류"                                            │
+│   정본: realplaying.md (해당 era 동안만 살아있음 — era 종료 시 의미 휘발)       │
+│   사용처: era 진행 중의 *작업 순서 추적*. 분기 식별·결정 근거에 등장 금지.       │
+└────────────────────────────────────────────────────────────────────────────┘
+                                  ⇣ 외부 메타 (분기 entry 의 *시기 맥락* 만 표시)
+┌────────────────────────────────────────────────────────────────────────────┐
+│ 계층 1 — 학습 방법  (A1 / A2 / B1 / B2 / C1 / C2)                             │
+│   "VLM·expert 를 어떻게 학습? (LoRA / Full FT / frozen 매트릭스)"               │
+│   영구 분류 — 모델 구조 기반. VLA 분야가 살아있는 한 의미 안 변함.               │
+│   정본: [docs/model_config.md §2 매트릭스](docs/model_config.md)                │
+└─────────────────────────────┬──────────────────────────────────────────────┘
+                              │
+                              ▼
+┌────────────────────────────────────────────────────────────────────────────┐
+│ 계층 2 — hyperparameter 인자                                                 │
+│   dataset 크기·empty_cameras·scheduler·bf16·batch·lr·steps·wrist_rot ...     │
+│   영구 분류 — lerobot/SmolVLA 표준 인자.                                       │
+│   정본: [docs/model_config.md §3 권장값 + 다음 시도 후보](docs/model_config.md)  │
+└─────────────────────────────┬──────────────────────────────────────────────┘
+                              │ 학습 방법 + 인자 묶음 = 1 분기 인스턴스
+                              ▼
+┌────────────────────────────────────────────────────────────────────────────┐
+│ 계층 3 — 분기 인스턴스  (001 / 002 / 003 / 004 / ...)                          │
+│   "이 방법 + 이 인자로 *학습된* 모델 ckpt = 1 분기"                              │
+│   자기서술적 — 이름에 *방법 + 핵심 인자* 박힘 (예: 003_a2_310ep_empty1_...).     │
+│   영구 분류 — era 와 무관, 이름만으로 정체 추론 가능.                            │
+│   정본: finetune/leftarm_v2/branches/<NNN>_<방법>_<인자>/                       │
+│   실행 기록: docs/leftarm_v2/learning_log1.md (아카이브) /                      │
+│             docs/leftarm_v2/learning_log2.md (현행)                             │
+└────────────────────────────────────────────────────────────────────────────┘
+```
 
-### M1.5 중간점검 학습 (2026-05-17, leftarm_v2 100ep subset)
+### 7-1) 시간 라벨의 *영구 계층 분리* 원칙
 
-> **M1.5 의 원 결정** ([realplaying.md M1.5](../realplaying.md)) 은 "image dataset 변환" 이었으나, **본 사이클에서 변경** — image 변환 폐기 + prof_computer (일반 x86 환경) 로 video dataset 그대로 학습.
-> DOD ("100ep subset 학습 진입 → OOM 없이 첫 ckpt 도달") 초과 달성: 75000 step 완주 + 5.5 epoch + loss 0.04 수렴.
+**왜 마일스톤이 *영구 계층 외부* 인가**:
 
-- [x] 본 사이클 학습 (batch 4 fp32, steps 75000, DGX 의도 5 epoch on batch 16 과 sample 수 동등)
-  - 학습 시간 7시간 34분, step time 0.343 s/step
-  - VRAM peak 60.67%, GPU temp peak 83°C
-  - System RAM 누수 0.18 GB/h (DGX 시도 2 의 1.25 GB/min 대비 400× 감소)
-  - loss min 0.013, final 0.04
-  - 75개 ckpt 저장, last ckpt 폴더 125 MB (LoRA adapter 46MB + meta)
-  - 상세: [docs/learning_log.md](docs/learning_log.md)
-- [x] HF Hub model repo push 완료: [`BaboGaeguri/leftarm_v2_A2_pc_2026-05-17`](https://huggingface.co/BaboGaeguri/leftarm_v2_A2_pc_2026-05-17) (46 MB, public)
+- 시간이 지나면 마일스톤은 *휘발성* — `leftarm_v3 era` 의 "M1" 과 본 era 의 "M1" 은 같은 이름이지만 *완전 다른 정의*. 마일스톤 이름 단독으로는 *어느 era 의 M1 인지* 모름.
+- *분기 인스턴스* 는 *영구 인덱스* (001/002/...) + *자기서술적 토큰* — `001_a2_100ep` 가 무엇인지 *이름만으로* 정체 추론 가능. era 와 무관.
+- 따라서 분기 식별·결정 근거·실행 로그 어디에도 *마일스톤 이름이 등장하지 않아야 함*. 시간 라벨이 필요한 영역은 *분기 entry 의 메타 박스에 1줄로* 보존 (예: `"본 분기는 leftarm_v2 era · M1.5 마일스톤 시기에 진행"`).
 
-### 다음 사이클
+### 7-2) 명명 룰 준수 — 분기 식별 표현
 
-- [ ] **Orin 추론 검증** — `lerobot-record --policy.path=BaboGaeguri/leftarm_v2_A2_pc_2026-05-17 ...` 으로 시연장 정성 평가 (M3 영역 일부 선검증)
-- [ ] **M1 완성** — 잔여 290ep 수집 (현재 110/400 ep, 2026-05-18 목표 200→400 조정)
-- [ ] **M2 본 학습** — 400ep 완성 후 prof_computer 에서 본 학습 (DGX 학습 잠정 중단 상태 유지 가정)
-- [ ] DGX 의 aarch64 ecosystem 정비 (torchcodec wheel 또는 FFmpeg 7) — backlog (장기)
+| 영역 | 금지 (마일스톤 직접 인용) | 권장 (자기서술적) |
+|---|---|---|
+| 분기 vs 분기 비교 | "vs 001 (M1.5 baseline)" | "vs 001 (A2 baseline, 100ep)" |
+| 분기 결정 근거 | "M1.5 wandb 분석" | "001 wandb 분석" |
+| hp 인용 | "M1.5 동일" | "001 동일" 또는 "(앞 분기) 동일" |
+| backlog 메모 | "M1.5 후반 정체" | "001 후반 정체" |
+
+→ **분기 식별엔 *분기 인덱스 (001~) + 방법 (a2 등) + 인자* 만 사용**. 마일스톤 이름 (M1.5 등) 은 *시기 맥락 메타 박스* 에만.
+
+### 7-3) 계층 간 *우연한 1대1 매핑* 주의
+
+| 우연 매핑 | 진실 |
+|---|---|
+| "M1.5 = 001 분기" | 우연 — M1.5 마일스톤의 학습이 *마침* 001 분기로 인스턴스화됐을 뿐. M1.5 가 *여러 분기* 를 거쳤다면 1대N 매핑이었을 것. *시간 라벨* ↔ *분기 인스턴스* 의 우연한 일치. |
+| "A2 = 003 분기" | 우연 — 003 분기가 *A2 방법을 채택해 인스턴스화* 됐을 뿐. A2 는 *영구 카탈로그 카드*, 003 은 *일회성 분기 번호*. **상위 = A2**, **하위 = 003**. |
+| "M2 = 003" | 우연 — M2 마일스톤의 학습이 *003 분기* 로 완수됐을 뿐. 다음 era 의 M2 는 다른 분기일 것. |
+
+→ *각 계층은 독립된 분류축*. 하위가 상위를 결정하지 않고, 상위가 하위를 *복수 인스턴스* 로 가질 수 있음.
+
+### 7-4) 분기명 토큰 룰 (계층 3 명명 규약)
+
+분기명 형식: `<NNN>_<방법>_<핵심 인자들>`
+
+| 토큰 | 의미 | 예시 |
+|---|---|---|
+| `NNN` | 분기 인덱스 (3자리 zero-pad, 0번부터 시작 가능) | `001`, `002`, `003` |
+| `<방법>` | 계층 1 매트릭스 cell (소문자) | `a2`, `c1` |
+| `<핵심 인자들>` | 변경된 hp 인자들을 짧은 토큰으로 나열 (snake_case) | `100ep`, `310ep`, `empty1`, `sched_sync`, `bf16`, `b6` |
+
+**토큰 표기 규약**:
+- *기본값과 다른 인자만* 토큰화. 기본값 ([docs/model_config.md §3 권장값](docs/model_config.md)) 은 생략. 예: `b4` 가 기본값이면 `b4` 토큰 생략.
+- *boolean 인자* 는 변경 시 `<인자명><값>` 으로 표기 (예: `empty1` = `empty_cameras=1`). 기본값 (예: `empty_cameras=0`) 인 분기는 토큰 생략.
+- *수치 인자* 는 `<인자명약자><값>` (예: `b6` = `batch=6`, `310ep` = dataset 310ep).
+- *기능 변경* 은 *짧은 이름* (예: `sched_sync` = scheduler_decay_steps 동기화, `bf16` = mixed precision bf16).
+
+**run prefix 룰** (학습 실행 시):
+- 형식: `leftarm_v2_<분기 후반부 식별자>_<pass>_<ts>`
+- *분기 후반부 식별자* = 분기명에서 `<NNN>_<방법>_` 를 뗀 *핵심 인자들* (또는 별명) — wandb run 목록에서 분기 추적 용이.
+- 예: `001` 의 run prefix = `leftarm_v2_2a_pc_<ts>` (별명 `2a` 사용 — *legacy*), `003` = `leftarm_v2_003_<pass>_<ts>` (분기 인덱스 직접 사용 — *현행 권장*).
+
+**별명·legacy 명명 정책**:
+- 003 사이클 이전 분기 (001, 002) 는 *별명 우선* 명명 흔적 잔존 (001 = "M1.5 baseline", 002 = "camera_empty"). *별명* 과 *분기명* 은 1대1 대응이지만 학습 로그·run prefix·HF Hub repo 명에 *섞여 사용* 됨 → 검색 시 *3종 토큰 cross-ref* 필요.
+- **004+ 이후 권장**: 별명 사용 *지양*, *분기 인덱스 (NNN) + 핵심 인자 토큰* 만 사용. learning_log entry 제목·run prefix·HF Hub repo 모두 동일 토큰.
+
+### 7-5) "단일 변수 변경" 원칙의 *현 상태*
+
+이전 finetune/leftarm_v2/README 의 *분기 = 단일 변수 변경* 원칙은 *003 사이클에서 5변수 묶음 변경으로 사실상 폐기*. **현 정책**: *단일 변수 분기 + 묶음 분기 모두 허용*. 단:
+
+- *단일 변수 분기* — 결과 해석 깔끔 (어느 변수가 효과인지 즉시 분리)
+- *묶음 분기* — 결과 도약 시 *dominant 변수 미분리* 위험 인지 + ablation 사이클 별도 시도 권장
+
+분기 명명 토큰은 *변경된 모든 변수* 를 다 박는 게 룰 (단일/묶음 무관).
+
+---
+
+## 8) 진행 기록·결정 흐름은 어디로?
+
+본 README 는 **노드 영구 정체성 + 명명 컨벤션** 만 다룬다. *시기성 정보* (진행 상황·학습 entry·다음 사이클 결정) 는 별도 문서에 *역할 분리*:
+
+| 정보 종류 | 정본 |
+|---|---|
+| era 마일스톤 진행·종료 조건·다음 사이클 | [`../realplaying.md`](../realplaying.md) (현 era 동안만 살아있음) |
+| 분기별 학습 실행 기록 (smoke/full, 메트릭, 결과) | [`docs/leftarm_v2/learning_log1.md`](docs/leftarm_v2/learning_log1.md) (아카이브) · [`learning_log2.md`](docs/leftarm_v2/learning_log2.md) (현행) |
+| 학습 방법 매트릭스·권장 hp·다음 시도 후보 | [`docs/model_config.md`](docs/model_config.md) (영구 카탈로그) |
+| 추론 평가 결과 | `../orin/docs/leftarm_v2/*_eval_*.md` |

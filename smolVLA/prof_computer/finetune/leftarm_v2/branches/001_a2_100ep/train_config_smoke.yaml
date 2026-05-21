@@ -2,7 +2,7 @@
 #
 # 목적: 본 학습 (train_config.yaml, 20K step) 진입 전 환경 파이프라인 검증.
 # 측정: VRAM peak / system RAM 누수율 / step time / torchcodec 동작 / loss 정상.
-# 통과 기준 (learning_log.md):
+# 통과 기준 (learning_log1.md):
 #   - 100 step 정상 완주 (SIGKILL 없음)
 #   - VRAM peak < 22 GB (24GB 의 92%)
 #   - RAM 누수율 < 500 MB/min (DGX 시도 2 의 1.25 GB/min 보다 큰 폭 개선)

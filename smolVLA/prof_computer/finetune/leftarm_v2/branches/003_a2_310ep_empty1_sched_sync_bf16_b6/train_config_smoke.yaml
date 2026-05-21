@@ -42,7 +42,7 @@ video_backend: torchcodec
 empty_cameras: 1
 scheduler_decay_steps: 100           # smoke step 수와 동기화 (lerobot 의 auto-scale 도 적용되지만 명시)
 
-# smoke 는 100ep subset (M1.5 smoke 와 동일 — 빠른 검증)
+# smoke 는 100ep subset (001 smoke 와 동일 — 빠른 검증)
 dataset_subset_2a:
   episode_ranges_inclusive:
     - [0, 99]
