@@ -1,0 +1,64 @@
+# 004_a2_310ep_empty1_sched_sync_bf16_b6_wrist_rot180 — 본 학습 config (2026-05-21)
+#
+# 분기 식별: 004_a2_310ep_empty1_sched_sync_bf16_b6_wrist_rot180
+#   - 매트릭스: A2 (LoRA r=16, target=all-linear)
+#   - 003 baseline + wrist 180° 회전 단일 변수 변경
+#
+# vs 003 변경 변수 1개:
+#   1) wrist camera 학습 시점 180° 회전 적용 (사전학습 분포 정합)
+#
+# 003 의 모든 인자 유지 (310ep · empty=1 · scheduler_decay_steps=120000 · bf16 · batch 6 · steps 120000).
+#
+# 가설: SmolVLA base VLM (SigLIP) 의 natural image 사전학습 prior 가 *상하반전 입력* 에
+# 약함 — wrist 가 180° 회전된 상태로 학습되어 base prior 활용 ↓ 가능성. wrist 만
+# 학습 시점에 180° 회전 정렬하면 사전학습 prior 활용 ↑ 기대.
+# 근거: research_wrist_orientation_2026-05-21.md (verdict: NEEDS_INVESTIGATION,
+#       Claude/GPT-4o 의 180° 입력 catastrophic drop 정량 + lerobot 의 Cv2Rotation
+#       파라미터 = 수집 단계 보정 표준 워크플로우 정황)
+#
+# 추론 시점 정합: cameras.json 의 wrist rotation 을 학습 후 +180 상쇄 (학습 결과 본 후 결정)
+#
+# 004 결과 해석 (참고):
+#   - 003 보다 유의미 ↑: 사전학습 prior 활용 효과 확정 → 학습 input 분포 정합 우선순위 ↑
+#   - 003 와 비슷: 003 의 적응이 이미 충분 — null result, 정보 가치 있음
+#   - 003 보다 ↓: 학습 분포 변경 비용 > 사전학습 prior 이득 — 시도 가치 영역 재검토
+#
+# 구현 경로: lerobot upstream 의 image_transforms API 는 *카메라별 selective* 미지원 →
+#   custom_train.py 가 LeRobotDataset 서브클래스 (WristRotatedLeRobotDataset) 로 __getitem__
+#   override 해 wrist 키만 180° 회전. lerobot upstream 무수정 (옵션 B 보존).
+
+policy_path: lerobot/smolvla_base    # 003 동일
+method: lora                         # 003 동일 (A2)
+lora:
+  target_modules: all-linear         # 003 동일
+  r: 16                              # 003 동일
+batch_size: 6                        # 003 동일
+steps: 120000                        # 003 동일
+num_workers: 4                       # 003 동일
+save_freq: 2000                      # 003 동일
+log_freq: 50                         # 003 동일
+wandb_enable: true                   # 003 동일
+device: cuda                         # 003 동일
+push_to_hub: false                   # 003 동일
+
+dataset_return_uint8: true           # 003 동일
+prefetch_factor: 2                   # 003 동일
+persistent_workers: false            # 003 동일
+
+video_backend: torchcodec            # 003 동일 (PC 환경 정상)
+
+# 003 신규 변수 유지
+empty_cameras: 1                     # 003 동일 (upstream LIBERO CI 표준)
+scheduler_decay_steps: 120000        # 003 동일 (= steps 동기화)
+
+# ── 본 분기 신규 변수 1: wrist camera 180° rotation ──
+# 적용 카메라 키: base_config.yaml 의 cameras 정의 + rename_map 후 형식 = observation.images.cameraN
+# wrist = base_config.cameras 의 두 번째 키 → rename 후 'observation.images.camera2'.
+# custom_train.py 가 base_config.cameras 키 순서로 wrist index 자동 추론.
+wrist_rotation_deg: 180
+
+# 본 학습 dataset 은 *전체 310ep* — subset 지정 안 함.
+# run_train.py 에서 args.pass_name == "full" 분기로 처리.
+dataset_subset_2a:
+  episode_ranges_inclusive:
+    - [0, 99]                        # smoke 또는 100ep 비교 검증 시 사용
