@@ -6,7 +6,7 @@
 #
 # USER_OVERRIDE 2026-05-18 옵션 W: lerobot-record 폐기 → leftarm_v2_inference.py 직접 호출.
 # - lerobot-record 는 orin/lerobot/ trim 과 양립 불가 (F1·F4·F5·F6 연쇄 import 실패).
-# - hil_inference.py 는 사전학습 ckpt 책임 보존 (갱신 X).
+# - hil_inference.py (orin/docs/legacy/) 는 옛 era 자산 — 본 wrapper 가 호출 X.
 # - F1 패치 (lerobot_record.py try/except) 는 trim 환경 정합으로 그대로 유지.
 #
 # Reference: orin/inference/leftarm_v2_inference.py
@@ -35,7 +35,7 @@ VENV_PATH="${VENV_PATH:-${HOME}/smolvla/orin/.hylion_arm/bin/activate}"
 CONFIG_DIR="${CONFIG_DIR:-${HOME}/smolvla/orin/config}"
 INFERENCE_SCRIPT="${INFERENCE_SCRIPT:-${HOME}/smolvla/orin/inference/leftarm_v2_inference.py}"
 # zero-shot subcommand 전용 — base smolvla_base 만 로딩하는 별도 entry
-# 가설 분리 검증 (learning_log §M1.5 추론 후 가설 분리 검증 사이클, 2026-05-18)
+# 가설 분리 검증 (learning_log1 §001 분기 추론 후 가설 분리 검증 사이클, 2026-05-18)
 BASE_INFERENCE_SCRIPT="${BASE_INFERENCE_SCRIPT:-${HOME}/smolvla/orin/inference/leftarm_base_inference.py}"
 
 # Task instructions (from collection_log.md)
@@ -259,7 +259,7 @@ cmd_live() {
 
 # ── Subcommand: zero-shot ─────────────────────────────────────────────────────
 # 가설 분리 검증용 — base smolvla_base 만 로딩 (LoRA adapter skip).
-# learning_log1.md §M1.5 추론 후 가설 분리 검증 사이클 작업 1 (사용자 담당).
+# learning_log1.md §001 분기 추론 후 가설 분리 검증 사이클 작업 1 (사용자 담당).
 cmd_zero_shot() {
     local task_key="${1:-}"
     if [[ -z "${task_key}" ]]; then
@@ -296,7 +296,7 @@ cmd_zero_shot() {
     echo "    base ckpt:      lerobot/smolvla_base (HF Hub)"
     echo "    task:           ${task_key}"
     echo "    rename_map:     top->camera1, wrist->camera2 (내부 자동 적용)"
-    echo "    가설 검증:       learning_log §M1.5 추론 후 가설 분리 검증 사이클 작업 1"
+    echo "    가설 검증:       learning_log1 §001 분기 추론 후 가설 분리 검증 사이클 작업 1"
     echo ""
 
     # leftarm_base_inference.py 직접 호출 (별도 entry, LoRA 영역 없음)

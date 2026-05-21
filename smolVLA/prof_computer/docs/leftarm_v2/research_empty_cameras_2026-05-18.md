@@ -3,7 +3,7 @@
 > 작성: 2026-05-18 | researcher
 > 호출자: 메인 — M1.5 (0/2 실패) 사후 분석 + 진행 중인 camera_empty 분기 학습 (~8h) 의 시간 가치 판단 + 3번째 카메라 추가 수집 우선순위 결정
 > 관련 spec: [`prof_computer/docs/model_config.md`](../model_config.md)
-> 관련 사이클: M1.5 (2026-05-17) — [learning_log1.md](learning_log1.md), [a2_eval_2026-05-17.md](../../../orin/docs/leftarm_v2/a2_eval_2026-05-17.md), [base_eval_2026-05-17.md](../../../orin/docs/leftarm_v2/base_eval_2026-05-17.md)
+> 관련 사이클: M1.5 (2026-05-17) — [learning_log1.md](learning_log1.md), [001_eval_2026-05-17.md](../../../orin/docs/leftarm_v2/001_eval_2026-05-17.md), [000_base_eval_2026-05-17.md](../../../orin/docs/leftarm_v2/000_base_eval_2026-05-17.md)
 >
 > **사후 메모 (2026-05-19 추가)**: 본 보고서 작성 시점 *진행 중* 이었던 분기 학습 (002_a2_100ep_empty1, run `8jkr7edb`) 은 2026-05-18 19:25 완주 (9시간 22분, 75000/75000 step). Orin 추론 비교 평가는 별도 사이클. 본 보고서의 *시점* 표현 (진행 중, ~8h 등) 은 *2026-05-18 오전 분석 시점* 기록으로 유지 — 결과 갱신은 [learning_log1.md §camera_empty 본 학습](learning_log1.md) 참조.
 > 기존 자료 (중복 작업 회피): `smolVLA/docs/work_flow/context/history/02_prereq_dataset_video_to_image/research/lerobot_smolvla_training_best_practice.md` (학습 best practice 일반 — 본 보고서는 그 보고서의 *카메라 수 mismatch 공백 영역* 보강)
@@ -65,7 +65,7 @@
 ### 2-1. 우리 환경의 현 상태 (M1.5 학습·추론 사실)
 
 - **prof_computer 학습 환경**: Win10 + WSL2 + RTX 3090 24GB, lerobot 0.5.x, LoRA r=16 all-linear, batch=4, steps=75000, dataset = 100ep balanced subset (task1 doll 50 + task2 can 50), `empty_cameras=0` (미명시). 100ep balanced subset 학습 완주, loss 0.04 수렴.
-- **Orin 추론 환경**: 동일 ckpt 로 task1 front + task2 front 각 1회 평가 = **0/2 (0%)**. base smolvla_base 0-shot 도 무반응. → *우리 ckpt 만의 문제 아님*. base 자체가 우리 셋업에서 immediately reactive 아님 (참고: `orin/docs/leftarm_v2/base_eval_2026-05-17.md`).
+- **Orin 추론 환경**: 동일 ckpt 로 task1 front + task2 front 각 1회 평가 = **0/2 (0%)**. base smolvla_base 0-shot 도 무반응. → *우리 ckpt 만의 문제 아님*. base 자체가 우리 셋업에서 immediately reactive 아님 (참고: `orin/docs/leftarm_v2/000_base_eval_2026-05-17.md`).
 - **카메라 셋업**: dataset 의 `observation.images.top`, `observation.images.wrist` → rename_map 으로 `observation.images.camera1`, `observation.images.camera2` 매핑. `camera3` 슬롯은 *base config 가 요구* 하지만 dataset 에 *없음*.
 - **현재 진행 사이클** (호출자 메시지에 명시): `run_train_camera_empty.py` (단일 변수 `--policy.empty_cameras=1` 만 다름), 같은 dataset / LoRA / batch / steps, wandb run `8jkr7edb` 진행 중 (~8h).
 
@@ -154,7 +154,7 @@ def validate_features(self) -> None:
 | "base 사전학습 분포가 항상 3 cam 이다" | **약함** (≈ 반증됨) | (a) paper: "missing view drop", (b) svla_so100_pickplace = 2 cam, (c) "It does not matter how many cameras as long as at least one" (community), (d) Hub config 의 camera1/2/3 는 *fine-tune 단계 의 schema* 일 가능성 — *pretraining batch 마다 카메라 수가 변했음* |
 | "M1.5 empty_cameras=0 학습이 base 분포와 *큰 mismatch* 다" | **중간** | (a) prefix 길이는 base config (3 cam) 와 다름, (b) 그러나 base 가 *variable cam count* 로 pretrain 됐다면 2 cam 도 분포 내 — paper 인용이 이를 지지. (c) loss 0.04 수렴 = train data fit 의 증거지 base 분포 정합 증거 아님 |
 | "empty_cameras=1 적용이 *근본 해결책* 이다" | **중간** | (a) upstream CI 가 이 패턴 사용 (LIBERO 2 cam + empty=1) — *maintainer 의도된 패턴*, (b) 그러나 ggando 100% 성공 사례가 *empty_cameras 사용 여부 불명* — 사용 안 했어도 성공한 거면 *empty_cameras 가 결정적 요인 아님*, (c) community 의 동일 실패 패턴 (issue #1270, #2753, #2210, 다수) 이 *모두 empty_cameras 미사용* 이지만 *해결책으로 empty_cameras 명시* 한 maintainer 답변 *없음* |
-| "0/2 실패의 *유일한* 원인이 camera mismatch 다" | **약함** | base 0-shot 도 무반응 (`orin/docs/leftarm_v2/base_eval_2026-05-17.md`) — base 자체가 우리 셋업에서 reactive 하지 않다. *다른 잠재 원인 모두 미배제* (normalization stats, action chunking n_action_steps=1 함정, dataset 품질, 100ep × 2 task 가 LoRA 수렴 부족, prompt 형식 불일치, state 차원 매핑) |
+| "0/2 실패의 *유일한* 원인이 camera mismatch 다" | **약함** | base 0-shot 도 무반응 (`orin/docs/leftarm_v2/000_base_eval_2026-05-17.md`) — base 자체가 우리 셋업에서 reactive 하지 않다. *다른 잠재 원인 모두 미배제* (normalization stats, action chunking n_action_steps=1 함정, dataset 품질, 100ep × 2 task 가 LoRA 수렴 부족, prompt 형식 불일치, state 차원 매핑) |
 
 ---
 
@@ -363,7 +363,7 @@ for k, v in d.items():
 
 ### 검증 C: base smolvla_base 0-shot 무반응의 *추론 인프라* 검증 (30min)
 
-기존 보고서 (`orin/docs/leftarm_v2/base_eval_2026-05-17.md`) 에서 base 0-shot 무반응 확정 — 이게 *우리 Orin 셋업의 추론 인프라 문제* 가 아닌지 점검:
+기존 보고서 (`orin/docs/leftarm_v2/000_base_eval_2026-05-17.md`) 에서 base 0-shot 무반응 확정 — 이게 *우리 Orin 셋업의 추론 인프라 문제* 가 아닌지 점검:
 - 카메라 raw 이미지가 모델에 *제대로 들어가는지* (이미지 dump → 시각 확인).
 - 모델 출력 action vector 가 *robot 에 제대로 전달되는지* (action log 확인).
 - prompt 가 *학습 시 task description 과 매칭* 되는지 (dataset meta/tasks.jsonl 와 inference prompt 비교).
@@ -427,8 +427,8 @@ ggando 가 *empty_cameras 명시 X* 로 100% 성공했다면, 다른 변수 (wor
 
 ### 우리 프로젝트 자료 (인용)
 - [`prof_computer/docs/leftarm_v2/learning_log1.md`](learning_log1.md) — M1.5 학습 상세 (M1.5~003 아카이브)
-- [`orin/docs/leftarm_v2/a2_eval_2026-05-17.md`](../../../orin/docs/leftarm_v2/a2_eval_2026-05-17.md) — M1.5 ckpt 추론 0/2
-- [`orin/docs/leftarm_v2/base_eval_2026-05-17.md`](../../../orin/docs/leftarm_v2/base_eval_2026-05-17.md) — base smolvla_base 0-shot 무반응
+- [`orin/docs/leftarm_v2/001_eval_2026-05-17.md`](../../../orin/docs/leftarm_v2/001_eval_2026-05-17.md) — M1.5 ckpt 추론 0/2
+- [`orin/docs/leftarm_v2/000_base_eval_2026-05-17.md`](../../../orin/docs/leftarm_v2/000_base_eval_2026-05-17.md) — base smolvla_base 0-shot 무반응
 - [`prof_computer/docs/model_config.md`](../model_config.md) — 학습 방법 매트릭스 + 결정 근거
 - `smolVLA/prof_computer/finetune/leftarm_v2/run_train_camera_empty.py` — 현 분기 학습 wrapper (단일 변수 차이)
 - `smolVLA/docs/work_flow/context/history/02_prereq_dataset_video_to_image/research/lerobot_smolvla_training_best_practice.md` — 기존 best practice 보고서 (본 보고서는 그 보고서의 *카메라 mismatch 공백 영역 보강*)

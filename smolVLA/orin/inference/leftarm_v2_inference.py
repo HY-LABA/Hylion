@@ -4,7 +4,7 @@
 ckpt 를 로드해 두 task instruction (task1/task2) 추론.
 
 USER_OVERRIDE 2026-05-18 옵션 W 결정에 따라 lerobot-record 폐기 + 신규 작성.
-hil_inference.py 는 사전학습 ckpt 책임 보존 (변경 X).
+orin/docs/legacy/hil_inference.py 는 사전학습 ckpt 책임 보존 (변경 X).
 
 학습 산출물 (변경 불가 fact):
 - HF Hub: BaboGaeguri/leftarm_v2_A2_pc_2026-05-17 — LoRA adapter on smolvla_base
@@ -16,7 +16,7 @@ hil_inference.py 는 사전학습 ckpt 책임 보존 (변경 X).
 - task2: "Hand the yellow can to the person"
 - n_action_steps=50 (config.json 이미 수정됨, 1 감지 시 경고)
 
-hil_inference.py / lego_v1_inference.py 와 차이:
+orin/docs/legacy/hil_inference.py / orin/docs/legacy/lego_v1_inference.py 와 차이:
 1. ckpt 종류: LoRA adapter (peft) — SmolVLAPolicy.from_pretrained(base) + PeftModel 적용
 2. task 선택: --task task1 / task2 CLI 인자 (다중 instruction 분기)
 3. rename_map: top→camera1, wrist→camera2 (observation 키 변환 후 policy 입력)
@@ -33,7 +33,7 @@ rename_map 적용:
            'observation.images.camera1' 로 rename 후 policy 입력
 
 gate-json:
-- orin/config/ports.json + cameras.json 자동 로드 (hil_inference.py / lego_v1_inference.py 와 동일 패턴).
+- orin/config/ports.json + cameras.json 자동 로드 (orin/docs/legacy/hil_inference.py / orin/docs/legacy/lego_v1_inference.py 와 동일 패턴).
 """
 
 import argparse
@@ -73,7 +73,7 @@ TASK_INSTRUCTIONS = {
 def parse_camera_arg(value: str) -> dict[str, int]:
     """`--cameras top:0,wrist:1` 형식을 파싱.
 
-    패턴 출처: hil_inference.py (검증된 구현)
+    패턴 출처: orin/docs/legacy/hil_inference.py (검증된 구현)
     Returns: {camera_name: device_index} 매핑. 입력 순서 보존 (Python 3.7+).
     """
     pairs: dict[str, int] = {}
@@ -91,7 +91,7 @@ def parse_camera_names(value: str) -> set[str]:
 def flip_observation_cameras(obs: dict, slots: set[str]) -> dict:
     """선택된 slot 의 raw camera observation 을 수직 반전.
 
-    패턴 출처: hil_inference.py / lego_v1_inference.py (검증된 구현)
+    패턴 출처: orin/docs/legacy/hil_inference.py / orin/docs/legacy/lego_v1_inference.py (검증된 구현)
     """
     for slot in slots:
         obs[slot] = obs[slot][::-1, :, :].copy()
@@ -106,7 +106,7 @@ def apply_rename_map(obs: dict) -> dict:
     추론 시: robot.get_observation() 이 'observation.images.top' / 'observation.images.wrist' 반환
     → 이를 policy 가 기대하는 'observation.images.camera1' / 'observation.images.camera2' 로 변환.
 
-    변환 대상 키가 없으면 무시 (hil_inference.py 의 slot 매핑 방식과 일관).
+    변환 대상 키가 없으면 무시 (orin/docs/legacy/hil_inference.py 의 slot 매핑 방식과 일관).
     """
     rename_pairs = [
         ("observation.images.top", "observation.images.camera1"),
@@ -122,7 +122,7 @@ def apply_rename_map(obs: dict) -> dict:
 def load_gate_config(gate_json_path: str) -> tuple[dict | None, dict | None]:
     """orin/config/ports.json + cameras.json 을 로드하여 반환.
 
-    패턴 출처: hil_inference.py load_gate_config (검증된 구현 그대로 차용)
+    패턴 출처: orin/docs/legacy/hil_inference.py load_gate_config (검증된 구현 그대로 차용)
     """
     p = Path(gate_json_path)
     config_dir = p if p.is_dir() else p.parent
@@ -157,7 +157,7 @@ def apply_gate_config(
 ) -> argparse.Namespace:
     """gate config 값으로 미지정 인자를 채운다.
 
-    CLI 직접 지정 우선 (하위 호환). 패턴: hil_inference.py apply_gate_config.
+    CLI 직접 지정 우선 (하위 호환). 패턴: orin/docs/legacy/hil_inference.py apply_gate_config.
     카메라 키: top (cameras.json 원본) → top 그대로 사용 (본 스크립트 --cameras 인자 키와 동일).
 
     cameras.json schema (rotation 정합 복원 — TODO-03-H 2026-05-18):
@@ -238,7 +238,7 @@ def _auto_discover_cameras() -> dict[str, int] | None:
     """OpenCVCamera.find_cameras() 로 시스템에 연결된 카메라를 자동 발견한다.
 
     발견된 카메라가 정확히 2 대인 경우에만 자동 적용 (top: 첫 번째, wrist: 두 번째).
-    패턴 출처: hil_inference.py _auto_discover_cameras (검증된 구현 그대로 차용)
+    패턴 출처: orin/docs/legacy/hil_inference.py _auto_discover_cameras (검증된 구현 그대로 차용)
     """
     try:
         from lerobot.cameras.opencv import OpenCVCamera
@@ -343,7 +343,7 @@ def main():
     parser = argparse.ArgumentParser(
         description=(
             "leftarm_v2_A2_pc_2026-05-17 LoRA adapter 추론 (Orin + SO-101 follower). "
-            "hil_inference.py (사전학습 ckpt 전용) 와 독립 운용 — USER_OVERRIDE 옵션 W."
+            "orin/docs/legacy/hil_inference.py (사전학습 ckpt 전용) 와 독립 운용 — USER_OVERRIDE 옵션 W."
         )
     )
     parser.add_argument(
@@ -506,7 +506,7 @@ def main():
     policy.config.n_action_steps = args.n_action_steps
 
     # empty_cameras: ckpt config.json 값을 policy.config 에 강제 적용.
-    # LoRA adapter 만 로드 시 base smolvla_base 의 default (=0) 가 들어와 학습 분포 (camera_empty 분기 = 1)
+    # LoRA adapter 만 로드 시 base smolvla_base 의 default (=0) 가 들어와 학습 분포 (002+ 분기 = empty_cameras=1)
     # 와 mismatch 발생 → 추론 신뢰도 저하. ckpt config.json 의 값을 ground truth 로 사용.
     measured_empty = getattr(policy.config, "empty_cameras", None)
     ckpt_config_path = Path(ckpt_dir_str) / "config.json"
@@ -531,11 +531,11 @@ def main():
     )
 
     # ── 2. Camera + Follower setup ─────────────────────────────────
-    # 패턴: hil_inference.py / lego_v1_inference.py (검증된 구현)
+    # 패턴: orin/docs/legacy/hil_inference.py / orin/docs/legacy/lego_v1_inference.py (검증된 구현)
     # SLOT_MAP: ["camera1", "camera2"] — policy 입력 키
     # cameras: {"top": idx, "wrist": idx} — 사용자 제공 키
     # 순서대로 slot 에 매핑 (top→camera1 slot, wrist→camera2 slot)
-    # USB 2.0 hub 대역폭 한계 — fourcc="MJPG" 강제 (lego_v1_inference.py 패턴)
+    # USB 2.0 hub 대역폭 한계 — fourcc="MJPG" 강제 (orin/docs/legacy/lego_v1_inference.py 패턴)
     # cameras.json 에서 읽은 카메라 파라미터 (rotation 정합 복원 — TODO-03-H 2026-05-18).
     # gate-json 미지정 시 _camera_params 가 빈 dict → default 적용 (rotation=0, 640x480, 30fps, MJPG).
     _cam_params = getattr(args, "_camera_params", {})
@@ -586,7 +586,7 @@ def main():
     signal.signal(signal.SIGINT, _sigint_handler)
 
     # ── 4. Inference loop ─────────────────────────────────────────
-    # 패턴: hil_inference.py / lego_v1_inference.py inference loop (검증된 구현)
+    # 패턴: orin/docs/legacy/hil_inference.py / orin/docs/legacy/lego_v1_inference.py inference loop (검증된 구현)
     # rename_map: observation dict 후처리 — top/wrist → camera1/camera2 rename
     action_history = []
     step_count = 0

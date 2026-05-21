@@ -275,7 +275,7 @@
 
 **다음 단계** (M2 진입은 M1 의 **400ep** 완성 후 — 2026-05-18 목표 200→400 조정):
 
-- [x] **Orin 추론 smoke** — `lerobot-record --policy.path=BaboGaeguri/leftarm_v2_A2_pc_2026-05-17` 로 M1.5 결과의 정성 평가 → **2026-05-18 실시, 0/2 (단축), 0~20% 영역 확정**. 상세: [a2_eval_2026-05-17.md](../../../orin/docs/leftarm_v2/a2_eval_2026-05-17.md)
+- [x] **Orin 추론 smoke** — `lerobot-record --policy.path=BaboGaeguri/leftarm_v2_A2_pc_2026-05-17` 로 M1.5 결과의 정성 평가 → **2026-05-18 실시, 0/2 (단축), 0~20% 영역 확정**. 상세: [001_eval_2026-05-17.md](../../../orin/docs/leftarm_v2/001_eval_2026-05-17.md)
 - [ ] **M1 잔여 290ep 수집 완료** (현재 110/400)
 - [ ] **M2 본 학습** — 400ep 완성 후 prof_computer 에서 본 학습. yaml 의 `scheduler_decay_steps` 를 `steps` 와 동기화 권장 (본 사이클은 30k step 이후 lr 거의 0 — backlog 메모)
 - [ ] **선택: 200ep 시점 중간점검 학습** — M1.5 (100ep) 와 동일 setup 으로 1회 학습 + Orin 평가 → 데이터 양 효과 정량화 + 400ep 진입 가치 calibration
@@ -285,7 +285,7 @@
 
 ### M1.5 추론 후 가설 분리 검증 사이클 — 2026-05-18 · 🔄 진행 중
 
-> **배경**: M1.5 추론 결과 0/2 (단축 평가) — 0~20% 영역 확정 ([a2_eval_2026-05-17.md](../../../orin/docs/leftarm_v2/a2_eval_2026-05-17.md) §결과 집계). 다음 사이클 학습 방법 결정을 위해 **A2 (현재) → A1 (VLM frozen + expert LoRA) 후퇴 시도 가치** 판단 필요.
+> **배경**: M1.5 추론 결과 0/2 (단축 평가) — 0~20% 영역 확정 ([001_eval_2026-05-17.md](../../../orin/docs/leftarm_v2/001_eval_2026-05-17.md) §결과 집계). 다음 사이클 학습 방법 결정을 위해 **A2 (현재) → A1 (VLM frozen + expert LoRA) 후퇴 시도 가치** 판단 필요.
 >
 > **핵심 의문**: A2 의 0% 가 (가설 α) *VLM LoRA 의 부작용 (100ep noise 학습으로 VLM 손상)* 인지, (가설 β) *데이터 양 부족 (학습 방법은 OK, 더 학습할 데이터 필요)* 인지 분리 불가. A1 으로 무조건 후퇴 시 **본인 우려**: "VLM 적응이 실제 기여했다면 A1 = 환경 인식 ↓ + action 매핑은 동일 학습 → A2 보다 더 나쁜 결과 위험".
 >
@@ -380,7 +380,7 @@
 
 > 양쪽 작업 완료 — 매트릭스 4번째 행 (`base 완전 무반응 + VLM LoRA norm 큰 변화`) 적중. 사용자 우려가 데이터로 완전 확정.
 
-**작업 1 결과** (사용자, [base_eval_2026-05-17.md](../../../orin/docs/leftarm_v2/base_eval_2026-05-17.md)): base smolvla_base 는 우리 환경 task1 instruction 에 *의미있는 동작 X* — A2 학습 모델보다도 더 형편없음. task2 는 task1 결과로 충분해 skip. **base 무반응 확정**.
+**작업 1 결과** (사용자, [000_base_eval_2026-05-17.md](../../../orin/docs/leftarm_v2/000_base_eval_2026-05-17.md)): base smolvla_base 는 우리 환경 task1 instruction 에 *의미있는 동작 X* — A2 학습 모델보다도 더 형편없음. task2 는 task1 결과로 충분해 skip. **base 무반응 확정**.
 
 **작업 2 결과** (메인, 위 §wandb 분석): VLM_vision LoRA 가 EXPERT_lm 과 거의 동등 강도 (ΔB/A: 0.486 vs 0.494) 로 학습됨. **VLM LoRA 큰 변화 확정**.
 
@@ -392,7 +392,7 @@
 2. **학습 방법 미세조정 2순위** (데이터 확장 후 별도 사이클) — A2 유지 + `lora.r: 16 → 32` / `scheduler_decay_steps=steps` 동기화 (M1.5 backlog 이미 잡힘, 후반 38k step 학습 정체의 직접 원인)
 3. **A1·B1·B2 모두 비추 (본 시점)** — A1 (VLM frozen) 은 학습된 환경 적응 폐기 → 본 데이터로 비추 확정. B1/B2 는 100ep 으론 과적합 위험 (model_config.md §2 매트릭스 그대로).
 
-→ 다음 사이클 spec Phase 1 진입 시 위 권고를 출발점으로 사용. [`orin/docs/leftarm_v2/base_eval_2026-05-17.md`](../../../orin/docs/leftarm_v2/base_eval_2026-05-17.md) §다음 사이클 입력 도 동일 결론.
+→ 다음 사이클 spec Phase 1 진입 시 위 권고를 출발점으로 사용. [`orin/docs/leftarm_v2/000_base_eval_2026-05-17.md`](../../../orin/docs/leftarm_v2/000_base_eval_2026-05-17.md) §다음 사이클 입력 도 동일 결론.
 
 ---
 
@@ -539,7 +539,7 @@ M1.5 원본 *완전 보존* + 별도 entry 3 파일:
     ~/prof_computer_runs/leftarm_v2_camera_empty_2a_pc_2026-05-18_10-01-11/checkpoints/last/pretrained_model
   ```
 - [ ] **Orin 추론 평가** — M1.5 와 *완전 동일 패턴* 단축 평가 (task1 front 1회 + task2 front 1회)
-- [ ] **`orin/docs/leftarm_v2/camera_empty_eval_2026-05-18.md`** 신설 — 평가 시트 (`orin/docs/leftarm_v2/a2_eval_2026-05-17.md` 양식 동일)
+- [ ] **`orin/docs/leftarm_v2/002_eval_2026-05-18.md`** 신설 — 평가 시트 (`orin/docs/leftarm_v2/001_eval_2026-05-17.md` 양식 동일)
 - [ ] **결과 비교 + 다음 사이클 결정**:
   - 유의미 개선 (≥1/2) → empty_cameras 가 부분 fix 확정 → 200ep 수집 + camera_empty 패턴 유지
   - 동작 패턴 개선 (헛스윙 → reach 등) → 부분 fix 신호 → 데이터 확장 + empty_cameras 유지
@@ -555,8 +555,8 @@ M1.5 원본 *완전 보존* + 별도 entry 3 파일:
 
 본 분기 ckpt vs M1.5 ckpt (`BaboGaeguri/leftarm_v2_A2_pc_2026-05-17`) 의 *동일 환경 + 동일 단축 평가 패턴* 비교:
 
-- 비교 방법: M1.5 추론 ([`orin/docs/leftarm_v2/a2_eval_2026-05-17.md`](../../../orin/docs/leftarm_v2/a2_eval_2026-05-17.md)) 와 동일 — task1 front 1회 + task2 front 1회 = 단축 2 trial
-- 평가 시트: `orin/docs/leftarm_v2/camera_empty_eval_2026-05-18.md` (신설 예정)
+- 비교 방법: M1.5 추론 ([`orin/docs/leftarm_v2/001_eval_2026-05-17.md`](../../../orin/docs/leftarm_v2/001_eval_2026-05-17.md)) 와 동일 — task1 front 1회 + task2 front 1회 = 단축 2 trial
+- 평가 시트: `orin/docs/leftarm_v2/002_eval_2026-05-18.md` (신설 예정)
 - 결과 분기:
   - **본 분기 추론이 M1.5 (0/2) 보다 *유의미 개선*** → camera 수 mismatch 가 0/2 의 원인 *부분 확정* → 다음 사이클 결정에 반영 (3번째 카메라 실제 활용 가치 ↑)
   - **본 분기 추론이 M1.5 와 *비슷한 0/2***  → camera 수 mismatch 는 *부차적 요인*, 데이터 양·다양성이 주 병목 확정 → 다음 사이클 데이터 확장 1순위 유지
@@ -721,7 +721,7 @@ M1.5 원본 *완전 보존* + 별도 entry 3 파일:
 | 평가 방법 | 단축 2 trial (task1 front + task2 front) | 단축 2 trial (동일) | **단축 8 trial** (계획 20 중, 사용자 단축 종료) |
 | 성공률 | 0/2 (0%) | 0/2 (0%) | **8/8 (100%)** — task1 3/3 (front 1, back 2) · task2 5/5 (front 2, back 3) |
 | 학습 분포 외 robustness | — | — | **4/4** (로봇 각도 perturbation 2 · 캔 mass 1 · 다중 perturbation 1) |
-| 평가 시트 | [`a2_eval_2026-05-17.md`](../../../orin/docs/leftarm_v2/a2_eval_2026-05-17.md) | [`camera_empty_eval_2026-05-18.md`](../../../orin/docs/leftarm_v2/camera_empty_eval_2026-05-18.md) | [`003_eval_2026-05-19.md`](../../../orin/docs/leftarm_v2/003_eval_2026-05-19.md) |
+| 평가 시트 | [`001_eval_2026-05-17.md`](../../../orin/docs/leftarm_v2/001_eval_2026-05-17.md) | [`002_eval_2026-05-18.md`](../../../orin/docs/leftarm_v2/002_eval_2026-05-18.md) | [`003_eval_2026-05-19.md`](../../../orin/docs/leftarm_v2/003_eval_2026-05-19.md) |
 | HF Hub repo | `leftarm_v2_A2_pc_2026-05-17` | `leftarm_v2_camera_empty_A2_pc_2026-05-18` | `leftarm_v2_003_a2_310ep_empty1_sched_sync_bf16_b6` |
 
 > 003 추론 평가 결과 갱신 완료 (2026-05-21, `/wrap-spec` 사후 반영). M1.5(0/2)·002(0/2) → 003(8/8) = **0% → 100% 도약**. 5변수 종합 분기 효과 결정적 확정.
