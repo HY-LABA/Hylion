@@ -211,9 +211,11 @@ DGX 의 시도 1·2 OOM 사고 (`smolVLA/dgx/docs/finetune/leftarm_v2/training_l
 
 > 팔로워 F1–F6은 Arm Kit Pro 기준 12V 모터(C018 또는 C047) 중 택일. 리더 L1–L6은 7.4V 모터 혼합 구성(C044 x2 / C001 x1 / C046 x3).
 
-leader + follower(현재 보유 1쌍) 합계:
+leader + follower **1쌍 기준** 모터 합계:
 - `C018 또는 C047 x6` (follower, 12V)
 - `C001 x1`, `C044 x2`, `C046 x3` (leader, 7.4V)
+
+> **보유 현황 (2026-05-20 갱신)**: SO-ARM101 Arm Pro Kit **2세트** 보유 (follower 2 + leader 2 = 팔 4개). 운영은 1쌍, 나머지 1쌍은 예비/백업. 위 모터 합계는 1쌍 기준 — 보유 전체는 ×2. 구매 내역: [bom.md](../../../docs/bom.md) §2.
 
 - 전원 공급:
   - **Follower arm**: **DC 12V** (Arm Kit Pro)
@@ -293,9 +295,11 @@ leader + follower(현재 보유 1쌍) 합계:
 
 ## 9) 로봇 구성 수량
 
-- Follower arm: 1대
-- Leader arm: 1대
+- Follower arm: 1대 (운영) — **보유 2대** (Arm Pro Kit 2세트, 1대 예비)
+- Leader arm: 1대 (운영) — **보유 2대**
 - Camera: overview OV5648 x1 + wrist U20CAM-720P x1 (혼합 구성)
+
+> 운영 구성은 follower 1 + leader 1 (smolVLA 데이터 수집 표준). SO-ARM101 Arm Pro Kit **2세트** 보유 — 나머지 1쌍은 예비/백업. 구매 내역: [bom.md](../../../docs/bom.md) §2 (2026-05-20).
 
 ## 10) 카메라 키 컨벤션 + 분기 결과 (08_final_e2e H2 검토 — 2026-05-04)
 
