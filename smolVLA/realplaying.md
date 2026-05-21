@@ -19,6 +19,34 @@
 
 ---
 
+## 명명 4-계층 (cold start 안내)
+
+본 프로젝트의 학습 관련 명명 (마일스톤 M1~M4 / 학습 방법 A1~C2 / hp 인자 / 분기 인스턴스 001~) 은 *4개 독립 계층* 으로 분리된다. 신규 합류자는 [`smolVLA/prof_computer/docs/model_config.md` §0 명명 4-계층](smolVLA/prof_computer/docs/model_config.md) 을 *반드시 1회독* — "M1.5 = 001" 같은 *우연한 1대1 매핑* 은 진실이 아님 주의.
+
+---
+
+## era 종료 조건
+
+본 era (leftarm_v2 사이클) 의 종료 조건은 다음 두 가지의 *동시 충족* 으로 정의한다:
+
+1. **성능 도달** — dev 환경에서 두 task 의미있는 수행 (영역별 success rate 측정으로 정량 확인)
+2. **재현 가능한 기록 유산** — 본 era 의 *셋업·수집·학습·배포·추론* 흐름이 *기존 문서 (realplaying / model_config / learning_log1 / finetune & orin README / setup·run 스크립트) 만으로 cold start AI 가 추적 가능* 한 상태
+
+**원 수치 목표 (M1 400ep 등) 의 *완수* 는 era 종료 조건에 포함되지 않는다** — 성능 도달이 우선 기준이고, 수치 목표는 *성능 부족 시* 의 보강 영역이라 *성능이 이미 충족됐다면 수치 미달이어도 era 종료 가능*.
+
+**조건 (2) 의 *형태 결정 (2026-05-21)***: 별도 *재실행 패키징 문서* (체크리스트·turnkey 스크립트 등) 신설은 *불필요* — 본 era 의 흐름이 이미 기존 문서들에 *cold start 추적 가능 형태* 로 분산 기록됨. 추가 패키징 작업은 *다음 era 의 영역* 으로 위임. 자세한 검증·잔여 영역 정리는 [learning_log1.md §era 종료 메모](smolVLA/prof_computer/docs/leftarm_v2/learning_log1.md) 참조.
+
+### 현 시점 상태 (2026-05-21)
+
+| 조건 | 충족 여부 | 근거 |
+|---|---|---|
+| (1) 성능 도달 | ✅ | 003 분기 (310ep + A2 + bf16+b6) — Orin 단축 평가 8/8 = 100% (task1 3/3, task2 5/5, 학습 분포 외 perturbation 4/4 포함). 상세: [orin/docs/leftarm_v2/003_eval_2026-05-19.md](smolVLA/orin/docs/leftarm_v2/003_eval_2026-05-19.md) |
+| (2) 재현 가능한 기록 유산 | ✅ | 기존 문서 흐름 (realplaying · prof_computer/README §7 명명 컨벤션 · learning_log1 분기 entry + §이관 + §era 종료 메모 · finetune README · prof_computer scripts/setup_env.sh · orin scripts/run_inference_leftarm_v2.sh) 으로 cold start AI 가 셋업→수집→학습→배포→추론 추적 가능 검증됨. |
+
+→ **본 era 종료 완료 (2026-05-21)**.
+
+---
+
 ## 핵심 전제
 
 - **단일팔**: SO-101 좌측 single-arm. 양팔(bi-arm)은 본 로드맵 범위 밖. (우측팔 gesture 트랙은 별개 — 아래 참조)
@@ -47,25 +75,26 @@
 
 각 마일스톤은 Phase 1 에서 별도 spec 으로 분해된다 (milestone → spec → todo). M1~M4 = spec `01`~`04`. 아래는 milestone 계층의 골격.
 
-### [ ] M1 — leftarm_v2 데이터 수집  (spec `01`)
+### [x] M1 — leftarm_v2 데이터 수집  (spec `01`) — *retro 완료 2026-05-21 (310ep 도달 시점)*
 
-- **목표**: leftarm_v2 학습용 dataset (2 task, 총 **400 episodes**) 을 dev 환경에서 수집·검증한다.
+- **목표**: leftarm_v2 학습용 dataset (2 task) 을 dev 환경에서 수집·검증한다.
 - **task (확정 2026-05-14)**: leftarm_v2 = 2 task 멀티태스크
   - ① 인형(doll) 을 집어 상자에 넣기
   - ② 캔(can) 을 집어 상자에 넣기
   - 한 SmolVLA 모델이 instruction 으로 두 task 를 구분해 수행 (M2).
-- **에피소드 (2026-05-18 갱신)**: task 당 **200**, 총 **400** (fresh 수집 — leftarm_v1 끌어오지 않음). 100→200 조정 사유: researcher 추정 (300~500ep) 의 중간 영역 진입 + camera mismatch 확신 영역 도달 (자세한 근거: [prof_computer/docs/leftarm_v2/research_empty_cameras_2026-05-18.md](smolVLA/prof_computer/docs/leftarm_v2/research_empty_cameras_2026-05-18.md) 또는 본 사이클 대화).
-- **주요 작업**:
-  - leftarm_v2 dataset 설계 (task instruction 문자열 2종, dataset 구조, HF repo 명명, 에피소드 배분 200/200)
-  - 수집 환경 최소 파라미터 기록 (카메라 위치·조명·작업영역 — 시연장 재현용 최소 셋) + 다양화 영역 (위치분포·조명·배경) 명시 기록 — 8차부터
+- **에피소드 — 원 목표 → 정정**:
+  - 원 목표 (2026-05-14): task 당 **100**, 총 **200**.
+  - 1차 조정 (2026-05-18): task 당 **200**, 총 **400** 으로 ↑. 사유 — M1.5 추론 0/2 + researcher 보고서 ([prof_computer/docs/leftarm_v2/research_empty_cameras_2026-05-18.md](smolVLA/prof_computer/docs/leftarm_v2/research_empty_cameras_2026-05-18.md)) 의 데이터 양 추정 (300~500ep) 의 중간 영역 진입.
+  - **현 DOD (retro 정정 2026-05-21)**: **310ep 도달 (task1 150 / task2 160) — 003 분기 학습 결과 *충분한 성능* 판명** ([learning_log1.md §003 분기 학습](smolVLA/prof_computer/docs/leftarm_v2/learning_log1.md) — Orin 8/8 = 100%). 원 *400ep 목표* 의 동기 (성능 부족 ← 데이터 부족 가설) 가 003 결과로 *반증* 됨 → 310ep 으로 era 종료 조건 충족 정당화. *400ep 완수* 는 다음 era 의 데이터 보강 영역으로 위임 (본 era 와 분리).
+- **주요 작업** (완료):
+  - leftarm_v2 dataset 설계 (task instruction 문자열 2종, dataset 구조, HF repo 명명)
+  - 수집 환경 최소 파라미터 기록 (카메라 위치·조명·작업영역) + 다양화 영역 (위치분포·조명·배경) 명시 기록 — 8차부터
   - 좌측 SO-101 + 카메라 calibration·포트·인덱스 재검증
-  - teleoperation 으로 400 episodes 수집 → HF Hub push
-  - dataset 검증 (400 ep, task 분포 200/200, frame shape·dtype)
+  - teleoperation 으로 310 episodes 수집 → HF Hub push
+  - dataset 검증 (310 ep, task 분포 150/160, frame shape·dtype)
 - **결정 포인트 (M1)**: dev 수집환경 ↔ 시연장 정합 → **"최소 파라미터만 기록" 으로 결정 (2026-05-14)**. 카메라·조명·작업영역 핵심값만 기록하고 dev 환경 그대로 수집. *2026-05-18 보강*: vision encoder 의 task-irrelevant invariance 학습을 위해 위치분포·조명·배경 다양화 의식적 기록 ([collection_log.md §추가 다양화 영역](smolVLA/dgx/docs/finetune/leftarm_v2/collection_log.md) 참조).
-- **DOD**: leftarm_v2 400 episodes (2 task × 200) 수집 완료 + HF Hub push + 검증 통과 → 학습 입력으로 사용 가능.
-- **선택 중간점검 (권장)**: 200ep 시점에서 *M1.5 (100ep) 와 동일 학습 setup* 으로 1회 학습 + Orin 추론 — 데이터 양 효과 정량화 + 400ep 진입 가치 calibration.
 
-### [ ] M1.5 — 데이터셋 학습 호환성 정비 (video decode 회피)  (spec `02_prereq`)
+### [x] M1.5 — 데이터셋 학습 호환성 정비 (video decode 회피)  (spec `02_prereq`) — *완료 2026-05-17*
 
 - **목표**: M2 학습 진입을 가능하게 — lerobot 의 video dataset 학습 시 pyav 의 video decode 자체 buffer leak 으로 인한 system-wide OOM 을 회피.
 - **배경 (2026-05-15 발견)**: leftarm_v2 의 2A 학습 시도 1·2 가 둘 다 ~28분 후 global OOM (system 95GB 증발, 5GB/min 누수). wandb·dmesg 진단 결과:
@@ -84,38 +113,32 @@
 - **본 사이클 결과 (2026-05-17)**: `smolVLA/prof_computer/` (RTX 3090 + WSL2, prof_train_setting §1 옵션 #1 인스턴스) 에서 **75000 step (5.5 epoch) 완주**. loss 0.04 수렴, VRAM peak 60.7%, RAM 누수 0.18 GB/h (DGX 시도 2 의 1.25 GB/min 대비 400× 감소). prereq spec 02 가설 ("torchcodec 정상 환경에선 DGX 의 OOM 메커니즘 재현 불가") 직접 증명. 산출물:
   - Local ckpt: `~/prof_computer_runs/leftarm_v2_2a_pc_2026-05-17_12-51-51/checkpoints/` (75개)
   - HF Hub: [`BaboGaeguri/leftarm_v2_A2_pc_2026-05-17`](https://huggingface.co/BaboGaeguri/leftarm_v2_A2_pc_2026-05-17) (LoRA adapter only, 46MB)
-  - 상세: [smolVLA/prof_computer/docs/learning_log.md](smolVLA/prof_computer/docs/learning_log.md)
+  - 상세: [smolVLA/prof_computer/docs/leftarm_v2/learning_log1.md](smolVLA/prof_computer/docs/leftarm_v2/learning_log1.md) (M1.5~003 아카이브) · 현행 사이클: [learning_log2.md](smolVLA/prof_computer/docs/leftarm_v2/learning_log2.md)
 - **재사용성 노트**: 향후 rightarm 등 다른 dataset 도 prof_computer (또는 prof_train_setting §1 의 다른 옵션 — Colab/RunPod 등) 에서 동일 절차로 학습. DGX 의 aarch64 ecosystem 정비 (lerobot torchcodec aarch64 wheel 또는 PyTorch + FFmpeg ABI 정합) 전까지 prof_computer 가 학습 노드 대행.
 
-### [ ] M2 — 학습 (DGX 또는 prof_computer)  (spec `02`)
+### [x] M2 — 학습 (prof_computer 채택)  (spec `02`) — *완료 2026-05-19 (003 분기)*
 
-- **목표**: leftarm_v2 dataset (M1 의 200 episodes 완성 후) 으로 SmolVLA 멀티태스크 정책을 fine-tune 한다 (1 모델 / 2 task).
-- **학습 노드 선택** (M1.5 2차 결정 반영): DGX 의 aarch64 ecosystem 정비 전까지는 **prof_computer 우선**. DGX 가 정비되면 그쪽도 가능. M1.5 의 검증 학습 (100ep, 75k step) 은 prof_computer 에서 완주됨 — 동일 노드에서 200ep 으로 확장.
-- **주요 작업**:
-  - 모델 구성 결정 (M1.5 본 사이클의 검증 — LoRA r=16 / all-linear / batch 4 / steps 75000 / fp32 — 을 200ep 으로 확장. scheduler_decay_steps 동기화 적용)
-  - prof_computer 또는 DGX 에서 학습 실행, 학습 곡선·메트릭 점검
-  - 학습 산출 체크포인트 검증 (smoke / 로드 테스트)
-- **결정 포인트 (M2)**: 모델 구성 — `smolvla_base` 기반 / LoRA 적용 여부·rank / 하이퍼파라미터 (구 `11_smolvla_model_decision` 주제). M1.5 검증값 (A2: LoRA all-linear r=16) 을 기본으로 하되 200ep 데이터 반영해 정밀 튜닝.
-- **DOD**: 학습 완료, 체크포인트가 Orin 배포 가능한 형태로 산출, 두 task 모두에 대해 의미있는 수렴.
+- **목표**: leftarm_v2 dataset 으로 SmolVLA 멀티태스크 정책을 fine-tune 한다 (1 모델 / 2 task).
+- **학습 노드 선택** (M1.5 2차 결정 반영): DGX 의 aarch64 ecosystem 정비 전까지는 **prof_computer 우선**. DGX 가 정비되면 그쪽도 가능. M1.5 의 검증 학습 (100ep, 75k step) 은 prof_computer 에서 완주됨 — 동일 노드에서 310ep 까지 확장 진행됨.
+- **본 사이클 결과 (2026-05-19, 003 분기)**: `003_a2_310ep_empty1_sched_sync_bf16_b6` — LoRA r=16 / all-linear / batch 6 bf16 / steps 120000 / scheduler_decay_steps=steps 동기화. 310ep 전체 학습 완주, final loss **0.0324**, 학습 시간 16h 11m. HF Hub: [`BaboGaeguri/leftarm_v2_003_a2_310ep_empty1_sched_sync_bf16_b6`](https://huggingface.co/BaboGaeguri/leftarm_v2_003_a2_310ep_empty1_sched_sync_bf16_b6). 두 task 모두 instruction 정확 응답 + 의미있는 수렴. 상세: [learning_log1.md §003 분기 학습](smolVLA/prof_computer/docs/leftarm_v2/learning_log1.md).
+- **결정 포인트 (M2)**: 모델 구성 — `smolvla_base` 기반 / **A2 (LoRA all-linear r=16)** 채택. 003 분기에서 5변수 종합 변경 (dataset 110→310ep, empty_cameras 0→1, scheduler_decay_steps 30000→120000, fp32→bf16, batch 4→6) 으로 성능 도약 확인.
+- **DOD** (✅ 충족): 학습 완료, 체크포인트 Orin 배포 가능 형태 산출, 두 task 모두 의미있는 수렴.
 
-### [ ] M3 — 배포 + 추론 (Orin)  (spec `03`)
+### [x] M3 — 배포 + 추론 (Orin)  (spec `03`) — *완료 2026-05-19 (003 평가)*
 
 - **목표**: 학습 체크포인트를 Orin 에 배포하고 추론 파이프라인을 구동한다.
-- **주요 작업**:
-  - 체크포인트 DGX → Orin 전송
-  - Orin 추론 파이프라인 구동 (카메라·SO-101 연결, 정책 로드 — LoRA adapter 케이스 시 로딩 검증)
-  - 추론 latency·동작 기본 점검
-- **결정 포인트 (M3)**: `orin/config/*.json` (포트·카메라) git 추적 정책 (구 `10_orin_config_policy` 주제).
-- **DOD**: Orin 에서 정책 로드 + 실시간 추론 루프 동작 확인.
+- **본 사이클 결과**: HF Hub `BaboGaeguri/leftarm_v2_003_a2_310ep_empty1_sched_sync_bf16_b6` (LoRA adapter 44MB) → Orin (prof_computer 학습 흐름 채택으로 *DGX → Orin* 이 아닌 *HF Hub → Orin* 경로) — 003 평가 시 정책 로드 + 실시간 추론 루프 정상 동작 확인 ([orin/docs/leftarm_v2/003_eval_2026-05-19.md](smolVLA/orin/docs/leftarm_v2/003_eval_2026-05-19.md)).
+- **결정 포인트 (M3)**: `orin/config/*.json` (포트·카메라) git 추적 정책 — cameras.json/ports.json 모두 git tracked + rotation/width/height 신규 필드로 003 평가 진행. 상세 결정 흐름 별도 정리 필요 (M4 패키징 시 흡수).
+- **DOD** (✅ 충족): Orin 정책 로드 + 실시간 추론 루프 동작 확인.
 
-### [ ] M4 — E2E 검증 + 사이클 패키징  (spec `04`)
+### [x] M4 — E2E 검증 + 사이클 패키징  (spec `04`) — *완료 2026-05-21*
 
-- **목표**: dev 환경에서 전체 사이클을 검증해 **모델이 두 task 를 실제로 수행**함을 확인하고, 시연장 재실행이 turnkey 가 되도록 절차를 패키징한다.
-- **주요 작업**:
-  - dev 환경에서 실시간 추론으로 SO-101 이 leftarm_v2 의 두 task 를 수행하는지 확인 (성공률 측정)
-  - 수집→학습→배포→추론 전체 사이클 절차 문서화
-  - 시연장 재실행 체크리스트 작성 (데이터만 교체하면 되도록)
-- **DOD**: dev 환경 E2E 사이클 성공 (두 task 수행 확인), 재실행 절차 문서 완성.
+- **목표**: dev 환경에서 전체 사이클을 검증해 **모델이 두 task 를 실제로 수행**함을 확인하고, 본 사이클의 *재현 가능한 기록 유산* 을 남긴다.
+- **본 사이클 결과**:
+  - ✅ **E2E 사이클 성공 확인** — 003 분기 Orin 평가 단축 8/8 (task1 3/3, task2 5/5, 학습 분포 외 perturbation 4/4 포함). dev 환경 두 task 수행 확정.
+  - ✅ **재현 가능한 기록 유산** — 별도 *재실행 패키징 문서* 신설 대신 *기존 문서 흐름* 으로 추적 가능 형태 확보 (위 §era 종료 조건 참조). 잔여 명시 영역 (수집 환경 물리 파라미터·HF push 명령 양식·평가 시트 빈 템플릿) 은 *다음 era 의 작업 영역* 으로 위임 ([learning_log1.md §era 종료 메모](smolVLA/prof_computer/docs/leftarm_v2/learning_log1.md) 의 *다음 era 흡수 영역* 참조).
+- **DOD** (✅ 충족): dev 환경 E2E 사이클 성공 + 본 era 흐름이 cold start AI 가 추적 가능한 형태로 기록 보존.
+- **마무리**: 본 마일스톤 완료 = era 종료 (2026-05-21).
 
 ---
 
@@ -126,9 +149,9 @@
 | 결정 포인트 | 배치 | 구 출처 | 상태 |
 |---|---|---|---|
 | dev 수집환경 ↔ 시연장 환경 정합 방식 | M1 | 구 09_demo_site_mirroring | ✅ "최소 파라미터만 기록" 으로 결정 (2026-05-14) |
-| lerobot video decode 호환성 (pyav leak 회피 방식) | M1.5 | — (2026-05-15 발견) | ✅ "image dataset 변환" 으로 결정 (2026-05-15) |
-| 모델 구성 (체크포인트·LoRA·하이퍼파라미터) | M2 | 구 11_smolvla_model_decision | ⚙️ 2A 학습 방법 (A2: LoRA all-linear) + subset (P) 결정 (2026-05-15). 정밀 hyperparameter 는 2B 시점 |
-| `orin/config/*.json` git 추적 정책 | M3 | 구 10_orin_config_policy | 미결 — M3 spec 작성 시 질문 |
+| lerobot video decode 호환성 (pyav leak 회피 방식) | M1.5 | — (2026-05-15 발견) | ✅ "image dataset 변환" 폐기 → **"prof_computer 로 학습 이관"** 으로 결정 (2026-05-16, M1.5 2차 결정) |
+| 모델 구성 (체크포인트·LoRA·하이퍼파라미터) | M2 | 구 11_smolvla_model_decision | ✅ **A2 (LoRA all-linear r=16) 채택**. 003 분기 (310ep + bf16+b6 + sched_sync + empty=1) 로 본 학습 완주 (2026-05-19) |
+| `orin/config/*.json` git 추적 정책 | M3 | 구 10_orin_config_policy | ⚙️ cameras.json/ports.json git tracked + rotation/width/height 신규 필드 채택 (003 평가 시 확정 2026-05-19). M4 패키징 시 문서화 흡수 |
 
 ---
 
@@ -147,3 +170,5 @@ DGX 머신 `~/smolvla/dgx/docs/` 에 수집·학습 운영 상세 문서가 존�
 | 2026-05-15 | M1 진행 중 task 정의 재정의 (인형→테이블 왼쪽 spatial reference, 캔→사람에게 hand-over) — top view 가동범위 제약 + task 다양성 확보 차원에서 "노란 플라스틱 상자" 폐기. 110ep (task1:50/task2:60) 시점에 M2-A (100ep balanced subset) 시도 진입. |
 | 2026-05-15 | **M1.5 신설** — 데이터셋 학습 호환성 정비. M2-A 학습 시도 1·2 가 둘 다 ~28분 후 system-wide OOM. 진단 결과 lerobot 의 video dataset 학습 시 pyav 의 buffer leak (codec/workers 무관). DGX 의 PyTorch 2.10 + GB10 + FFmpeg 6 환경에서 torchcodec/video_reader 빌드 호환 불가 → **image dataset 변환** 을 정공법으로 채택. spec `02_prereq` 신규. M2 학습은 본 milestone 완료 후 재진입. |
 | 2026-05-18 | **M1 목표 200→400ep 조정** (task 당 100→200). 사유: M1.5 추론 0/2 + researcher 보고서 ([prof_computer/docs/leftarm_v2/research_empty_cameras_2026-05-18.md](smolVLA/prof_computer/docs/leftarm_v2/research_empty_cameras_2026-05-18.md)) 의 데이터 양 추정 (300~500ep) 영역 진입 + camera mismatch 확신 영역 도달 (400ep 시점 데이터 부족 가설 신뢰도 ↑). 추가 도입: 수집 다양화 영역 (위치분포·조명·배경) — 8차부터 명시 ([collection_log.md §추가 다양화 영역](smolVLA/dgx/docs/finetune/leftarm_v2/collection_log.md)). |
+| 2026-05-21 | **era 종료 조건 신설 + M1 retro 정정 + M1.5/M2/M3 완료 표시 + M4 부분 완료 표시**. 사유: 003 분기 학습 결과 (Orin 8/8 = 100%) 로 성능 목표 충족 — 원 400ep 목표의 동기 (성능 부족 ← 데이터 부족 가설) 가 반증됨. era 종료 조건을 *(1) 성능 도달 + (2) M4 패키징 완성* 으로 정의, M1 의 *400ep 완수* 는 era 종료 조건에서 제외. |
+| 2026-05-21 | **era 종료 조건 (2) 재정의 + M4 완료 처리 + era 종료 선언**. 사용자 결정: 별도 *재실행 패키징 문서* 신설은 불필요 — 본 era 의 흐름이 이미 기존 문서 (realplaying / model_config §0 / learning_log1 분기 entry + §이관 + §era 종료 메모 / finetune & orin README / setup·run 스크립트) 로 cold start AI 가 추적 가능 형태 확보. 조건 (2) 를 *재현 가능한 기록 유산* 으로 재정의, ✅ 충족. **본 era 종료 (2026-05-21)**. |

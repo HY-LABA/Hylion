@@ -99,7 +99,7 @@ vision encoder 의 *task-irrelevant 변동 invariance* 학습 목적. 차수당 
 
 ### Orientation 합계
 
-> 2026-05-18 목표 조정: task 당 100 → **200 ep**. 전체 200 → **400 ep**. 사유: researcher 추정 (300~500ep) 의 중간 영역 진입으로 데이터 부족 가설 통계 신뢰도 ↑ + camera mismatch 확신 영역 도달 (자세한 근거는 [model_config.md](../../../../prof_computer/docs/model_config.md) §0 또는 본 사이클 대화).
+> 2026-05-18 목표 조정: task 당 100 → **200 ep**. 전체 200 → **400 ep**. 사유: researcher 추정 (300~500ep) 의 중간 영역 진입으로 데이터 부족 가설 통계 신뢰도 ↑ + camera mismatch 확신 영역 도달 (자세한 근거는 [learning_log1.md §이관 1 — 2A/2B 패스 구조 변경 이력](../../../../prof_computer/docs/leftarm_v2/learning_log1.md) 또는 본 사이클 대화).
 
 | task | 누적 / 목표 | front | back |
 |---|---|---|---|

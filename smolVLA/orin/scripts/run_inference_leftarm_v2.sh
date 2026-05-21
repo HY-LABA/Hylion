@@ -259,7 +259,7 @@ cmd_live() {
 
 # ── Subcommand: zero-shot ─────────────────────────────────────────────────────
 # 가설 분리 검증용 — base smolvla_base 만 로딩 (LoRA adapter skip).
-# learning_log.md §M1.5 추론 후 가설 분리 검증 사이클 작업 1 (사용자 담당).
+# learning_log1.md §M1.5 추론 후 가설 분리 검증 사이클 작업 1 (사용자 담당).
 cmd_zero_shot() {
     local task_key="${1:-}"
     if [[ -z "${task_key}" ]]; then

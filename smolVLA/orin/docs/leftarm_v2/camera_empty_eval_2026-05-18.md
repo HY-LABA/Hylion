@@ -10,7 +10,7 @@
 |---|---|
 | 평가 대상 ckpt | [`BaboGaeguri/leftarm_v2_camera_empty_A2_pc_2026-05-18`](https://huggingface.co/BaboGaeguri/leftarm_v2_camera_empty_A2_pc_2026-05-18) |
 | ckpt 형태 | LoRA adapter 45MB (base: `lerobot/smolvla_base`) |
-| 학습 메타 요약 | 100ep subset (ep 0~99) · LoRA r=16 all-linear · batch 4 fp32 · **75,000 step** · final loss 0.130 · 9시간 22분. **단일 변수 차이**: `empty_cameras: 1` (M1.5 A2 = 0). 나머지 100% 동일. 상세: [`learning_log.md` §camera_empty 분기 학습](../../../prof_computer/docs/leftarm_v2/learning_log.md#camera_empty-분기-학습--2026-05-18) |
+| 학습 메타 요약 | 100ep subset (ep 0~99) · LoRA r=16 all-linear · batch 4 fp32 · **75,000 step** · final loss 0.130 · 9시간 22분. **단일 변수 차이**: `empty_cameras: 1` (M1.5 A2 = 0). 나머지 100% 동일. 상세: [`learning_log1.md` §camera_empty 분기 학습](../../../prof_computer/docs/leftarm_v2/learning_log1.md#camera_empty-분기-학습--2026-05-18) |
 | 평가일 | 2026-05-18 |
 | 평가자 | 사용자 (1인) |
 | 평가 환경 | 실 Orin + 좌측 SO-101 아암 + 시연장 (M1.5 평가와 동일 셋업) |
@@ -164,7 +164,7 @@
 | 동작 부드러움 | 양호 (모터·하드웨어 정상) | 양호 (동일) | **동일** |
 | 정책 *판단력* 한계 | 도달 단계 일부, 짚기·완료 단계 응답성 부재 | 도달 단계 일부, 짚기·완료 단계 응답성 부재 | **동일 패턴** |
 
-### 학습 메트릭 비교 (참고 — [`learning_log.md` §M1.5 vs 002 비교 표](../../../prof_computer/docs/leftarm_v2/learning_log.md#m15-001-와의-비교--empty_cameras-단일-변수만-차이))
+### 학습 메트릭 비교 (참고 — [`learning_log1.md` §M1.5 vs 002 비교 표](../../../prof_computer/docs/leftarm_v2/learning_log1.md#m15-001-와의-비교--empty_cameras-단일-변수만-차이))
 
 | 학습 지표 | M1.5 (001) | 002 (camera_empty) | 차이 |
 |---|---|---|---|
@@ -183,7 +183,7 @@
 | 결론 | 근거 |
 |---|---|
 | **`empty_cameras` 가설 *root cause 아님* 확정** | 단일 변수만 변경했는데도 추론 정량 (0% → 0%) + 정성 (동일 패턴) 차이 부재. base 형식 정합 회복 (3 cam zero-pad) 만으로는 정책 *판단력* 개선 안 됨. |
-| **다른 root cause 영역으로 이동** | research §6 의 검증 C·D 영역 (dataset 품질, workspace, 추론 인프라) — 본 사이클에서 *배제된 후보* (n_action_steps Hub 함정 + normalization stats infinity — `learning_log.md` §검증 A·B) 외 *남은 영역*. **가장 가능성 높은 영역 = 데이터셋 크기·품질·다양성**. |
+| **다른 root cause 영역으로 이동** | research §6 의 검증 C·D 영역 (dataset 품질, workspace, 추론 인프라) — 본 사이클에서 *배제된 후보* (n_action_steps Hub 함정 + normalization stats infinity — `learning_log1.md` §검증 A·B) 외 *남은 영역*. **가장 가능성 높은 영역 = 데이터셋 크기·품질·다양성**. |
 | **`empty_cameras=1` 유지 여부** | 학습 시간 +24% 비용 대비 추론 개선 없음 → *기본값 (=0) 유지 권장*. 본 분기 ckpt 는 *부분 검증용* 자료로 보존. |
 
 ---

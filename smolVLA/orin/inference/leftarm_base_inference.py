@@ -4,7 +4,7 @@
 사전학습 모델만 로딩해, 우리 환경 (Orin + 좌측 SO-101 + camera1/camera2) 에서
 task1/task2 instruction 에 대한 *base VLM 의 응답성* 을 정성 측정한다.
 
-신설 사유 (learning_log.md §M1.5 추론 후 가설 분리 검증 사이클, 2026-05-18):
+신설 사유 (learning_log1.md §M1.5 추론 후 가설 분리 검증 사이클, 2026-05-18):
 - A2 (현재 LoRA + Expert all-linear) ckpt 추론 결과 0/2 (단축) → 0~20% 영역 확정
 - 핵심 의문: α (VLM LoRA 의 부작용으로 100ep noise 학습 → VLM 손상) vs
             β (데이터 양 부족 — 학습 방법 OK)

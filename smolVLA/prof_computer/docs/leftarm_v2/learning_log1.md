@@ -1,5 +1,11 @@
-# prof_computer — 학습 로그
+# prof_computer — 학습 로그 1 (M1.5 ~ 003 아카이브)
 
+> 📦 **아카이브 (2026-05-21 freeze)** — 본 파일은 *M1.5 ~ 003 분기* 까지의 학습 시도 기록 보존본. 추가 entry 작성 금지.
+> **"003까지 하고 결과까지 충분히 증명이 된 셈이니 이제는 좀 더 성능을 올릴 방법에 대해서 고민해야 할 시점."** (2026-05-21, 사용자 결정)
+> **현행 사이클 (004+)**: [learning_log2.md](learning_log2.md).
+>
+> ---
+>
 > 본 노드 (Windows 10 + WSL2 + RTX 3090) 의 fine-tune 시도별 실행 기록.
 > DGX 학습 시도 (legacy): [training_log.md](../../../dgx/legacy/train_trial_2026-05-17/docs/training_log.md) — 시도 1·2·3 모두 OOM (2026-05-15~16). DGX 학습 잠정 중단 사유: [legacy/train_trial_2026-05-17/README.md](../../../dgx/legacy/train_trial_2026-05-17/README.md).
 > 결정 근거: [model_config.md](../model_config.md) — leftarm_v2/v3+ 공통 학습 방법론.
@@ -600,38 +606,40 @@ M1.5 원본 *완전 보존* + 별도 entry 3 파일:
 - wandb run: [`babogaeguri-hanyang-university/leftarm_v2/runs/40kzxlmq`](https://wandb.ai/babogaeguri-hanyang-university/leftarm_v2/runs/40kzxlmq)
 - HF Hub: [`BaboGaeguri/leftarm_v2_003_a2_310ep_empty1_sched_sync_bf16_b6`](https://huggingface.co/BaboGaeguri/leftarm_v2_003_a2_310ep_empty1_sched_sync_bf16_b6) (push 완료 2026-05-19 08:10 UTC)
 
-**학습 메트릭** (train_config.json + smoke 측정 기반 — wandb 메트릭은 run 40kzxlmq 페이지에서 확인 가능):
+**학습 메트릭** (실측 — `metrics.scalar.csv` 추출, 2026-05-21 갱신):
 
 | 지표 | 값 |
 |---|---|
 | 시작 | 2026-05-18 23:06 KST |
-| 종료 | 2026-05-19 ~15:00 KST (추정, HF push 08:10 UTC 기준 ~16-18h 후) |
-| 총 시간 | **~16시간** (smoke 3 step time 0.48s × 120000 step 외삽, 실제는 wandb run 40kzxlmq 확인) |
+| 종료 | 2026-05-19 ~15:18 KST (실측 runtime 기준) |
+| 총 시간 | **16h 11m 13s** (58273 s) |
 | 도달 step | 120000 / 120000 (100%) ✅ |
 | 도달 sample | 720,000 (120000 × batch 6) |
-| epoch | ~4.39 (310ep dataset, batch 6 기준) |
-| step time (steady) | ~0.48 s/step (smoke 3 측정값 — 실측은 wandb 40kzxlmq 확인) |
-| dataloading_s | [wandb run 40kzxlmq 확인] |
-| final loss | [wandb run 40kzxlmq 확인] |
-| loss steady oscillation (last 20K) | [wandb run 40kzxlmq 확인] |
-| grad_norm 후반 | [wandb run 40kzxlmq 확인] |
+| epoch | 4.38 (실측, 310ep dataset · batch 6 기준) |
+| step time (avg) | **0.481 s/step** (update 0.476 + dataload 0.005) |
+| dataloading_s (avg) | **0.0052 s** (전 구간 평균 — dataload 병목 없음 확정) |
+| final loss | **0.0324** |
+| loss steady (last 20K, n=401) | **min 0.010 / avg 0.044 / max 0.168** |
+| grad_norm 후반 (last 20K) | **0.42 ~ 0.55** (M1.5 0.55~0.65 대비 하단 시프트) |
 | lr 마지막 | **2.5e-6** (cosine min — scheduler_decay_steps=120000=steps, 전 구간 decay) |
-| ckpt 저장 | **60개** (save_freq=2000, step 2000 마다) |
-| last ckpt 크기 | [wandb 또는 로컬 확인 — LoRA adapter only, 001/002 기준 ~45-125 MB 예상] |
+| ckpt 저장 | **60개** (save_freq=2000, step 010000~066000 — wandb 측정 ckpt 디렉토리 기준; *학습 산출물 디렉토리에는 전체 60 step ckpt 누적*) |
+| last ckpt 크기 | **124.32 MB** (optimizer state 80.19 MB + LoRA adapter 44.06 MB + meta) |
 
-> wandb 메트릭 미추출 사유: devPC 환경에 `wandb` 패키지 미설치 (시스템 Python, venv 외부). 사용자가 `wandb.ai/babogaeguri-hanyang-university/leftarm_v2/runs/40kzxlmq` 에서 직접 확인 후 `[...]` 항목 갱신 가능.
+> 메트릭 추출 방법: `~/prof_computer_runs/leftarm_v2_003_a2_310ep_empty1_sched_sync_bf16_b6_full_2026-05-18_23-06-14/metrics.scalar.csv` (2401 행, lerobot 가 wandb 와 별도 dump). wandb run 40kzxlmq 와 동일 데이터.
 
-**시스템 메트릭** (smoke 3 측정값 기반, 본 학습 16h 추정):
+**시스템 메트릭** (실측 — `metrics.system.csv` 7768 행 추출):
 
 | 지표 | 값 |
 |---|---|
-| VRAM peak (smoke 3 측정) | **79.52%** (~20.49 GB / 24 GB) |
-| VRAM steady (본 학습 — 추정) | [wandb run 40kzxlmq 확인] |
-| GPU power | [wandb run 40kzxlmq 확인] |
-| GPU util | [wandb run 40kzxlmq 확인] |
-| GPU temp | [wandb run 40kzxlmq 확인] |
-| System Memory | [wandb run 40kzxlmq 확인] |
-| Disk 사용 (학습 후) | [wandb run 40kzxlmq 확인 — 60 ckpt × 파일당 크기] |
+| VRAM peak | **84.77%** (~20.95 GB / 24 GB) — smoke 3 의 79.52% 대비 +5%p (본 학습 transient peak) |
+| VRAM avg | **80.41%** (~19.86 GB) |
+| GPU power | min 26W / **avg 344W** / max 360W |
+| GPU util | min 5% / **avg 77%** / max 97% |
+| GPU temp peak | **83°C** (avg 81°C — M1.5 와 동일 peak, 평균 +1°C) |
+| System Memory | min 10.6% / **avg 19.5%** / max 22.3% (48GB WSL 할당 기준) |
+| Process RSS | 1019 MB → 2165 MB (peak 2933 MB) |
+| RAM 누수율 | **0.062 GB/h** (1146 MB / 17.97h — M1.5 0.18 GB/h 대비 1/3 수준, sys-OS 영역 합산이라 실제 누수는 더 낮을 가능성) |
+| Disk delta (학습 후) | **+10.08 GB** (85.67 → 95.75 GB — 60 ckpt × 124MB 외 wandb cache 포함) |
 
 #### HF Hub 검증 (2026-05-19, prod-test AUTO_LOCAL)
 
@@ -683,36 +691,240 @@ M1.5 원본 *완전 보존* + 별도 entry 3 파일:
 
 | 지표 | M1.5 (001) | 002 (camera_empty) | 003 (5변수 종합) |
 |---|---|---|---|
-| 총 시간 | 7시간 34분 | 9시간 22분 | ~16시간 (추정) |
-| step time | 0.343 s/step | 0.397 s/step | ~0.48 s/step (smoke 3) |
+| 총 시간 | 7시간 34분 | 9시간 22분 | **16h 11m 13s** |
+| step time | 0.343 s/step | 0.397 s/step | **0.481 s/step** (update 0.476 + dataload 0.005) |
 | 도달 step | 75,000 ✅ | 75,000 ✅ | 120,000 ✅ |
 | 도달 sample | 300,000 | 300,000 | 720,000 |
-| final loss (last step) | 0.132 | 0.130 | [wandb 40kzxlmq] |
-| loss steady (last 20K) | 0.013–0.087 | 0.05–0.20 | [wandb 40kzxlmq] |
-| grad_norm 후반 | 0.55–0.65 | 0.56–0.71 | [wandb 40kzxlmq] |
+| final loss (last step) | 0.132 | 0.130 | **0.0324** |
+| loss steady (last 20K) | 0.013–0.087 | 0.05–0.20 | **0.010–0.168 (avg 0.044)** |
+| grad_norm 후반 | 0.55–0.65 | 0.56–0.71 | **0.42–0.55** |
 | lr 마지막 | 2.5e-6 (step 30k 이후 정체) | 2.5e-6 (step 30k 이후 정체) | **2.5e-6 (전 구간 cosine decay)** |
 | ckpt 저장 수 | 75개 | 75개 | **60개** (save_freq=2000) |
-| last ckpt 크기 | ~125 MB | ~45 MB | [로컬 확인 또는 wandb] |
+| last ckpt 크기 | ~125 MB | ~45 MB | **124.32 MB** (optim 80 + adapter 44 + meta) |
 
 ### 시스템 메트릭 비교
 
 | 지표 | M1.5 (001) | 002 (camera_empty) | 003 (5변수 종합) |
 |---|---|---|---|
-| VRAM peak | 60.67% (~14.7 GB) | 40–42% (~14–15 GB) | **79.52% (~20.49 GB)** (smoke 3) |
-| GPU power | 300–320W | 300–340W | [wandb 40kzxlmq] |
-| GPU util | 60–80% | 60–90% | [wandb 40kzxlmq] |
-| GPU temp peak | 83°C | 80°C | [wandb 40kzxlmq] |
-| System Memory | 15% steady | 15% steady | [wandb 40kzxlmq] |
-| RAM 누수 | 0.18 GB/h | 0 | [wandb 40kzxlmq] |
-| Disk (학습 후) | ~60 GB | 73→80 GB | [wandb 40kzxlmq — 60 ckpt × 파일당 크기] |
+| VRAM peak | 60.67% (~14.7 GB) | 40–42% (~14–15 GB) | **84.77% (~20.95 GB)** (본 학습 실측, smoke 3 79.52%) |
+| GPU power | 300–320W | 300–340W | **avg 344W** (max 360W) |
+| GPU util | 60–80% | 60–90% | **avg 77%** (max 97%) |
+| GPU temp peak | 83°C | 80°C | **83°C** (avg 81°C) |
+| System Memory | 15% steady | 15% steady | **avg 19.5%** (max 22.3%) |
+| RAM 누수 | 0.18 GB/h | 0 | **0.062 GB/h** (1146 MB / 17.97h — sys-OS 합산) |
+| Disk (학습 후) | ~60 GB | 73→80 GB | **85.67 → 95.75 GB** (+10.08 GB — 60 ckpt × 124MB 외 wandb cache 포함) |
 
 ### 추론 평가 비교
 
 | 지표 | M1.5 (001) | 002 (camera_empty) | 003 (5변수 종합) |
 |---|---|---|---|
-| 평가 방법 | 단축 2 trial (task1 front + task2 front) | 단축 2 trial (동일) | **확장 20 trial** (task×orientation×5) |
-| 성공률 | 0/2 (0%) | 0/2 (0%) | [TODO-03 PHYS_REQUIRED 완료 후 갱신] |
-| 평가 시트 | [`a2_eval_2026-05-17.md`](../../../orin/docs/leftarm_v2/a2_eval_2026-05-17.md) | [`camera_empty_eval_2026-05-18.md`](../../../orin/docs/leftarm_v2/camera_empty_eval_2026-05-18.md) | `003_eval_2026-05-19.md` (TODO-02 신설) |
+| 평가 방법 | 단축 2 trial (task1 front + task2 front) | 단축 2 trial (동일) | **단축 8 trial** (계획 20 중, 사용자 단축 종료) |
+| 성공률 | 0/2 (0%) | 0/2 (0%) | **8/8 (100%)** — task1 3/3 (front 1, back 2) · task2 5/5 (front 2, back 3) |
+| 학습 분포 외 robustness | — | — | **4/4** (로봇 각도 perturbation 2 · 캔 mass 1 · 다중 perturbation 1) |
+| 평가 시트 | [`a2_eval_2026-05-17.md`](../../../orin/docs/leftarm_v2/a2_eval_2026-05-17.md) | [`camera_empty_eval_2026-05-18.md`](../../../orin/docs/leftarm_v2/camera_empty_eval_2026-05-18.md) | [`003_eval_2026-05-19.md`](../../../orin/docs/leftarm_v2/003_eval_2026-05-19.md) |
 | HF Hub repo | `leftarm_v2_A2_pc_2026-05-17` | `leftarm_v2_camera_empty_A2_pc_2026-05-18` | `leftarm_v2_003_a2_310ep_empty1_sched_sync_bf16_b6` |
 
-> 003 추론 평가 결과는 TODO-03 완료 + `/verify-result` 후 본 표 해당 셀 갱신 예정.
+> 003 추론 평가 결과 갱신 완료 (2026-05-21, `/wrap-spec` 사후 반영). M1.5(0/2)·002(0/2) → 003(8/8) = **0% → 100% 도약**. 5변수 종합 분기 효과 결정적 확정.
+
+---
+
+## § model_config 에서 이관된 의사결정 흐름 (2026-05-21 재배치)
+
+> **이관 사유**: [model_config.md](../model_config.md) 는 *정적 학습 방식 카탈로그* 가 역할 — *시점성 결정 흐름·실험 결과 인용·시도 이력* 은 본 사이클 로그가 담아야 함. 2026-05-21 정리 시 model_config 에 흘러들어간 시점성 정보를 본 § 로 이관.
+> **편입 형태**: 원 model_config 의 § 단위로 복원. 이관 시점의 model_config 본문 그대로 보존 (수정 없음).
+
+### 이관 1 — 2A/2B 패스 구조 변경 이력 (원 model_config §0)
+
+**2026-05-15 원 결정** (DGX 학습 계획 시점):
+
+| 패스 | dataset | 정책 | 목적 |
+|---|---|---|---|
+| 2A | 100 ep balanced subset | v1 검증값 + step ↑ | 사이클 검증 + 조기 평가 |
+| 2B | **200 ep 전체** | 2A 결과 반영 정밀 튜닝 | M2 최종 산출 |
+
+**2026-05-18 변경**: 2B 목표 **200 → 400ep**.
+
+> 변경 사유: M1.5 추론 0/2 + researcher 보고서 ([research_empty_cameras_2026-05-18.md](research_empty_cameras_2026-05-18.md)) 의 데이터 양 추정 (300~500ep) 영역 진입 + camera mismatch 확신 영역 도달. 자세한 근거 [realplaying.md M1 변경 이력](../../../realplaying.md).
+
+**현 시점 실제 흐름** (003 사이클 완료 후): "2A → 2B" 의 추상은 실제로 **M1.5 (001) → 002 → 003 분기** 의 점진 진화로 진행됨. 003 결과 (8/8 100%) 로 *2A 의 핵심 의도 (조기 평가 → 다음 결정)* 는 충족, *2B (400ep 본 학습)* 은 M1 잔여 수집 + 004+ 사이클에서 진행 예정.
+
+### 이관 2 — 학습 방법 매트릭스의 *데이터 양별 적합* 칼럼 (원 model_config §2)
+
+> 원 model_config §2 의 *100ep 적합* / *300ep 적합* 칼럼은 *특정 학습 결과 인용*이 박혀있어 본 § 로 이관. model_config 의 매트릭스는 *일반 trade-off* 만 유지.
+
+**100ep 시점 적합도** (M1.5 단계 — 2026-05-17 평가):
+
+| 옵션 | 100ep 적합 | 근거 |
+|---|---|---|
+| A1 (VLM frozen + expert LoRA) | ⚠️ paper 권장이나 본 환경 비추 | base 0-shot 우리 환경 무반응 ([learning_log1.md §M1.5 추론 후 가설 분리 검증](learning_log1.md)) — frozen 시 환경 적응 0, expert 가 base VLM representation 위에 매핑만 학습 → 사실상 instruction-conditioned ACT. **2026-05-18 비추 확정** |
+| **A2 (VLM LoRA + expert LoRA)** | ✅ **v1 검증, 채택** | M1.5 채택 분기 |
+| B1 (frozen + Full FT) | ⚠️ 가능하나 무거움 | A1 의 expert 확장판. VLA 의미 폐기 + 100ep 과적합 위험. lerobot 표준 entry 로 *config 만으로는 불가* — PEFT wrap 이 base 전체 frozen + adapter 만 trainable 강제 ([pretrained.py:303](../../../docs/reference/lerobot/src/lerobot/policies/pretrained.py#L303)) |
+| B2 (Full FT + Full FT) | ❌ 100ep 과적합 위험 + RTX 3090 24GB OOM | — |
+| C1 (LoRA VLM + Full FT expert) | ⚠️ 코드 수정 필요 | lerobot 표준 entry 로 *config 만 불가* — 신규 학습 entry + lerobot 코드 우회 필요 |
+| C2 (Full FT VLM + LoRA expert) | ⚠️ 코드 수정 + VLM Full FT 100ep 과적합 위험 | — |
+
+**300ep 시점 적합도** (003 분기 진입 시점 — 2026-05-18 평가):
+
+| 옵션 | 300ep 적합 | 근거 |
+|---|---|---|
+| A1 | ⚠️ 본질 동일 | 데이터 ↑ 효과는 expert 단독 학습 안정성 ↑ 이나 *VLA 의미 폐기* 그대로 |
+| **A2** | ✅ **권장 영역 안** | [best_practice §4-4](lerobot_smolvla_training_best_practice.md): VLA 고성능 300-1200ep, multi-task 100ep/task 권장 — 300ep = task 당 150ep 균형 가정 시 안정 영역. **003 분기 채택** |
+| B1 | ⚠️ 과적합 위험 ↓ (300ep / 150M trainable 비율 개선) | *VLA 의미 폐기* 본질 동일 + 여전히 lerobot 코드 우회 필요 |
+| B2 | ⚠️ 과적합 위험 ↓ (300ep 영역 진입) | RTX 3090 24GB OOM 그대로 (메모리는 step 단위). DGX 학습 재가능 시점만 의미 |
+| **C1** | ✅ **300ep 에서 시도 가치 ↑** | expert Full FT 의 과적합 위험 ↓ 영역 진입 + LoRA r=16 표현력 한계 돌파 가능. 코드 수정 + Phase 1 spec 영역 그대로 |
+| C2 | ❌ 300ep 도 VLM 600M Full FT 엔 부족 | paper SO100 250ep × multitask 권장과 비교 — VLA 분야 600M Full FT 표준 데이터 양 1000ep+. 본 시점 비추 |
+
+**A2 의 M1.5 실측 보강** (원 model_config §2 A2 셀 비고):
+
+- VLM_vision LoRA 학습량 = EXPERT_lm 과 동등 (ΔB/A 0.486 vs 0.494) — VLM 적응 *실제 작동* (wandb run `8les615t` 분석).
+- 100ep 결과 0% (단축) — *데이터 양 병목 가설* 도출 → 003 (310ep) 진입 정당화.
+
+### 이관 3 — 300ep 영역 trade-off 변화 분석 (원 model_config §2 trade-off "300ep 영역 변화")
+
+> 2026-05-18 데이터 확장 (110 → 310ep) 결정 반영. 100ep → 310ep 으로 ~3배 확장되며 일부 옵션의 *과적합 위험* 영역이 변경. 근거: [best_practice §4-4](lerobot_smolvla_training_best_practice.md) — multi-task 권장 100ep/task (= 200ep) 초과 + VLA 일반 고성능 300-1200ep 영역 *진입점*.
+
+| 옵션 | 100ep 시점 | 300ep 시점 변화 |
+|---|---|---|
+| A2 (LoRA r=16) | ✅ 권장 영역 안 | ✅ 권장 영역 안 (003 채택) |
+| B1 (expert Full FT) | ⚠️ 100ep 과적합 영역 | ⚠️ *완화 영역 진입*. 단 lerobot 코드 우회 + VLA 의미 폐기 본질 동일 |
+| C1 (LoRA VLM + expert Full FT) | ⚠️ expert 150M 100ep 과적합 위험 | ✅ *가장 큰 변화* — *시도 가치 영역 진입*. 코드 우회 + Phase 1 spec 영역 |
+| B2 / C2 | ❌ 큰 모델 과적합 | ⚠️ *VLA 분야 표준 데이터 양 (1000ep+)* 기준 *여전히 부족* — 본 시점 비추 |
+
+### 이관 4 — 시점별 "다음 사이클 결정" 흐름 (원 model_config §2 "다음 사이클 결정")
+
+**100ep 시점 결정** (M1.5 사후 — 2026-05-17):
+
+- 현 100ep 그대로 의미 있는 자율 학습 분기 = A2 + r=32 (capacity ↑ 단일 변수). 큰 도약 어려움 — 근본 병목은 데이터 양.
+- C1 진입은 별도 spec 필요 — 신규 학습 entry 작성 + PEFT manual wrap + expert param unfreeze + lr group 분리.
+- 데이터 확장 (M1 잔여 100ep + 다양성) 이 1순위 — 학습 방법 조정은 그 다음.
+
+**310ep 시점 결정** (2026-05-18 DGX 추가 수집 push 완료, 003 분기 진입):
+
+- **A2 유지 + 310ep + empty=1 + scheduler 동기화 = 003 분기 채택** — 데이터 확장 효과 + upstream 정합 + 학습 효율 backlog 해결 *3 영역 동시 변경*. 003 결과 보고 다음 단계 결정.
+- **C1 진입 시점 *재고*** — 300ep 영역에서 expert Full FT 의 과적합 위험 영역 완화. 003 결과가 *유의미 개선* 이면 C1 우선순위 ↑ (별도 spec 으로 진행). *비슷한 0/2* 면 C1 코드 우회 비용 대비 기대 효과 ↓ — 데이터 추가 (400ep) 또는 다른 hypothesis 우선.
+- **데이터 추가 수집 (310→400ep)** 계속 진행 가치 — M1 목표 도달 + 권장 영역 깊이 진입.
+
+**003 사후 시점 (현 시점, 2026-05-21)**: 003 결과 8/8 (100%) → "성능 향상 방법 고민" 영역 진입. 004+ 사이클의 결정은 [learning_log2.md](learning_log2.md) 가 담음.
+
+### 이관 5 — 2A 결정 근거 (원 model_config §3 "2A 결정 — A2")
+
+> 원 model_config §3 의 결정 근거는 *2026-05-15 시점 선택* 의 정당화이라 본 § 로 이관. model_config 의 §3 (현 카탈로그) 은 *현 권장값 + 일반 근거* 만 유지.
+
+**1. v1 검증 base**: leftarm_v1 가 A2 (`method: lora`, `target_modules: all-linear`, `r=16`) 로 학습 사이클을 돌렸음. step 부족 (500/5000) 이라 성능은 미검증이나 *학습 구조 자체는 검증됨*.
+
+**2. 변수 1개 조정 원칙**: 2A 는 v1 대비 **step 수만** 늘려 (500 → 20,000) 변수 1개 변경. 결과 해석 깔끔 (v1 의 미수렴 = step 부족이었나 vs 구조 문제인가 분리 가능).
+
+**3. VLM 부분 적응**: `all-linear` 로 VLM linear layer 에도 LoRA adapter → 우리 데이터에 약간 적응 (color grounding 강화 기대).
+
+**4. 메모리·시간 적당**: DGX 메모리 헤드룸 충분, 2A 학습이 시간 폭증하지 않아 2B 진행 시간 확보. (사후 실제: DGX OOM → prof_computer 이관 — [learning_log1.md §M1.5 중간점검 학습](learning_log1.md) 참조)
+
+### 이관 6 — hyperparameter 시도별 변경 이력 (원 model_config §4 표 안 시점 메모)
+
+> 원 model_config §4 의 hp 표 셀에 *시도 1 OOM 후 변경* 같은 시점 메모가 박혀있어 본 § 로 이관. *현 권장값* 자체는 model_config 가 유지.
+
+**num_workers**:
+
+- v1 / 2A 원 계획 (2026-05-15): `8` (DGX 코어 활용)
+- DGX 시도 1 OOM 후 축소: `8 → 2` (메모리 누수 주범으로 판단, wandb 증거상 GPU 12W idle → 보존할 활용도 없음)
+- prof_computer 환경에서 재조정: `2 → 4` (system RAM·VRAM 분리라 workers ↑ 가 GPU 메모리 영향 X)
+
+**prefetch_factor**:
+
+- 2A 원 계획: `2` (lerobot default)
+- DGX 시도 1 OOM 후 추가 축소: `2 → 1` (`num_workers × prefetch = 2 × 1 = 2 batch` buffer)
+- prof_computer 에서 회복: `1 → 2` (system RAM 압박 회피 여유)
+
+**dataset_return_uint8**:
+
+- v1 default: `false` (float32)
+- 2A 변경: `true` (float32 → uint8, IPC 1/4, GPU 변환 — 정확도 영향 0). DGX UMA 메모리 안정 목적.
+
+**persistent_workers**:
+
+- v1 default: `true`
+- 2A 변경: `false` (epoch 사이 워커 재시작, memory leak 위험 회피). 시도 1 단일 epoch 내 OOM 이라 효과 없었음 — 무해 유지.
+
+**batch_size**:
+
+- DGX 의도: `16`
+- prof_computer smoke 시도 1 (b16): CUDA driver OOM ([learning_log1.md §smoke 시도 1](learning_log1.md))
+- prof_computer smoke 시도 2 (b8 fp32): VRAM 94.82% — 본 학습 위험
+- prof_computer smoke 시도 3 (b8 bf16): VRAM 94.73% — bf16 효과 없음 확인
+- prof_computer smoke 시도 4 (b4 fp32): VRAM 51.79% — **M1.5 본 학습 채택**
+- 003 분기 smoke 1 (bf16+b4): VRAM 34.31% — bf16 작동 확정 (accelerate launch 후)
+- 003 분기 smoke 2 (bf16+b8): OOM (step 1) — attention transient peak 의 batch 비선형 영향
+- 003 분기 smoke 3 (bf16+b6): VRAM 79.52% — **003 본 학습 채택**
+
+**steps**:
+
+- DGX 의도: `20000` (batch 16 × 5 epoch on 60k frames)
+- M1.5 (batch 4): `75000` (sample 수 동등)
+- 003 (batch 6, 310ep dataset): `120000` (~4.39 epoch on 310ep)
+
+### 이관 7 — §7 "학습 실행 기록" 섹션 (원 model_config §7)
+
+> 원 model_config §7 "2A — 미실행 (대기)" 섹션은 2026-05-15 작성 시점의 *학습 실행 entry placeholder* 였고, 본인이 이미 ⚠️ outdated 인정 (DGX 시도 1·2·3 + prof_computer M1.5 → 003 실제 진행과 mismatch). 실제 실행 기록은 본 learning_log1.md (M1.5/002/003 entry) 가 이미 담음 → model_config 측 §7 은 **삭제 대상**.
+
+이관 보존 불필요 — 본 learning_log1.md 의 각 분기 entry 가 *원래 model_config §7 이 담아야 했던 내용* 의 정본.
+
+---
+
+## § era 종료 메모 (2026-05-21)
+
+> 본 § 는 *learning_log1 의 마지막 entry* — 이후 추가 없음. 후속 사이클은 [learning_log2.md](learning_log2.md) 가 담음.
+
+### 본 era (leftarm_v2 사이클) 의 정체
+
+[realplaying.md](../../../realplaying.md) M1~M4 로 정의된 *수집→학습→배포→추론→패키징* 사이클. M1.5 사이클의 prof_computer 이관 결정 이후 본 노드 (Windows 10 + WSL2 + RTX 3090) 가 학습 책임 전담.
+
+### era 종료 조건 충족 상태 (2026-05-21 시점 — era 종료 선언)
+
+| 조건 | 충족 여부 | 근거 |
+|---|---|---|
+| (1) 성능 도달 | ✅ | 003 분기 (310ep · A2 LoRA r=16 + bf16+b6 + sched_sync + empty=1) — Orin 단축 8/8 = **100%**. task1 3/3 (front 1, back 2) · task2 5/5 (front 2 — 캔 물 채움 1 포함, back 3 — 다중 perturbation 1 포함). 학습 분포 외 perturbation 4/4 견딤. |
+| (2) 재현 가능한 기록 유산 | ✅ | 사용자 결정 (2026-05-21): 별도 *재실행 패키징 문서* 신설 불필요. 본 era 흐름이 이미 *기존 문서 흐름* 으로 cold start AI 가 추적 가능 형태 확보. 검증 결과는 아래 *cold start 추적성 검증* 참조. |
+
+### cold start 추적성 검증 (2026-05-21)
+
+본 era 의 흐름을 *처음 만나는 AI* 가 *기존 문서만으로* 재현 가능한지 7 영역 점검:
+
+| 영역 | 추적 가능 여부 | 근거 |
+|---|---|---|
+| (a) 수집 명령·분포 | ✅ | `dgx/finetune/leftarm_v2/run_record.py` + [collection_log.md](../../../dgx/docs/finetune/leftarm_v2/collection_log.md) (task instruction · 차수 표 · 다양화 영역 컨벤션) |
+| (b) prof_computer 셋업 | ✅ | [prof_computer/scripts/setup_env.sh](../../scripts/setup_env.sh) (모든 설치 자동) + [prof_train_setting.md](../../../docs/storage/prof_train_setting.md) |
+| (c) 학습 분기 실행 | ✅ | 분기 디렉토리 self-contained + [finetune/leftarm_v2/README.md §3](../../finetune/leftarm_v2/README.md) 6-step 절차 |
+| (d) Orin 배포·추론 | ✅ | [orin/scripts/run_inference_leftarm_v2.sh](../../../orin/scripts/run_inference_leftarm_v2.sh) 5 subcommand (turnkey 에 근접) + `n_action_steps=50` 함정 자동 처리 |
+| (e) 수집 환경 물리 파라미터 (카메라 마운트·조명·작업영역) | ⚠️ 사용자 머릿속 + 차수 정성 메모만 존재 | *추론 불가 영역* — 다음 era 작성 가치 |
+| (f) HF Hub push 명령 (정확한 argv) | ⚠️ 사용자 암묵지 | *추론 가능하나 옵션 선택 기준 없음* — 다음 era 작성 가치 |
+| (g) 평가 시트 빈 템플릿 | ⚠️ 003 시트 복사·mimic 가능하나 명시 가이드 없음 | *복사 패턴 정착됨, 명시 가이드 없어도 운영 가능* — 다음 era 우선순위 낮음 |
+
+→ **본 era 종료 조건 (2) 충족** — (a)~(d) 의 4 영역이 cold start 추적 가능 + (e)(f)(g) 의 3 영역은 *기존 문서 흐름으로 어느 정도 재구성 가능* + *완전 명시는 다음 era 의 *수집 환경 표준화* 또는 *시연장 재실행* 시점에 작업 가치 ↑*.
+
+### 본 era 의 핵심 학습 (다음 era 의 *유산*)
+
+1. **학습 방법** — A2 (VLM LoRA + expert LoRA, r=16, all-linear) 가 본 데이터 양 영역 (100~310ep) 에서 *유효성 확정*. A1 (VLM frozen) 은 base smolvla 의 우리 환경 0-shot 무반응 으로 *비추 확정* ([M1.5 추론 후 가설 분리 검증 사이클](#m15-추론-후-가설-분리-검증-사이클--2026-05-18--진행-중) 참조).
+2. **데이터 양 영역** — 100ep (M1.5/002 = 0/2) 와 310ep (003 = 8/8) 사이가 *결정적 임계* — *310ep 이 본 task·robot·환경 조합에서 성능 충족 영역의 *하한* 임을 확정*. *원 400ep 목표* 의 가설 (성능 부족 ← 데이터 부족) 은 *310ep 시점에서 이미 반증*.
+3. **학습 효율 변수** — bf16 (`accelerate launch --mixed_precision=bf16` 진입) + batch 6 + scheduler_decay_steps 동기화 의 3 변수가 *VRAM 활용·후반 학습 정체 해결* 에 기여. `--policy.use_amp=true` 단독은 효과 없음 확정.
+4. **dominant 변수 미분리** — 003 의 5변수 묶음 변경의 *어느 변수가 dominant 인지* 단일 변수 ablation 미수행. *추정*: 데이터 양 110→310ep 이 1순위 (002 결과 단일 변수 empty_cameras=1 무효 사실 기준). 단 *학습 효율 3변수* 의 기여도는 ablation 별도 사이클 영역.
+5. **명명 4-계층 분리** — 본 era 후반 (2026-05-21 정정) 에 명명 체계 명문화. *마일스톤 / 학습 방법 / hp 인자 / 분기 인스턴스* 4계층이 *독립* 임을 [model_config.md §0](../model_config.md) 에 정본화. *우연한 1대1 매핑* ("M1.5 = 001", "A2 = 003") 에 대한 cold start 혼란 회피.
+
+### 본 era 의 잔여 한계 (다음 era 진입 시 검토 영역)
+
+- **trial 수 통계 한계** — 003 의 8/8 은 단축 평가. 이항분포 95% CI 하한 ~63% — *진짜 100%* 와 *우연한 8연승* 분리 불가. 다음 era 에서 *확장 평가* (20+ trial) 또는 *분포 변화 robustness 매트릭스* 가치.
+- **학습 분포 외 robustness** — 4 trial perturbation 견딤은 *정성 신호* 영역. 통계적 robustness 측정은 별도 사이클.
+- **M1 잔여 (310→400ep)** — 본 era 종료에는 불필요. 다음 era 의 *데이터 보강 영역* 으로 위임. *데이터 추가의 동기* 는 *성능 충족 영역의 *확장* (다른 환경·다른 사람·다른 조명)* 이지 *현 환경 성능 도달* 이 아님.
+- **dominant 변수 ablation** — 5변수 묶음의 *어느 변수가 핵심* 인지 단일 변수 분리 미수행. 다음 era 의 *학습 효율 최적화* 영역.
+- **명시 미정의 영역 3개** — 위 *cold start 추적성 검증* 표의 (e)(f)(g): 수집 환경 물리 파라미터 / HF push 명령 양식 / 평가 시트 빈 템플릿. 본 era 운영엔 무해 (사용자 암묵지 + 기존 시트 mimic 으로 충분) 였으나 *시연장 재실행 시점* 또는 *다른 사람 합류 시점* 에 명시 가치 ↑.
+
+### era 마감 사후 작업 (본 § 작성 시점에 함께 진행)
+
+| 작업 | 결과 |
+|---|---|
+| [realplaying.md](../../../realplaying.md) era 종료 조건 신설 + M1 retro 정정 + M1.5/M2/M3 완료 + M4 부분 완료 | ✅ |
+| [model_config.md §0](../model_config.md) 4-계층 명명 컨벤션 + 분기 토큰 룰 | ✅ |
+| [finetune/leftarm_v2/README.md §2](../../finetune/leftarm_v2/README.md) 명명 룰 redirect + 분기 표 갱신 + "단일 변수 원칙" 정정 | ✅ |
+| [learning_log2.md](learning_log2.md) cold start 진입 안내 + 4-계층 redirect | ✅ |
+
+### 다음 era 진입 시점
+
+**본 era 종료 (2026-05-21)**. 최종 상태가 *learning_log1 + realplaying* 양쪽에 freeze. 다음 era 의 정의 (범위·목표·새 마일스톤 체계) 는 *현재 미정* — 본 § 에서 *언급하지 않음*. 후속 사이클은 [learning_log2.md](learning_log2.md) 에 누적, 다음 era 정의는 *그 시점 사용자 결정* 영역.

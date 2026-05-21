@@ -334,7 +334,7 @@ M2 — 학습 (일반 환경)
 
 - Local ckpt: `~/prof_computer_runs/leftarm_v2_2a_pc_2026-05-17_12-51-51/` (75 ckpt)
 - HF Hub: [BaboGaeguri/leftarm_v2_A2_pc_2026-05-17](https://huggingface.co/BaboGaeguri/leftarm_v2_A2_pc_2026-05-17) (46 MB, public, LoRA adapter only)
-- 상세 사이클 로그: [smolVLA/prof_computer/docs/learning_log.md](../../prof_computer/docs/learning_log.md)
+- 상세 사이클 로그: [smolVLA/prof_computer/docs/leftarm_v2/learning_log1.md](../../prof_computer/docs/leftarm_v2/learning_log1.md) (M1.5~003 아카이브) · [learning_log2.md](../../prof_computer/docs/leftarm_v2/learning_log2.md) (현행)
 
 ### 다음 사이클
 

@@ -171,7 +171,7 @@ DataCollector venv 상세는 ~~`docs/storage/07_datacollector_venv_setting.md`~~
 | GPU temp peak | 83°C |
 | loss min / final | 0.013 / 0.04 (DGX 시도 1 step 350 loss 0.292 대비 압도적 수렴) |
 
-→ `prereq spec 02_prereq_dataset_video_to_image` 가설 (torchcodec 정상 환경에선 DGX OOM 재현 불가) 직접 증명. 상세: `smolVLA/prof_computer/docs/learning_log.md`.
+→ `prereq spec 02_prereq_dataset_video_to_image` 가설 (torchcodec 정상 환경에선 DGX OOM 재현 불가) 직접 증명. 상세: `smolVLA/prof_computer/docs/leftarm_v2/learning_log1.md`.
 
 ## 8) 추가 확인 필요 항목
 

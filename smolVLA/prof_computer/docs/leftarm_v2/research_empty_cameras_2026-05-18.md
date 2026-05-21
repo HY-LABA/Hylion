@@ -3,9 +3,9 @@
 > 작성: 2026-05-18 | researcher
 > 호출자: 메인 — M1.5 (0/2 실패) 사후 분석 + 진행 중인 camera_empty 분기 학습 (~8h) 의 시간 가치 판단 + 3번째 카메라 추가 수집 우선순위 결정
 > 관련 spec: [`prof_computer/docs/model_config.md`](../model_config.md)
-> 관련 사이클: M1.5 (2026-05-17) — [learning_log.md](learning_log.md), [a2_eval_2026-05-17.md](../../../orin/docs/leftarm_v2/a2_eval_2026-05-17.md), [base_eval_2026-05-17.md](../../../orin/docs/leftarm_v2/base_eval_2026-05-17.md)
+> 관련 사이클: M1.5 (2026-05-17) — [learning_log1.md](learning_log1.md), [a2_eval_2026-05-17.md](../../../orin/docs/leftarm_v2/a2_eval_2026-05-17.md), [base_eval_2026-05-17.md](../../../orin/docs/leftarm_v2/base_eval_2026-05-17.md)
 >
-> **사후 메모 (2026-05-19 추가)**: 본 보고서 작성 시점 *진행 중* 이었던 분기 학습 (002_a2_100ep_empty1, run `8jkr7edb`) 은 2026-05-18 19:25 완주 (9시간 22분, 75000/75000 step). Orin 추론 비교 평가는 별도 사이클. 본 보고서의 *시점* 표현 (진행 중, ~8h 등) 은 *2026-05-18 오전 분석 시점* 기록으로 유지 — 결과 갱신은 [learning_log.md §camera_empty 본 학습](learning_log.md) 참조.
+> **사후 메모 (2026-05-19 추가)**: 본 보고서 작성 시점 *진행 중* 이었던 분기 학습 (002_a2_100ep_empty1, run `8jkr7edb`) 은 2026-05-18 19:25 완주 (9시간 22분, 75000/75000 step). Orin 추론 비교 평가는 별도 사이클. 본 보고서의 *시점* 표현 (진행 중, ~8h 등) 은 *2026-05-18 오전 분석 시점* 기록으로 유지 — 결과 갱신은 [learning_log1.md §camera_empty 본 학습](learning_log1.md) 참조.
 > 기존 자료 (중복 작업 회피): `smolVLA/docs/work_flow/context/history/02_prereq_dataset_video_to_image/research/lerobot_smolvla_training_best_practice.md` (학습 best practice 일반 — 본 보고서는 그 보고서의 *카메라 수 mismatch 공백 영역* 보강)
 
 ---
@@ -426,7 +426,7 @@ ggando 가 *empty_cameras 명시 X* 로 100% 성공했다면, 다른 변수 (wor
 - [Xavier O'Keefe — Fine Tuning SmolVLA for New Environments (Medium)](https://medium.com/correll-lab/fine-tuning-smolvla-for-new-environments-code-included-af266c56d632)
 
 ### 우리 프로젝트 자료 (인용)
-- [`prof_computer/docs/leftarm_v2/learning_log.md`](learning_log.md) — M1.5 학습 상세
+- [`prof_computer/docs/leftarm_v2/learning_log1.md`](learning_log1.md) — M1.5 학습 상세 (M1.5~003 아카이브)
 - [`orin/docs/leftarm_v2/a2_eval_2026-05-17.md`](../../../orin/docs/leftarm_v2/a2_eval_2026-05-17.md) — M1.5 ckpt 추론 0/2
 - [`orin/docs/leftarm_v2/base_eval_2026-05-17.md`](../../../orin/docs/leftarm_v2/base_eval_2026-05-17.md) — base smolvla_base 0-shot 무반응
 - [`prof_computer/docs/model_config.md`](../model_config.md) — 학습 방법 매트릭스 + 결정 근거
