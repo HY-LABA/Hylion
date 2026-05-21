@@ -1,10 +1,10 @@
 #!/usr/bin/env python
-"""DGX 학습 체크포인트 호환성 검증 (Orin 측 추론 환경)
+"""학습 체크포인트 호환성 검증 (Orin 측 추론 환경)
 
-실행 위치: Orin (~/smolvla/orin/examples/tutorial/smolvla/load_checkpoint_test.py)
+실행 위치: Orin (~/smolvla/orin/tests/load_checkpoint_test.py)
 사용:
     python load_checkpoint_test.py                                       # default = lerobot/smolvla_base (사전학습)
-    python load_checkpoint_test.py --ckpt-path /path/to/pretrained_model # DGX 학습 체크포인트
+    python load_checkpoint_test.py --ckpt-path /path/to/pretrained_model # 학습 체크포인트 (prof_computer/DGX)
 
 검증 항목:
     1. SmolVLAPolicy.from_pretrained(ckpt_path) 로드
@@ -13,7 +13,7 @@
     4. action shape (1, 50, 6) 또는 (1, 50, 32) padding 출력 확인
     5. exit code 0 / 1
 
-결정 근거: 02_dgx_setting TODO-10 / orin/examples/tutorial/smolvla/smoke_test.py 와 형제
+orin/tests/smoke_test.py 와 형제:
     smoke_test.py 가 "Orin 환경 자체 검증" 이라면 본 스크립트는 "체크포인트 호환성 검증".
 """
 

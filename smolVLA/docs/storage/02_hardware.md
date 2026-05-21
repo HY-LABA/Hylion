@@ -308,7 +308,7 @@ leader + follower **1쌍 기준** 모터 합계:
 | 노드 | 키 이름 | 파일 | 비고 |
 |---|---|---|---|
 | DGX (데이터 수집) | `wrist_left`, `overview` | `dgx/interactive_cli/flows/record.py` `cameras_str` (legacy 이관) | lerobot-record `--robot.cameras` draccus 인자 |
-| Orin (추론) | `top`, `wrist` | `orin/config/cameras.json`, `orin/inference/hil_inference.py` | hil_inference.py SLOT_MAP → smolvla_base `camera1/camera2` |
+| Orin (추론) | `top`, `wrist` | `orin/config/cameras.json`, `orin/inference/leftarm_v2_inference.py` | rename_map: top/wrist → smolvla `camera1/camera2` |
 
 두 노드가 카메라를 독립적으로 사용 (수집 시 DGX 키 → 데이터셋 저장, 추론 시 Orin 키 → policy forward). 노드 간 직접 키 공유 없으므로 현재 불일치는 동작 무관.
 
@@ -317,8 +317,8 @@ leader + follower **1쌍 기준** 모터 합계:
 | 검토 영역 | 결과 |
 |---|---|
 | `dgx/record.py --robot.cameras` overview vs wrist 해상도 | 둘 다 640×480 + MJPG 적용 중 — U20CAM-720P 640×480 지원, MJPG 지원. 코드 분기 불필요 |
-| `orin/config/cameras.json` slot 별 fourcc 분기 | cameras.json 은 index + flip 만 저장. hil_inference.py 는 width=640, height=480, fps=30 하드코딩. U20CAM-720P 640×480@30fps 지원. 분기 불필요 |
-| `orin/inference/hil_inference.py` flip 기본값 | `set()` (플립 없음) 기본값 유지. wrist 물리 장착 방향은 실물 셋업 시 확인 후 `cameras.json.wrist.flip` 또는 `--flip-cameras wrist` 로 적용 |
+| `orin/config/cameras.json` slot 별 fourcc 분기 | cameras.json 이 width/height/fps/fourcc/rotation 모두 저장. `leftarm_v2_inference.py` 가 이를 읽어 OpenCVCameraConfig 구성. 분기 불필요 |
+| `orin/config/cameras.json` flip 기본값 | `wrist.flip: true` 권장 (실 셋업 wrist 카메라 상하반전 보정). 또는 `--flip-cameras wrist` CLI 인자로 적용 |
 | §5-2 fourcc=MJPG 패턴 | 두 카메라 모두 MJPEG 지원 — DGX record.py 이미 fourcc=MJPG 강제 적용 중. 변경 불필요 |
 
 ### 10-3) 잠재 리스크 (BACKLOG 추적)

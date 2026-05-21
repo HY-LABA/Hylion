@@ -1,8 +1,6 @@
 # orin/checkpoints/ — 학습된 정책 ckpt 보관
 
-> 책임: DGX 에서 학습된 smolVLA 정책 ckpt 를 시연장 Orin 측에 보관. `hil_inference.py` 등 추론 스크립트가 본 디렉터리에서 ckpt 를 로드.
-> 신설: 04_infra_setup TODO-O2 (2026-04-30)
-> 첫 ckpt 도착 시점: 05_leftarmVLA TODO-13
+> 책임: prof_computer/DGX 에서 학습된 SmolVLA 정책 ckpt 를 Orin 측에 보관. `leftarm_v2_inference.py` 등 추론 스크립트가 본 디렉터리에서 ckpt 를 로드.
 
 ---
 
@@ -11,58 +9,60 @@
 ```
 orin/checkpoints/
 ├── README.md                    # 본 문서 (git 추적)
-└── <run_name>/                  # gitignore — 학습 run 단위
-    └── <step>/                  # 학습 step 단위 (예: 050000, last)
-        └── pretrained_model/
-            ├── config.json
-            ├── train_config.json
-            └── model.safetensors
+└── <repo_id_or_run_name>/       # gitignore — ckpt 단위
+    └── pretrained_model/
+        ├── config.json
+        ├── train_config.json
+        ├── adapter_model.safetensors    # LoRA adapter (A2 분기)
+        └── adapter_config.json
 ```
 
-`<run_name>` 은 DGX 측 `dgx/outputs/<run_name>/` 와 일치. `<step>` 은 `last` 또는 학습 step 수.
+`<repo_id_or_run_name>` 은 HF Hub repo 명 (예: `BaboGaeguri/leftarm_v2_003_a2_310ep_empty1_sched_sync_bf16_b6`) 또는 학습 run name (`leftarm_v2_<NNN>_<pass>_<ts>`).
 
 ## 예시
 
 ```
 orin/checkpoints/
 ├── README.md
-├── leftarm_v1/
-│   ├── 050000/
-│   │   └── pretrained_model/
-│   │       ├── config.json
-│   │       ├── train_config.json
-│   │       └── model.safetensors
-│   └── last/
-│       └── pretrained_model/
-│           └── ... (동일)
-└── biarm_v1/
-    └── 100000/
-        └── pretrained_model/
-            └── ...
+├── leftarm_v2_A2_pc_2026-05-17/         # 001 분기 ckpt
+│   └── pretrained_model/
+│       ├── config.json
+│       ├── train_config.json
+│       ├── adapter_model.safetensors
+│       └── adapter_config.json
+└── leftarm_v2_003_a2_310ep_empty1_sched_sync_bf16_b6/  # 003 분기 ckpt
+    └── pretrained_model/
+        └── ...
 ```
 
 ---
 
-## 전송 도구
+## 다운로드 도구
 
-DGX → 시연장 Orin 의 ckpt 전송은 `scripts/sync_ckpt_dgx_to_orin.sh` (devPC 경유 2-hop):
+HF Hub 에서 직접 다운로드 (prof_computer 가 학습 후 push 한 ckpt):
 
 ```bash
-# devPC 에서 실행
-bash scripts/sync_ckpt_dgx_to_orin.sh --run leftarm_v1 --step last
+hf download BaboGaeguri/leftarm_v2_003_a2_310ep_empty1_sched_sync_bf16_b6 \
+  --local-dir ~/smolvla/orin/checkpoints/leftarm_v2_003_a2_310ep_empty1_sched_sync_bf16_b6/pretrained_model
 ```
 
-- 02_dgx_setting TODO-10b 에서 검증된 절차 (903 MB safetensors byte-exact 일치 PASS)
-- 시연장 Orin 의 네트워크 격리 시 우회 경로는 04 TODO-T2 에서 재검토
+또는 `scripts/run_inference_leftarm_v2.sh download` subcommand 사용:
+
+```bash
+CKPT_REPO_ID=BaboGaeguri/leftarm_v2_003_a2_310ep_empty1_sched_sync_bf16_b6 \
+  ~/smolvla/orin/scripts/run_inference_leftarm_v2.sh download
+```
+
+→ ckpt 다운로드 + `n_action_steps` 자동 점검·수정.
 
 ## ckpt 호환성 검증
 
-전송 후 `orin/examples/tutorial/smolvla/load_checkpoint_test.py` 로 호환성 PASS 확인:
+전송 후 `tests/load_checkpoint_test.py` 로 호환성 PASS 확인:
 
 ```bash
 source ~/smolvla/orin/.hylion_arm/bin/activate
-python ~/smolvla/orin/examples/tutorial/smolvla/load_checkpoint_test.py \
-    --ckpt-path ~/smolvla/orin/checkpoints/leftarm_v1/last/pretrained_model/
+python ~/smolvla/orin/tests/load_checkpoint_test.py \
+    --ckpt-path ~/smolvla/orin/checkpoints/<repo_id>/pretrained_model/
 ```
 
 forward + action shape `(1, 50, *)` 출력이면 OK.
@@ -71,15 +71,14 @@ forward + action shape `(1, 50, *)` 출력이면 OK.
 
 ## git 정책
 
-- **본 README 만 추적** — `<run_name>/` 하위는 gitignore (`orin/checkpoints/<run_name>/` 패턴)
-- 사유: ckpt 파일 크기 (수백 MB ~ GB), 학습 사이클별로 새 run 생성
+- **본 README 만 추적** — `<repo_id_or_run_name>/` 하위는 gitignore (`orin/checkpoints/*/` 패턴)
+- 사유: ckpt 파일 크기 (수십 MB ~ GB), 학습 사이클별로 새 ckpt 생성
 
 ---
 
 ## 참고
 
-- `docs/storage/07_orin_structure.md` §2 (checkpoints/ 컴포넌트 책임) + §4-1 (devPC sync hub)
-- `docs/storage/06_dgx_venv_setting.md` §10 (DGX → Orin 체크포인트 전송 절차, 02 TODO-10b 검증)
-- `docs/storage/legacy/arm_2week_plan/work_flow/specs/history/04_infra_setup.md` TODO-T2 (시연장 Orin 의 ckpt 전송 경로 재확인)
-- `orin/examples/tutorial/smolvla/load_checkpoint_test.py` (ckpt 호환성 검증)
-- `orin/examples/tutorial/smolvla/hil_inference.py` (ckpt 로드 후 실 SO-ARM 추론 — 05 TODO-14 에서 ckpt 인자 추가 예정)
+- 추론 entry: [`orin/inference/README.md`](../inference/README.md)
+- 학습 ckpt 출처: `prof_computer/finetune/leftarm_v2/branches/<NNN>_<방법>_<인자>/`
+- 호환성 검증: [`orin/tests/README.md`](../tests/README.md) → `load_checkpoint_test.py`
+- 명명 컨벤션: [`prof_computer/README.md` §7](../../prof_computer/README.md)

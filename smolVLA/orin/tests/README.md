@@ -1,39 +1,42 @@
 # orin/tests/ — 시나리오 점검 + 환경 게이트
 
-> 책임: SO-ARM 포트 / 카메라 인덱스·flip / venv·CUDA 라이브러리 등 Orin 운영 전 환경을 시나리오 단위로 점검. 결과는 `orin/config/` 의 cached config 와 비교/갱신.
-> 신설: 04_infra_setup TODO-O2 (2026-04-30)
-> 형제: `dgx/scripts/preflight_check.sh` (DGX 측 학습 전 자원 점검)
+> 책임: 시연장 진입 전 SO-ARM 포트 / 카메라 인덱스·flip / venv·CUDA / ckpt 호환성 등 *Orin 운영 전제* 를 점검. 결과는 `orin/config/` 의 cached config 와 비교/갱신.
+> 형제: `orin/docs/legacy/` (옛 era 의 latency·baseline 측정 도구 보존)
 
 ---
 
-## 두 모드
+## check_hardware 의 두 모드
 
 | 모드 | 동작 | 사용 시점 |
 |---|---|---|
 | `--mode first-time` | 모든 항목 새로 발견 + 사용자 확인 + `orin/config/` 에 cache 저장 | 초기 셋업 / 시연장 이동 후 / 하드웨어 교체 후 |
 | `--mode resume` | `orin/config/` 의 cached 값으로 검증만 (변동 시 FAIL) | 이후 매 운영 진입 직전 |
 
-운영 스크립트 (`hil_inference.py`, `record_dataset.sh` 등) 가 시작 시 `tests/check_hardware.sh --mode resume --quiet` sub-call 로 게이트 통과 후 진입.
+운영 스크립트 (`leftarm_v2_inference.py` 등) 가 시작 시 `tests/check_hardware.sh --mode resume --quiet` sub-call 로 게이트 통과 후 진입하는 게 *의도된 흐름*. (현 시점엔 wrapper 가 자동 호출 안 함 — 사용자 수기 호출이 표준)
 
 ---
 
-## 자산 (현재)
+## 자산 (현행 — 시연장 운영 도구)
 
-| 파일 | 책임 | 출처 |
+| 파일 | 책임 |
+|---|---|
+| `check_hardware.sh` | **단일 진입점** — first-time/resume 두 모드로 venv·CUDA·SO-ARM 포트·카메라 인덱스·flip 통합 점검 |
+| `configs/first_time.yaml` | first-time 모드의 점검 항목·임계치 정의 |
+| `configs/resume.yaml` | resume 모드의 cached 값 검증 룰 정의 |
+| `smoke_test.py` | venv·CUDA·import·smolvla forward 환경 검증 (hardware 없이 동작) |
+| `load_checkpoint_test.py` | 임의 경로 ckpt 호환성 검증 (prof_computer/DGX → Orin 전송 후 forward + action shape) |
+| `diagnose_motor_encoder.py` | SO-ARM 모터 encoder 진단 (관절별 raw Present_Position read·검증) — 모터 이상 시 디버깅 도구 |
+
+---
+
+## Legacy 자산 (참조용 — `orin/docs/legacy/`)
+
+| 파일 | 옛 책임 | 이관 사유 |
 |---|---|---|
-| `diagnose_motor_encoder.py` | SO-ARM 모터 encoder 진단 (관절별 위치 read·검증) | 01_teleoptest TODO-03a 산출물 (2026-04-27 작성, 04 TODO-O2 에서 `orin/calibration/` 으로부터 이관) |
-| `smoke_test.py` | venv·CUDA·import·smolvla forward 환경 검증 | 01_teleoptest TODO-01 산출물 (04 TODO-O2b 에서 `orin/examples/tutorial/smolvla/` 로부터 이관) |
-| `load_checkpoint_test.py` | 임의 경로 ckpt 호환성 검증 (DGX→Orin 전송 후 forward + action shape) | 02_dgx_setting TODO-10b 산출물 (04 TODO-O2b 에서 이관) |
-| `inference_baseline.py` | 더미 입력 1회 forward (사전학습 분포 미러링 + action shape/dtype/range 출력) | 03_smolvla_test_on_orin TODO-06 산출물 (04 TODO-O2b 에서 이관) |
-| `measure_latency.py` | latency p50/p95 + RAM(UMA) peak 측정. `--num-steps` 인자로 flow matching steps 분기 | 03_smolvla_test_on_orin TODO-06 산출물 (04 TODO-O2b 에서 이관) |
+| `orin/docs/legacy/inference_baseline.py` | 더미 입력 1회 forward (사전학습 분포 미러링 + action shape/dtype/range 출력) | `smoke_test.py` + `load_checkpoint_test.py` 가 동일 책임 흡수. 현 era 호출 0 |
+| `orin/docs/legacy/measure_latency.py` | latency p50/p95 + RAM peak 측정. `--num-steps` 인자로 flow matching steps 분기 | 현 era 평가 흐름 외부 (003 의 trial 평가 + wandb 메트릭으로 진행). 다음 era 의 성능 분석 시점에 재활용 가능 |
 
-## 자산 (예정 — 04 진행 중 추가)
-
-| 파일 | 책임 | 추가 시점 |
-|---|---|---|
-| `check_hardware.sh` | 단일 진입점. 4단계 점검 (venv·CUDA / SO-ARM 포트 / 카메라 인덱스 / 카메라 방향) | TODO-G1 |
-| `configs/first_time.yaml` | first-time 모드의 점검 항목·임계치 정의 | TODO-G1 |
-| `configs/resume.yaml` | resume 모드의 cached 값 검증 룰 정의 | TODO-G1 |
+→ 두 파일은 현 시연·평가에서 호출 X. 다음 era 진입 시 패턴 참조 또는 재활용 가능.
 
 ---
 
@@ -48,6 +51,6 @@
 
 ## 참고
 
-- `docs/storage/07_orin_structure.md` §2 (tests/ 컴포넌트 책임) + §3 (마일스톤별 책임 매트릭스)
-- `docs/storage/legacy/arm_2week_plan/work_flow/specs/history/04_infra_setup.md` TODO-G1 / TODO-G2 (실 구현·검증)
-- BACKLOG 03 #14·#15·#16 — 본 게이트가 해소할 환경 이슈 4건 (venv import / 카메라 인덱스 / wrist flip)
+- 추론 운영 entry: [`orin/inference/README.md`](../inference/README.md)
+- Legacy 자산: [`orin/docs/legacy/README.md`](../docs/legacy/README.md)
+- 명명 컨벤션: [`prof_computer/README.md` §7](../../prof_computer/README.md)
