@@ -214,6 +214,9 @@ Legacy/
 # Exception: smolVLA/dgx/legacy/ 는 DGX 학습 시도 보존 영역 (의도된 추적 대상 — 2026-05-18 도입)
 !smolVLA/dgx/legacy/
 !smolVLA/dgx/legacy/**
+# Exception: smolVLA/orin/docs/legacy/ 는 leftarm_v2 era 종료 시 보존된 옛 inference entry (의도된 추적 대상 — 2026-05-21 도입)
+!smolVLA/orin/docs/legacy/
+!smolVLA/orin/docs/legacy/**
 
 .mp3
 .wav
