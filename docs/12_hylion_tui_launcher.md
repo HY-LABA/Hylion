@@ -46,7 +46,11 @@
 |---|---|---|---|
 | **Stage 1 · 초기 셋팅** | preflight · CAN up · 관절 캘리브 | **캘리브 시에만** (로봇 옆) | ~3분 |
 | **Stage 2 · Cold Start** | Jetson 데몬 점검 + NUC bridge / bhl-lowlevel / bhl-policy 기동 | 없음 (노트북에서) | ~15초 |
-| **Stage 3 · 전체 프로그램 실행** | Jetson coordinator (`run_coordinator.sh`) foreground | 음성 인터랙션 | 시연 끝까지 |
+| **Stage 3 · 전체 프로그램 실행** | Jetson `hylion-coordinator` tmux 세션 + attach | 음성 인터랙션 | 시연 끝까지 |
+
+> Stage 3 은 coordinator 를 Jetson tmux 세션(`hylion-coordinator`) 안에 띄운다.
+> 노트북 SSH 가 끊겨도 coordinator 는 Jetson 에서 계속 동작 → 다른 노트북에서
+> `--attach` 한 줄로 끊김 없이 인계 가능 (§3.4 참고).
 
 각 단계의 step 정의는 [scripts/hylion-tui.py](../scripts/hylion-tui.py) 의
 `build_stages()` 참고.
@@ -156,31 +160,61 @@ python3 scripts/hylion-tui.py --no-confirm
 ### 3.3 상태 확인 / 정리
 
 ```bash
-# 지금 NUC tmux 세션·포트·Jetson coordinator 가 어떤 상태인가
+# 지금 어느 세션이 살아있나 (Jetson coordinator + NUC 3개)
 python3 scripts/hylion-tui.py --status
 
-# NUC 의 hylion-* tmux 세션을 전부 죽이고 처음부터 다시 시작하고 싶다
+# tmux 세션 정리 (NUC 3개 / Jetson coordinator 각각 따로 확인)
 python3 scripts/hylion-tui.py --reset
 ```
 
-### 3.4 살아 있는 tmux 세션 직접 들여다보기 (디버그)
+### 3.4 노트북 교체 — 끊김 없이 인계 (배터리 dying 시나리오)
+
+Stage 3 의 coordinator 는 Jetson tmux 안에서 도므로 노트북 SSH 가 끊겨도 죽지
+않는다. 다른 노트북에서 한 줄로 이어 받기:
 
 ```bash
-# 라이브 출력 보고 싶으면
+# 노트북 A (배터리 잔량 OK)
+python3 scripts/hylion-tui.py
+# → Stage 1, 2 완료 후 Stage 3 에서 'hylion-coordinator' tmux 세션 attach
+# → 한참 시연 중...
+
+# [노트북 A 배터리 사망 ⚡  → SSH TCP 끊김]
+# Jetson tmux 안의 coordinator 는 그대로 음성 대기 / 대화 history 보존.
+# NUC tmux 3개 도 그대로.
+
+# 노트북 B (새 노트북, pip install rich + ssh config 동일)
+python3 scripts/hylion-tui.py --attach
+# → Stage 1·2 SKIP, 바로 tmux attach. 끊김 0.
+# → 직전 4 턴 LLM 컨텍스트 그대로. "아까 그거 다시 해줘" 도 통함.
+```
+
+`--attach` 가 하는 일은 단 한 줄:
+`ssh -t jetson tmux attach -d -t hylion-coordinator` — `-d` 는 노트북 A 의
+좀비 SSH 가 아직 TCP timeout 전이라 잔존해도 떼고 우리가 가져오게 함.
+
+**tmux 안에서의 키:**
+- `Ctrl+B → d` : detach. coordinator 살려두고 노트북 셸 복귀. 다시 붙으려면 `--attach`.
+- `Ctrl+C`    : coordinator 본체에 SIGINT 전달 → 정상 종료 (tmux 세션도 닫힘).
+
+### 3.5 살아 있는 tmux 세션 직접 들여다보기 (디버그)
+
+```bash
+# 라이브 출력 보고 싶으면 (read-only, 끄지 않음)
 ssh -t nuc tmux attach -t hylion-bhl-policy
-#   detach: Ctrl+B, d
-#   세션 그대로 살려둠 (kill 아님)
+ssh -t jetson tmux attach -t hylion-coordinator
+#   detach: Ctrl+B, d  (세션 그대로 살려둠)
 ```
 
 세션 이름:
 
-| 세션 | 무엇 |
-|---|---|
-| `hylion-bridge` | `python -m nuc.bhl.bridge` (TCP :9000, UDP :10011) |
-| `hylion-bhl-lowlevel` | `make run` (C++ 5스레드, 250Hz control) |
-| `hylion-bhl-policy` | `rl_controller.py` (ONNX 25Hz 추론) |
+| 호스트 | 세션 | 무엇 |
+|---|---|---|
+| Jetson | `hylion-coordinator` | `run_coordinator.sh` (메인 루프) |
+| NUC | `hylion-bridge` | `python -m nuc.bhl.bridge` (TCP :9000, UDP :10011) |
+| NUC | `hylion-bhl-lowlevel` | `make run` (C++ 5스레드, 250Hz control) |
+| NUC | `hylion-bhl-policy` | `rl_controller.py` (ONNX 25Hz 추론) |
 
-각 세션의 stdout 은 NUC 의 `/tmp/<session>.log` 에도 tee 됩니다.
+각 세션의 stdout 은 해당 머신의 `/tmp/<session>.log` 에도 tee 됩니다.
 
 ---
 
@@ -210,8 +244,17 @@ ssh nuc     tmux new -d -s hylion-bhl-policy   "python -m ...rl_controller"
 ### Stage 3
 
 ```
-ssh -t jetson  cd ~/Hylion && bash scripts/run_coordinator.sh
-              ↳ foreground 인계. Ctrl+C 로 종료하면 TUI 로 복귀.
+ssh    jetson  tmux new -d -s hylion-coordinator "bash scripts/run_coordinator.sh"
+ssh -t jetson  tmux attach -d -t hylion-coordinator
+              ↳ SSH 끊겨도 tmux 안의 coordinator 는 그대로.
+              ↳ Ctrl+B,d 로 detach (살려둠) · Ctrl+C 로 종료 (세션 닫음).
+```
+
+### --attach (Stage 1·2 건너뛰고 바로 인계)
+
+```
+ssh -t jetson  tmux attach -d -t hylion-coordinator
+              ↳ 다른 노트북에서 한 줄. -d 는 잔존 클라이언트 detach 후 가져오기.
 ```
 
 ---

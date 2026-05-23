@@ -1291,3 +1291,33 @@
   - `--stage 2 --dry-run` → 실제 NUC tmux 세션 띄우기까지 검증.
   - NUC 의 BHL 리포 경로가 기본값과 다르면 `HYLION_NUC_BHL_REPO` export.
 
+### 노트북 교체 끊김 0 — coordinator tmux 패치 (2026-05-23)
+
+- 오늘 변경 요약:
+  - Stage 3 의 coordinator 를 `ssh -t bash …` 포그라운드 인계 → **Jetson tmux
+    세션 `hylion-coordinator` 안에서 실행 + `tmux attach -d` 로 보기** 방식
+    으로 전환. 사용자가 "노트북 여러 대로 배터리 교체 가능?" 질문 후 적용.
+    핵심은 coordinator 의 부모를 sshd 가 아닌 tmux 로 만드는 것 — 메모리·GPU
+    부담은 0 에 가깝고 (tmux 본체 ~3MB) coordinator 자체는 원래부터 Jetson
+    에서 도는 프로세스라 위치 변화 없음.
+  - 효과: 노트북 배터리 사망/wifi 끊김 시 SSH 끊기지만 coordinator 는
+    그대로 살아 있음 → 새 노트북에서 `--attach` 한 줄로 끊김 0 인계.
+    LLM history (최근 4 턴), session_id, BHL FSM 상태 모두 보존.
+  - 추가된 옵션: `--attach` (Stage 1·2 SKIP 후 바로 attach), `_ensure_tmux`
+    Jetson host 도 검사, `--status` 가 Jetson coordinator tmux 도 표시,
+    `--reset` 이 NUC 와 Jetson coordinator 를 따로 묻고 정리.
+  - tmux 키: Ctrl+B,d 로 detach (살려둠), Ctrl+C 로 종료 (세션도 닫힘).
+  - docs/12_hylion_tui_launcher.md 에 §3.4 "노트북 교체" 시나리오 추가,
+    §4 의 Stage 3 SSH 호출 시퀀스 갱신, 세션 표에 Jetson 행 추가.
+  - README.md 의 빠른 시작 절에 `--attach` 옵션 + 끊김 0 설명 추가.
+- 테스트 결과:
+  - `python3 -m py_compile scripts/hylion-tui.py` → OK.
+  - `python3 scripts/hylion-tui.py --help` → `--attach` 신규 옵션 노출 확인.
+  - 실제 노트북 교체 검증은 노트북 2대 셋업 후 수행 예정.
+- 수정 파일 목록: `scripts/hylion-tui.py`,
+  `docs/12_hylion_tui_launcher.md`, `README.md`, `WORKLOG.md`.
+- 다음 환경에서 바로 할 일:
+  - Jetson 에 `sudo apt install tmux` (없으면 Stage 3 가 명시적 실패).
+  - 노트북 2대 시나리오 시연: A 에서 `hylion-tui.py` → A 강제 종료 →
+    B 에서 `hylion-tui.py --attach` 가 끊김 없이 같은 history 로 잇는지 검증.
+

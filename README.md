@@ -21,9 +21,14 @@ step 의 라이브 로그가 같이 보인다.
 
 python3 scripts/hylion-tui.py              # 1→2→3 순차
 python3 scripts/hylion-tui.py --stage 2    # 같은 부팅에서 캘리브 끝났으면
-python3 scripts/hylion-tui.py --status     # 지금 떠 있는 NUC 세션 확인
-python3 scripts/hylion-tui.py --reset      # NUC tmux 세션 전부 정리
+python3 scripts/hylion-tui.py --attach     # 다른 노트북에서 인계 (끊김 0, history 보존)
+python3 scripts/hylion-tui.py --status     # 지금 떠 있는 세션 확인
+python3 scripts/hylion-tui.py --reset      # tmux 세션 정리
 ```
+
+coordinator 가 Jetson tmux(`hylion-coordinator`) 안에서 돌아서 노트북 배터리
+사망·wifi 끊김에도 죽지 않는다. 다음 노트북에서 `--attach` 한 줄로 끊김 없이
+인계 가능.
 
 자세한 SSH 셋업 · 환경변수 override · 트러블슈팅:
 [docs/12_hylion_tui_launcher.md](docs/12_hylion_tui_launcher.md).

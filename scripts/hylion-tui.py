@@ -8,15 +8,18 @@
 
 설계 결정:
   · 이 파일은 노트북에서 돈다. Jetson/NUC 와의 통신은 모두 `ssh` 호출.
-  · 장기 실행 프로세스는 NUC 의 tmux 세션(`hylion-*`) 으로 detach. 죽으면
-    세션이 사라지므로 헬스 체크가 단순해진다.
-  · 캘리브와 coordinator 는 본질적으로 사용자 인터랙션이 필요하므로
-    `ssh -t` 로 노트북 터미널을 일시 인계 → 끝나면 TUI 복귀.
+  · 장기 실행 프로세스는 양쪽 tmux 세션으로 detach:
+      NUC 측      hylion-bridge / hylion-bhl-lowlevel / hylion-bhl-policy
+      Jetson 측   hylion-coordinator   ← SSH 끊김에도 살아남음 (배터리 사망 등)
+    죽으면 세션이 사라지므로 헬스 체크가 단순해지고, 다른 노트북에서 `--attach`
+    한 줄로 끊김 없이 인계 가능 (대화 history 보존).
+  · 캘리브는 본질적으로 사용자 인터랙션이 필요하므로 `ssh -t` 로 노트북
+    터미널을 일시 인계 → 끝나면 TUI 복귀.
 
 요구사항:
   laptop$ pip install rich
   ~/.ssh/config 에 'jetson' / 'nuc' Host 등록 (NUC 는 ProxyJump=jetson 권장)
-  NUC 에 tmux 설치 (`sudo apt install tmux`).
+  Jetson + NUC 모두에 tmux 설치 (`sudo apt install tmux`).
 
 자세한 사용법: docs/12_hylion_tui_launcher.md
 """
@@ -62,6 +65,8 @@ NUC_PYTHON = os.environ.get("HYLION_NUC_PYTHON", "python3")
 SESSION_BRIDGE = "hylion-bridge"
 SESSION_LOWLEVEL = "hylion-bhl-lowlevel"
 SESSION_POLICY = "hylion-bhl-policy"
+# Jetson 측 tmux 세션 이름 (coordinator) — SSH 끊김에도 살아남도록 tmux 안에서 실행
+SESSION_COORDINATOR = "hylion-coordinator"
 
 LOG_BUFFER_MAX = 240
 LOG_VISIBLE_LINES = 22
@@ -411,12 +416,14 @@ def step_daemons(tui: TUI, step: Step) -> bool:
     return True   # 정보성, FAIL 처리 안 함
 
 
-def _ensure_tmux(tui: TUI) -> bool:
-    rc, out = tui.ssh_capture(NUC_HOST, "command -v tmux || echo MISSING",
+def _ensure_tmux(tui: TUI, host: str = NUC_HOST) -> bool:
+    rc, out = tui.ssh_capture(host, "command -v tmux || echo MISSING",
                               timeout=10)
     if "MISSING" in out:
-        tui.log("  NUC 에 tmux 가 없습니다. `sudo apt install tmux` 후 재시도.",
-                "red bold")
+        tui.log(
+            f"  {host} 에 tmux 가 없습니다. `sudo apt install tmux` 후 재시도.",
+            "red bold",
+        )
         return False
     return True
 
@@ -545,22 +552,97 @@ def step_policy(tui: TUI, step: Step) -> bool:
 
 
 def step_coordinator(tui: TUI, step: Step) -> bool:
-    tui.log("", "")
-    tui.log(
-        "Stage 3 — coordinator 를 노트북 터미널 foreground 로 인계합니다.",
-        "cyan bold",
-    )
-    tui.log("  · 'Hey Hyleon' 대기 상태로 진입합니다.", "cyan")
-    tui.log("  · Ctrl+C 로 종료하면 TUI 가 다시 돌아옵니다.", "cyan")
+    """coordinator 를 Jetson tmux 세션으로 띄우고 attach.
 
-    if not tui.confirm("coordinator 를 지금 시작할까요?", default=True):
+    SSH 끊김(배터리 dying, wifi 끊김 등) 시에도 coordinator 가 SIGHUP 으로 죽지
+    않고 Jetson tmux 안에서 계속 동작. 새 노트북에서 `--attach` 로 끊김 없이
+    인계 → 대화 history (최근 4 턴) 도 그대로 보존.
+    """
+    if not _ensure_tmux(tui, host=JETSON_HOST):
+        step.detail = "Jetson 에 tmux 미설치"
+        return False
+
+    # 기존 tmux 세션 검사
+    rc, out = tui.ssh_capture(
+        JETSON_HOST,
+        f"tmux has-session -t {SESSION_COORDINATOR} 2>/dev/null "
+        f"&& echo ALIVE || echo DEAD",
+        timeout=10,
+    )
+    already_alive = "ALIVE" in out
+
+    tui.log("", "")
+    if already_alive:
+        tui.log(
+            f"기존 tmux '{SESSION_COORDINATOR}' 가 살아 있습니다. attach 합니다.",
+            "cyan bold",
+        )
+        tui.log("  · history / session 모두 보존된 채로 인계됩니다.", "cyan")
+    else:
+        tui.log("Jetson tmux 안에 새 coordinator 세션을 띄웁니다.", "cyan bold")
+        tui.log(
+            "  · SSH 끊겨도 coordinator 는 Jetson 에서 계속 동작 → "
+            "다음 노트북에서 `--attach` 로 끊김 없이 인계.",
+            "cyan",
+        )
+    tui.log("  · Ctrl+B → d : detach (coordinator 살려두고 TUI 복귀)", "dim")
+    tui.log("  · Ctrl+C    : coordinator 종료 (tmux 세션도 같이 닫힘)", "dim")
+
+    if not tui.confirm(
+        "지금 진행할까요?" if already_alive else "coordinator 를 지금 시작할까요?",
+        default=True,
+    ):
         step.status = Status.SKIP
         step.detail = "사용자가 보류"
         return True
 
-    cmd = f"cd {JETSON_PROJECT} && bash scripts/run_coordinator.sh"
-    rc = tui.ssh_interactive(JETSON_HOST, cmd)
-    if rc in (0, 130, 143):    # 130=SIGINT, 143=SIGTERM → 정상 종료로 본다
+    if not already_alive:
+        # 새 세션 띄움 (detached). bash 의 부모를 sshd 가 아닌 tmux 로 만드는 것이
+        # 핵심 — SSH 끊김 시 SIGHUP 이 안 옴.
+        create_cmd = (
+            f"tmux new -d -s {SESSION_COORDINATOR} "
+            f"\"cd {JETSON_PROJECT} && bash scripts/run_coordinator.sh "
+            f"2>&1 | tee /tmp/{SESSION_COORDINATOR}.log\""
+        )
+        rc, _ = tui.ssh_capture(JETSON_HOST, create_cmd, timeout=10)
+        if rc != 0:
+            step.detail = f"tmux new 실패 (rc={rc})"
+            return False
+        # warm-up 시작 직후 attach 해도 되지만, 세션이 1초 안에 죽는 경우를
+        # 잡으려고 잠깐 대기.
+        time.sleep(1.0)
+        rc, out = tui.ssh_capture(
+            JETSON_HOST,
+            f"tmux has-session -t {SESSION_COORDINATOR} 2>/dev/null "
+            f"&& echo ALIVE || echo DEAD",
+            timeout=10,
+        )
+        if "ALIVE" not in out:
+            step.detail = (
+                f"tmux 세션이 시작 후 즉시 죽음 "
+                f"(로그: /tmp/{SESSION_COORDINATOR}.log)"
+            )
+            return False
+
+    # attach -d : 잔존 클라이언트(예: 끊긴 노트북의 좀비 SSH)가 있으면 떼고
+    # 우리가 가져옴. multi-attach 보다 깔끔.
+    attach_cmd = f"tmux attach -d -t {SESSION_COORDINATOR}"
+    rc = tui.ssh_interactive(JETSON_HOST, attach_cmd)
+
+    # 사용자가 detach 했는지 / coordinator 가 종료됐는지 구분 → 세션이 살아 있나로 판단
+    _, post_out = tui.ssh_capture(
+        JETSON_HOST,
+        f"tmux has-session -t {SESSION_COORDINATOR} 2>/dev/null "
+        f"&& echo ALIVE || echo DEAD",
+        timeout=10,
+    )
+    if "ALIVE" in post_out:
+        step.detail = (
+            "detach 됨 — coordinator 는 Jetson 에서 계속 동작 중. "
+            "재인계: `python3 scripts/hylion-tui.py --attach`"
+        )
+        return True
+    if rc in (0, 130, 143):    # 130=SIGINT, 143=SIGTERM
         step.detail = f"coordinator 정상 종료 (rc={rc})"
         return True
     step.detail = f"coordinator 비정상 종료 (rc={rc})"
@@ -619,6 +701,18 @@ def build_stages() -> list[Stage]:
 def cmd_status(dry_run: bool) -> int:
     tui = TUI(dry_run=dry_run)
     tui.console.rule("[bold]Hylion 상태 점검[/]")
+
+    # Jetson 측 coordinator tmux
+    rc, out = tui.ssh_capture(
+        JETSON_HOST,
+        f"tmux ls 2>/dev/null | grep '^{SESSION_COORDINATOR}' "
+        f"|| echo '(coordinator tmux 미동작)'",
+        timeout=10,
+    )
+    tui.console.print(f"\n[bold]Jetson tmux 세션 ({SESSION_COORDINATOR})[/]")
+    tui.console.print(Text(out))
+
+    # NUC 측 tmux
     rc, out = tui.ssh_capture(
         NUC_HOST,
         "tmux ls 2>/dev/null | grep '^hylion-' || echo '(tmux 세션 없음)'",
@@ -627,6 +721,7 @@ def cmd_status(dry_run: bool) -> int:
     tui.console.print("\n[bold]NUC tmux 세션[/]")
     tui.console.print(Text(out or "(없음)"))
 
+    # NUC 포트
     rc, out = tui.ssh_capture(
         NUC_HOST,
         "ss -tln 2>/dev/null | grep -E ':(9000|10000|10001|10011)' "
@@ -636,6 +731,7 @@ def cmd_status(dry_run: bool) -> int:
     tui.console.print("\n[bold]NUC 포트 리슨[/]")
     tui.console.print(Text(out))
 
+    # Jetson coordinator 프로세스 (tmux 안에 있어도 pgrep 으로 잡힘)
     rc, out = tui.ssh_capture(
         JETSON_HOST,
         "pgrep -af 'jetson.core.coordinator' || echo '(coordinator 미동작)'",
@@ -649,18 +745,67 @@ def cmd_status(dry_run: bool) -> int:
 def cmd_reset(dry_run: bool) -> int:
     tui = TUI(dry_run=dry_run)
     tui.console.rule("[bold red]Hylion 세션 정리[/]")
-    if not Confirm.ask(
-        "NUC 의 hylion-* tmux 세션을 모두 종료할까요?", default=False
+    if Confirm.ask(
+        "NUC 의 hylion-* tmux 세션 (bridge/lowlevel/policy) 을 모두 종료할까요?",
+        default=False,
     ):
-        return 0
-    for s in (SESSION_POLICY, SESSION_LOWLEVEL, SESSION_BRIDGE):
+        for s in (SESSION_POLICY, SESSION_LOWLEVEL, SESSION_BRIDGE):
+            tui.ssh_capture(
+                NUC_HOST,
+                f"tmux kill-session -t {s} 2>/dev/null; echo killed_{s}",
+                timeout=10,
+            )
+    # coordinator 는 별도로 묻는다 — 운영 중 실수 방지
+    if Confirm.ask(
+        f"Jetson 의 {SESSION_COORDINATOR} tmux 도 종료할까요? "
+        "(coordinator 가 죽고 history 소실됨)",
+        default=False,
+    ):
         tui.ssh_capture(
-            NUC_HOST,
-            f"tmux kill-session -t {s} 2>/dev/null; echo killed_{s}",
+            JETSON_HOST,
+            f"tmux kill-session -t {SESSION_COORDINATOR} 2>/dev/null; "
+            f"echo killed_{SESSION_COORDINATOR}",
             timeout=10,
         )
     tui.console.print("\n[green]완료[/]")
     return 0
+
+
+def cmd_attach(dry_run: bool) -> int:
+    """기존 coordinator tmux 세션에 즉시 attach (다른 노트북에서 인계용).
+
+    Stage 1·2 는 건너뛰고 Stage 3 의 attach 부분만 실행. tmux 세션이 없으면
+    안내만 남기고 종료.
+    """
+    tui = TUI(dry_run=dry_run)
+    if dry_run:
+        tui.console.print(
+            f"[yellow][dry-run][/] ssh -t {JETSON_HOST} "
+            f"tmux attach -d -t {SESSION_COORDINATOR}"
+        )
+        return 0
+    rc, out = tui.ssh_capture(
+        JETSON_HOST,
+        f"tmux has-session -t {SESSION_COORDINATOR} 2>/dev/null "
+        f"&& echo ALIVE || echo DEAD",
+        timeout=10,
+    )
+    if "ALIVE" not in out:
+        tui.console.print(
+            f"[red]Jetson 에 tmux '{SESSION_COORDINATOR}' 세션이 없습니다.[/]\n"
+            "처음부터 시작:  [cyan]python3 scripts/hylion-tui.py[/]\n"
+            "Stage 3 만:      [cyan]python3 scripts/hylion-tui.py --stage 3[/]"
+        )
+        return 1
+    tui.console.print(
+        f"\n[bold cyan]→ ssh -t {JETSON_HOST}[/]  "
+        f"tmux attach -d -t {SESSION_COORDINATOR}\n"
+        "[dim]   Ctrl+B → d : detach · Ctrl+C : coordinator 종료[/]\n"
+    )
+    return subprocess.call(
+        ["ssh", "-t", JETSON_HOST,
+         f"tmux attach -d -t {SESSION_COORDINATOR}"]
+    )
 
 
 # ══════════════════════════════════════════════════════════════════
@@ -689,7 +834,12 @@ def main() -> int:
     )
     parser.add_argument(
         "--reset", action="store_true",
-        help="NUC hylion-* tmux 세션 모두 종료",
+        help="hylion-* tmux 세션 정리 (NUC + Jetson coordinator)",
+    )
+    parser.add_argument(
+        "--attach", action="store_true",
+        help="기존 Jetson coordinator tmux 세션에 즉시 attach "
+             "(다른 노트북에서 인계할 때)",
     )
     args = parser.parse_args()
 
@@ -697,6 +847,8 @@ def main() -> int:
         return cmd_status(args.dry_run)
     if args.reset:
         return cmd_reset(args.dry_run)
+    if args.attach:
+        return cmd_attach(args.dry_run)
 
     tui = TUI(dry_run=args.dry_run)
     tui.stages = build_stages()
