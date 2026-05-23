@@ -1341,3 +1341,36 @@
   - Jetson 에서 `git pull` 후 `bash scripts/preflight.sh` 재실행, §3 OK 확인.
   - 남은 WARN (NUC bridge / MeloTTS / GROQ_API_KEY) 각각 진단·해결.
 
+### MeloTTS daemon 자동 launch — offline 진입 시 lazy 기동 (2026-05-23)
+
+- 오늘 변경 요약:
+  - `jetson/core/tts/melotts_client.py` 의 `MeloTTSSpeaker` 에 daemon liveness
+    보장 로직 추가. `warm_up()` 과 `_post_synthesize()` 진입 시 `/health` 를
+    probe 하고, 응답이 없으면 `.venv-melotts` python 으로 `uvicorn
+    services.tts_server.server:app --host 127.0.0.1 --port 8001` 을
+    `subprocess.Popen(..., start_new_session=True)` 로 detached spawn.
+    그 후 `/health` 가 200 을 줄 때까지 폴링 (최대 30s).
+  - 진입 후 첫 성공 시 `self._daemon_ensured = True` 캐시 — 다음 호출은 health
+    probe 1회만. transport 예외 발생 시 플래그 리셋 → 다음 호출에서 재시도.
+  - online 모드에서는 coordinator 가 `MeloTTSSpeaker` 를 만들지 않아서
+    daemon 도 절대 안 뜸. offline 모드에서만 첫 호출 비용 (~5s launch +
+    ~22s 모델 load) 1회 발생, 이후 즉시. coordinator 종료 후에도 daemon 은
+    살아남아 다음 coordinator 가 즉시 reuse.
+  - 디자인 의도: README §"Install as systemd service" 의 부팅 자동기동을
+    피하면서, offline 진입을 명령 없이 자연스럽게 처리. systemd 등록 0,
+    `enable --now` 0 — 사람이 시점 결정하지 않는 lazy 패턴.
+  - 의식적으로 손대지 않은 것: coordinator.py 의 매 turn `is_online()` 호출
+    및 backend 결정 정책. 이 부분은 별도 리팩토링(시작 1회 probe + 일시
+    충돌 시 retry/cooldown) 으로 분리.
+- 테스트 결과:
+  - 노트북: `python3 -m py_compile jetson/core/tts/melotts_client.py` OK.
+  - Jetson pull 후 실제 daemon launch 검증 예정 — `.venv-melotts` 존재
+    확인 → `MeloTTSSpeaker().warm_up()` → `/tmp/hylion-tts.log` + `ss :8001`.
+- 수정 파일 목록: `jetson/core/tts/melotts_client.py`, `WORKLOG.md`.
+- 다음 환경에서 바로 할 일:
+  - Jetson 에서 `git pull` 후 위 검증 수행.
+  - online 정책 리팩토링 (별도 작업): coordinator.py 의 매 turn
+    `is_online()` 제거 → 시작 1회 probe 로 sticky online, 호출 예외 catch
+    시 그 turn 만 offline fallback → 다음 turn online retry. 연속 실패
+    N회 시 sticky offline (cooldown). 매개변수는 별도 결정.
+
