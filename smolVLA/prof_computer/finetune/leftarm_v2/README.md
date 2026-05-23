@@ -29,6 +29,7 @@
 | `branches/001_a2_100ep/` | A2 | dataset 100ep subset (baseline) | `leftarm_v2_2a_pc_<ts>` *(legacy)* | ✅ 완료 (2026-05-17) — Orin 0/2 단축. *시기 맥락: M1.5 마일스톤* |
 | `branches/002_a2_100ep_empty1/` | A2 | dataset 100ep + `empty_cameras=1` | `leftarm_v2_camera_empty_<pass>_pc_<ts>` *(legacy 별명 명명)* | ✅ 완료 (2026-05-18) — Orin 0/2 단축 (empty 단독 효과 0 확정). *별명: "camera_empty"* |
 | `branches/003_a2_310ep_empty1_sched_sync_bf16_b6/` | A2 | dataset 310ep + `empty_cameras=1` + `scheduler_decay_steps=120000` (= steps 동기화) + bf16 mixed precision + `batch_size=6` | `leftarm_v2_003_<pass>_<ts>` *(현행 권장 — 분기 인덱스 직접 사용)* | ✅ 완료 (2026-05-19) — Orin 8/8 단축 = **100%** (5변수 종합 효과 확정) |
+| `branches/004_a2_310ep_empty1_sched_sync_bf16_b6_wrist_rot180/` | A2 | 003 동일 + wrist camera 학습 시점 180° 회전 (사전학습 분포 정합) | `leftarm_v2_004_<pass>_<ts>` | ✅ 완료 (2026-05-22) — final loss 0.0375, 18h 42m. Orin 평가 예정 |
 | (향후 신규 분기) | (A2 또는 다른 매트릭스 cell) | (변경된 인자 토큰) | `leftarm_v2_<NNN>_<pass>_<ts>` *(권장)* | (예정 — learning_log2.md 에 entry) |
 
 ### 운영 원칙
