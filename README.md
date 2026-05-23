@@ -8,6 +8,30 @@ Non-ROS2 (UDP/TCP 기반) 파이프라인. 표준 진입점은 Jetson 의
 
 ---
 
+## 가장 빠른 시작 — 노트북에서 한 줄 TUI 런처
+
+NUC 측 캘리브·`make run`·`rl_controller`·bridge 까지 **노트북에서** SSH 로 다
+띄우고 싶으면 [scripts/hylion-tui.py](scripts/hylion-tui.py) 를 쓴다. 3 단계
+(초기 셋팅 → Cold Start → 전체 프로그램 실행) 진행이 한 화면에 표시되고, 각
+step 의 라이브 로그가 같이 보인다.
+
+```bash
+# 노트북 (1회): pip install rich
+# ~/.ssh/config 에 'jetson' / 'nuc' (ProxyJump=jetson) 등록
+
+python3 scripts/hylion-tui.py              # 1→2→3 순차
+python3 scripts/hylion-tui.py --stage 2    # 같은 부팅에서 캘리브 끝났으면
+python3 scripts/hylion-tui.py --status     # 지금 떠 있는 NUC 세션 확인
+python3 scripts/hylion-tui.py --reset      # NUC tmux 세션 전부 정리
+```
+
+자세한 SSH 셋업 · 환경변수 override · 트러블슈팅:
+[docs/12_hylion_tui_launcher.md](docs/12_hylion_tui_launcher.md).
+
+아래는 TUI 를 쓰지 않고 직접 하나씩 띄울 때의 절차다.
+
+---
+
 ## 운영 흐름 — "환경 설정"과 "작동"을 분리
 
 Hylion 은 **두 단계로 나눠서** 운영한다. 부팅하자마자 코디네이터가 자동으로 뜨지

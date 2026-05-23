@@ -1259,3 +1259,35 @@
     그대로 NUC bridge(:9000) 에 도달하는지 확인.
   - 실제 NUC IP 가 10.42.0.221 이 아니면 셸에서 `export HYLION_BHL_HOST=…`.
 
+### 노트북 SSH 한 줄 런처 (hylion-tui.py) 추가 (2026-05-23)
+
+- 오늘 변경 요약:
+  - `scripts/hylion-tui.py`(신규) — 노트북에서 SSH 로 Jetson + NUC 를 같이
+    띄우는 3단계 TUI 런처. 의도적으로 부팅 자동 실행을 안 쓰는 운영 모드와
+    맞물림. rich Live 패널로 stage·step 진행 + 라이브 SSH stdout 스트림.
+      · Stage 1 초기 셋팅: preflight · NUC CAN up · 관절 캘리브(`ssh -t` 인계)
+      · Stage 2 Cold Start: Jetson 데몬 점검 + NUC bridge / bhl-lowlevel /
+        bhl-policy 를 NUC tmux 세션(`hylion-*`) 으로 detach 후 헬스체크
+      · Stage 3 전체 실행: `run_coordinator.sh` 를 노트북 foreground 인계
+    옵션: `--stage {1,2,3}` / `--status` / `--reset` / `--dry-run` /
+    `--no-confirm`. 환경변수 5종으로 호스트·경로·Python 인터프리터 override.
+    같은 부팅 안에서 `calibration.yaml` 이 신선하면 캘리브 step 자동 SKIP 제안
+    (mtime > `/proc/1` mtime 비교).
+  - `docs/12_hylion_tui_launcher.md`(신규) — 사용 가이드, SSH config 예제
+    (`Host nuc` 에 `ProxyJump=jetson`), 환경변수 표, 실제 SSH 호출 시퀀스,
+    트러블슈팅, 설계 메모 (tmux 선택 이유, 인터랙티브/비대화 분리 이유 등).
+  - `README.md` — 맨 위에 "가장 빠른 시작 — 노트북에서 한 줄 TUI 런처" 절
+    추가. 기존 2단계 수동 절차는 그 아래 그대로 보존 (TUI 안 쓰는 경로용).
+- 테스트 결과:
+  - `python3 -m py_compile scripts/hylion-tui.py` → OK.
+  - `python3 scripts/hylion-tui.py --help` → argparse 출력 정상.
+  - 실제 SSH/리모트 테스트는 노트북·NUC 셋업 후에 수행 예정.
+- 수정 파일 목록: `scripts/hylion-tui.py`(신규),
+  `docs/12_hylion_tui_launcher.md`(신규), `README.md`, `WORKLOG.md`.
+- 다음 환경에서 바로 할 일:
+  - 노트북에 `pip install rich`, `~/.ssh/config` 에 `jetson`/`nuc`(ProxyJump)
+    등록, NUC 에 `tmux` 설치.
+  - `python3 scripts/hylion-tui.py --dry-run` 으로 흐름 한 번 점검.
+  - `--stage 2 --dry-run` → 실제 NUC tmux 세션 띄우기까지 검증.
+  - NUC 의 BHL 리포 경로가 기본값과 다르면 `HYLION_NUC_BHL_REPO` export.
+
