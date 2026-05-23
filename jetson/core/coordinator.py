@@ -54,7 +54,7 @@ WHISPER_HALLUCINATION_PHRASES = frozenset({
 from jetson.core.bhl_client import BhlClient
 from jetson.core.gesture_client import start_gesture_daemon
 from jetson.core.llm import build_llm_backend
-from jetson.core.network import is_online
+from jetson.core.online_gate import OnlineGate
 from jetson.core.stt import build_input_event, build_stt_backend
 from jetson.core.stt.local_whisper import warm_up as warm_up_local_whisper
 from jetson.expression.microphone import record_to_wav, wav_has_speech
@@ -243,12 +243,14 @@ def _build_turn_services(
 	*,
 	whisper_model_size: str,
 	whisper_language: str,
+	gate: OnlineGate | None = None,
 ):
 	"""Pick STT/LLM/TTS backends for this turn.
 
 	If the online path fails its warm-up probe (e.g. Groq unreachable despite
 	is_online=True), fall back to offline backends so the user still gets a
-	response this turn.
+	response this turn — and report the failure to ``gate`` so subsequent
+	activations spend one cooldown window in offline before retrying.
 	"""
 	if online:
 		try:
@@ -267,6 +269,8 @@ def _build_turn_services(
 			return True, stt_backend, llm_backend, tts_backend
 		except Exception as exc:
 			print(f"[Hybrid] online route unavailable -> fallback to offline stub: {exc}")
+			if gate is not None:
+				gate.report_online_failure()
 
 	stt_backend = build_stt_backend(
 		online=False,
@@ -502,6 +506,7 @@ def run_live_pipeline(
 	whisper_language: str,
 	wakeword_listener,
 	gesture_daemon,
+	gate: OnlineGate,
 	bhl_client: BhlClient | None = None,
 	estop_listener=None,
 ) -> None:
@@ -525,12 +530,13 @@ def run_live_pipeline(
 			f"device={activation.device_name}"
 		)
 
-		online_probe = is_online()
-		print(f"[Network] is_online={online_probe}")
+		online_probe = gate.is_active()
+		print(f"[Network] online_active={online_probe} (sticky w/ cooldown)")
 		online, stt_backend, llm_backend, tts_backend = _build_turn_services(
 			online_probe,
 			whisper_model_size=whisper_model_size,
 			whisper_language=whisper_language,
+			gate=gate,
 		)
 		print(f"[Backends] stt={stt_backend.name} llm={llm_backend.name}")
 
@@ -703,16 +709,18 @@ def _parse_args() -> argparse.Namespace:
 	return parser.parse_args()
 
 
-def _startup_warm_up(args: argparse.Namespace) -> None:
+def _startup_warm_up(args: argparse.Namespace, gate: OnlineGate) -> None:
 	"""§F5 warm-up policy: warm only the side likely to be hot.
 
 	online → Groq probe (no model load). offline → local whisper + Ollama
 	model + MeloTTS daemon model. The other side stays cold and lazy-loads on
 	first runtime fallback. Failures here are logged but never abort startup;
-	the pipeline degrades gracefully.
+	the pipeline degrades gracefully. Reads online state from ``gate`` (which
+	already performed its own probe at construction) so the coordinator pays
+	at most one ``is_online()`` cost before the first wake activation.
 	"""
-	initial_online = is_online()
-	print(f"[Startup] is_online={initial_online}")
+	initial_online = gate.is_active()
+	print(f"[Startup] online_active={initial_online}")
 
 	if initial_online:
 		try:
@@ -721,6 +729,7 @@ def _startup_warm_up(args: argparse.Namespace) -> None:
 			print(f"[Warm-up] LLM  {llm.name} ... OK")
 		except Exception as exc:
 			print(f"[Warm-up] LLM  online Groq ... FAIL (lazy-load): {exc}")
+			gate.report_online_failure()
 		return
 
 	try:
@@ -753,6 +762,10 @@ def main() -> None:
 	# connect, in the .hylion_arm venv) overlaps with model warm-up below.
 	# Failure is non-fatal — start_gesture_daemon() returns a disabled handle.
 	gesture_daemon = start_gesture_daemon()
+	# Single sticky online/offline gate; one is_online() probe is paid at
+	# construction and then reused across wake activations (with cooldown-based
+	# retry on failures) instead of probing inside every turn.
+	gate = OnlineGate()
 	try:
 		wakeword_listener = build_wake_word_listener()
 		# E-stop listener is built once and started/stopped per BHL move.
@@ -760,7 +773,7 @@ def main() -> None:
 		# missing model file or audio stack only surfaces a one-line warning
 		# and the move executes without wake-word stop.
 		estop_listener = build_emergency_stop_listener()
-		_startup_warm_up(args)
+		_startup_warm_up(args, gate)
 		if gesture_daemon.wait_ready(timeout=15.0):
 			print("[Warm-up] Gesture daemon ... OK")
 		else:
@@ -781,6 +794,7 @@ def main() -> None:
 			whisper_language=args.whisper_language,
 			wakeword_listener=wakeword_listener,
 			gesture_daemon=gesture_daemon,
+			gate=gate,
 			bhl_client=bhl_client,
 			estop_listener=estop_listener,
 		)

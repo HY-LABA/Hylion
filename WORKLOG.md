@@ -1408,3 +1408,45 @@
     `GROQ_API_KEY=` 줄에 적기.
   - Jetson: `git pull` → `bash scripts/preflight.sh` 재실행, §7 OK 확인.
 
+### Online/offline sticky gate + 일시 충돌 cooldown (2026-05-23)
+
+- 오늘 변경 요약:
+  - 기존 동작: `run_live_pipeline` 의 wake 활성화 직후마다 `is_online()`
+    호출 → 인터넷이 끊긴 환경에선 4 target × 1.5 s timeout 이 매번
+    누적되어 응답 latency 에 ~6 s 가 추가. `_startup_warm_up` 도 별도로
+    한 번 더 `is_online()` 호출.
+  - `jetson/core/online_gate.py` 신규: `OnlineGate` 클래스.
+    · 생성 시점에 1회만 `is_online()` 으로 sticky 결정.
+    · `is_active()` 는 캐시된 상태를 반환하되, 마지막 probe 후
+      `cooldown_sec`(=60 s) 지나면 lazy re-probe — startup offline 상태도
+      복구 가능.
+    · `report_online_failure()` 호출되면 한 cooldown window (60 s) 동안
+      강제 False, 만료 후 재 probe 로 회복 시도.
+    · 단위 시뮬레이션으로 4 시나리오 (sticky True, latch False, cooldown
+      recovery, startup offline → recover) 의 probe 호출 횟수 모두 확인.
+  - `coordinator.py`:
+    · `OnlineGate` import + `is_online` 직접 import 제거 (호출처 0).
+    · `main()` 안 `gesture_daemon` 직후 `gate = OnlineGate()` 1회 생성.
+    · `_startup_warm_up(args)` → `_startup_warm_up(args, gate)`. 안에서
+      `is_online()` → `gate.is_active()`. online warm-up 예외 catch 시
+      `gate.report_online_failure()`.
+    · `run_live_pipeline` 시그니처에 `gate: OnlineGate` 추가, 호출처에서
+      전달. 매 wake 직후 `online_probe = gate.is_active()`.
+    · `_build_turn_services(..., gate=...)` kwarg 추가. online build/warm
+      실패 catch 시 `gate.report_online_failure()`.
+  - 의도적으로 안 손댄 것: chat 안 inner turn loop 의 LLM/STT/TTS 호출
+    중 네트워크 예외 catch + 그 turn 만 offline fallback. 이 부분은 별도
+    follow-up 으로 분리 (사이즈·테스트 부담 분리 위해).
+- 테스트 결과:
+  - 노트북: py_compile (coordinator.py + online_gate.py) OK.
+  - OnlineGate 단위 시뮬레이션: 시나리오 4 종 모두 probe 호출 횟수
+    예상치와 일치 (S1: 1, S2: 1 latched, S3: 2 after recover, S4: 3 final).
+- 수정 파일 목록: `jetson/core/online_gate.py` (신규),
+  `jetson/core/coordinator.py`, `WORKLOG.md`.
+- 다음 환경에서 바로 할 일:
+  - Jetson `git pull` 후 `python3 -m py_compile jetson/core/coordinator.py`
+    회귀 검증, 짧은 dry-run 으로 `[Network] online_active=...` 로그가
+    실제로 한 번만 찍히고 다음 wake 부터는 sticky 인지 확인.
+  - Follow-up: chat inner loop 의 호출 단계 fallback (예외 catch → 그 turn
+    offline backend 로 재시도) — 별도 변경/PR.
+
