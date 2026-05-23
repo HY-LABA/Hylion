@@ -1321,3 +1321,23 @@
   - 노트북 2대 시나리오 시연: A 에서 `hylion-tui.py` → A 강제 종료 →
     B 에서 `hylion-tui.py --attach` 가 끊김 없이 같은 history 로 잇는지 검증.
 
+### preflight.sh — 스피커 점검 locale 의존 grep 보정 (2026-05-23)
+
+- 오늘 변경 요약:
+  - `scripts/preflight.sh` §3 의 스피커 점검이 한글 locale Jetson 에서 false
+    WARN 발생. `aplay -l` 출력이 "카드 N:" (한글) 로 나와서 `grep -q '^card'`
+    가 매치 실패하던 것. `aplay` 호출에 `LC_ALL=C` prefix 추가해 영문 출력
+    강제 → locale-independent.
+  - 진단 경위: README "사전 점검만" 흐름으로 preflight 실행 시 §3 (재생
+    장치) 가 WARN. `/proc/asound/cards` 와 `aplay -l` 한글 출력 비교로 false
+    alarm 확인. 실제로는 USB-Audio 카드(YJX-C5, BSX, P5HD) 모두 인식됨.
+  - `arecord` 쪽 마이크 검사는 영문 키워드(`P5HD`) 매치라 locale 영향 없어
+    그대로 둠.
+- 테스트 결과:
+  - 노트북: 정적 변경 (1 줄 diff).
+  - Jetson pull 후 재실행해서 §3 가 OK 로 바뀌는지 검증 예정.
+- 수정 파일 목록: `scripts/preflight.sh`, `WORKLOG.md`.
+- 다음 환경에서 바로 할 일:
+  - Jetson 에서 `git pull` 후 `bash scripts/preflight.sh` 재실행, §3 OK 확인.
+  - 남은 WARN (NUC bridge / MeloTTS / GROQ_API_KEY) 각각 진단·해결.
+

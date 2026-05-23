@@ -119,7 +119,7 @@ else
     warn "arecord 미설치 — 마이크 자동 점검 불가" "수동 확인 필요."
 fi
 if command -v aplay >/dev/null 2>&1; then
-    if aplay -l 2>/dev/null | grep -q '^card'; then
+    if LC_ALL=C aplay -l 2>/dev/null | grep -q '^card'; then
         ok "재생 장치(스피커) 인식됨"
     else
         warn "재생 장치가 aplay -l 에 없음" "USB 스피커 연결 확인 — 없으면 TTS 가 안 들림."
