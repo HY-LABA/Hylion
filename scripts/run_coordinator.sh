@@ -27,6 +27,13 @@ if [ ! -e "$CUSPARSELT_LIB/libcusparseLt.so.0" ]; then
 fi
 export LD_LIBRARY_PATH="$CUSPARSELT_LIB:${LD_LIBRARY_PATH:-}"
 
+# NUC bridge 주소: Jetson↔NUC 유선 직결(NetworkManager 공유망 10.42.0.0/24).
+# bhl_client.py 의 기본값은 127.0.0.1 이므로 NUC 의 실제 IP 를 명시해야
+# coordinator 가 NUC bridge(:9000)로 TCP/NDJSON 을 보낼 수 있다.
+# NUC IP 가 바뀌면 셸에서 export HYLION_BHL_HOST=... 로 override.
+export HYLION_BHL_HOST="${HYLION_BHL_HOST:-10.42.0.221}"
+export HYLION_BHL_PORT="${HYLION_BHL_PORT:-9000}"
+
 # 마이크 선택: P5HD USB (1ch mono, 44.1kHz/48kHz 둘 다 지원). YJX-C5 는 stereo
 # headset 류라 wake-word 용 적합하지 않고, mono 44.1kHz 거부함. P5HD 가 4월
 # 검증 때 쓰던 메인 마이크와 같은 스펙. wake-word + 녹음 + e-stop listener

@@ -1239,3 +1239,23 @@
   - 시연 당일: SSH 접속 → `preflight.sh` 로 FAIL 0 확인 →
     `test_wakeword.sh` 간단 테스트 → `run_coordinator.sh` 작동 시작.
   - 무인 배치가 필요해지면 `install-coordinator-service.sh` 로 옵션 B 설치.
+
+### 원격 제어용 env override 정리 (2026-05-23)
+
+- 오늘 변경 요약:
+  - `scripts/run_coordinator.sh` — `HYLION_BHL_HOST=10.42.0.221`,
+    `HYLION_BHL_PORT=9000` 기본값 추가. `bhl_client.py` 의 default 는
+    127.0.0.1 이라 그대로면 coordinator 가 NUC bridge 로 못 갔음. Jetson↔NUC
+    유선 직결(NetworkManager 공유망 10.42.0.0/24) 가정. NUC IP 가 바뀌면 셸
+    export 로 override.
+  - `nuc/bhl/tests/mock_coordinator.py` — `BRIDGE_HOST`/`BRIDGE_PORT` env
+    override + 두 번째 CLI 인자로 host 지정 가능. NUC 실제 IP 로 통합 테스트
+    가능. 기본값은 그대로 127.0.0.1:9000 (Jetson 로컬 테스트).
+- 테스트 결과: 코드 변경만, 별도 런타임 테스트 미실행.
+- 수정 파일 목록: `scripts/run_coordinator.sh`,
+  `nuc/bhl/tests/mock_coordinator.py`, `WORKLOG.md`.
+- 다음 환경에서 바로 할 일:
+  - 노트북→Jetson SSH 환경에서 `bash scripts/run_coordinator.sh` 가 새 기본값
+    그대로 NUC bridge(:9000) 에 도달하는지 확인.
+  - 실제 NUC IP 가 10.42.0.221 이 아니면 셸에서 `export HYLION_BHL_HOST=…`.
+
