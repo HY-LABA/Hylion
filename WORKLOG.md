@@ -1374,3 +1374,37 @@
     시 그 turn 만 offline fallback → 다음 turn online retry. 연속 실패
     N회 시 sticky offline (cooldown). 매개변수는 별도 결정.
 
+### GROQ_API_KEY .env 로 통일 + 코드가 자동 로드 (2026-05-23)
+
+- 오늘 변경 요약:
+  - 운영 중 진단 도중 `~/.bashrc` 에 평문으로 적혀 있던 GROQ_API_KEY 가
+    grep 출력으로 conversation 에 노출됨 → 키 revoke + 재발급 필요. 노출
+    범위는 conversation log (Anthropic 측) 뿐, repo·GitHub history 에는
+    없음 (`.env` 가 .gitignore 138 행에 있고 키 문자열도 tracked file 어디에도
+    없음으로 확인).
+  - 원인 구조: groq_llm/groq_whisper/llm_runtime 3 곳이 `os.getenv` 만
+    봐서, 비-인터랙티브 SSH 셸·systemd unit 등 `.bashrc` 가 안 읽히는
+    환경에서는 키가 누락. Clova 만 `.env` 파싱하던 패턴을 공용으로 옮김.
+  - `jetson/core/env_secrets.py` 신규: `_read_env_file()` + `get_secret()`
+    + `ensure_env_from_dotenv()`. 마지막 함수는 셸 env 가 비어 있고
+    `.env` 에 값이 있으면 `os.environ` 에 inject — Groq SDK 의 `Groq()`
+    가 자동으로 키를 잡도록.
+  - 사용처 3 곳 (`groq_llm.py`, `groq_whisper.py`, `llm_runtime.py`)
+    `os.getenv` → `ensure_env_from_dotenv` 로 교체, unused `import os` 정리.
+  - `scripts/preflight.sh` §7 의 GROQ 점검을 셸 env + `.env` 둘 다 보도록
+    보강. ENV_FILE 정의를 함수 정의 직후로 끌어올려 GROQ/Clova 가 공유.
+- 테스트 결과:
+  - 노트북: py_compile (4 파일) OK, bash -n preflight.sh OK.
+  - 단위 시뮬레이션: 임시 .env 로 `ensure_env_from_dotenv("GROQ_API_KEY")`
+    호출 → 반환값·`os.environ` 양쪽에 주입됨 확인.
+  - Jetson 검증 예정: pull 후 사용자가 `~/.bashrc` 노출 line 삭제 + 새 키를
+    .env 에 적은 다음, `bash scripts/preflight.sh` 가 §7 를 OK 로 잡는지.
+- 수정 파일 목록: `jetson/core/env_secrets.py` (신규),
+  `jetson/core/llm/groq_llm.py`, `jetson/core/stt/groq_whisper.py`,
+  `jetson/core/brain/llm_runtime.py`, `scripts/preflight.sh`, `WORKLOG.md`.
+- 다음 환경에서 바로 할 일:
+  - 사용자: Groq 콘솔에서 노출된 키 revoke → 새 키 발급 → `~/.bashrc`
+    line 120 의 `export GROQ_API_KEY=...` 제거 → 새 키를 `.env` 의
+    `GROQ_API_KEY=` 줄에 적기.
+  - Jetson: `git pull` → `bash scripts/preflight.sh` 재실행, §7 OK 확인.
+

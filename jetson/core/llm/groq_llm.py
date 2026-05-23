@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-import os
 import time
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
 
+from jetson.core.env_secrets import ensure_env_from_dotenv
 from jetson.core.llm.prompt import (
 	ONLINE_SYSTEM_PROMPT,
 	assemble_action,
@@ -29,7 +29,7 @@ class GroqClient:
 		if self._client is not None:
 			return self._client
 
-		if not os.getenv("GROQ_API_KEY"):
+		if not ensure_env_from_dotenv("GROQ_API_KEY"):
 			return None
 
 		try:

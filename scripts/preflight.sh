@@ -177,15 +177,17 @@ fi
 
 # .env 파일에서 key 값이 비어있지 않은지 (값은 노출 안 함)
 envfile_has() { awk -F= -v k="$1" '$1==k && length($2)>0 {f=1} END{exit !f}' "$2" 2>/dev/null; }
+ENV_FILE="$PROJECT_ROOT/.env"
 
 if [ -n "${GROQ_API_KEY:-}" ]; then
     GROQ_KEY=true; ok "GROQ_API_KEY 환경변수 설정됨 (online LLM/STT)"
+elif [ -f "$ENV_FILE" ] && envfile_has GROQ_API_KEY "$ENV_FILE"; then
+    GROQ_KEY=true; ok "GROQ_API_KEY .env 설정됨 (코드가 자동 로드)"
 else
-    warn "GROQ_API_KEY 환경변수 없음" \
-         "online LLM/STT 불가 — 쓰려면 run 전에 'export GROQ_API_KEY=...' (offline Ollama 는 영향 없음)."
+    warn "GROQ_API_KEY 미설정 (env·.env 모두 비어있음)" \
+         "online LLM/STT 불가 — .env 의 GROQ_API_KEY= 줄에 키를 적거나 셸에서 export. (offline Ollama 는 영향 없음)."
 fi
 
-ENV_FILE="$PROJECT_ROOT/.env"
 if [ -f "$ENV_FILE" ]; then
     if envfile_has Naver_Clova_Speech_Client_ID "$ENV_FILE" \
        && envfile_has Naver_Clova_Speech_Client_Secret "$ENV_FILE"; then

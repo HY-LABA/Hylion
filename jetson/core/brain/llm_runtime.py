@@ -1,6 +1,7 @@
-import os
 from dataclasses import dataclass
 from typing import Optional, Any
+
+from jetson.core.env_secrets import ensure_env_from_dotenv
 
 
 @dataclass
@@ -25,7 +26,7 @@ class LLMRuntime:
         )
 
     def _init_groq_client(self) -> Optional[Any]:
-        if not os.getenv("GROQ_API_KEY"):
+        if not ensure_env_from_dotenv("GROQ_API_KEY"):
             return None
 
         try:
