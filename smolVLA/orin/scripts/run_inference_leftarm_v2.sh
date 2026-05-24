@@ -77,50 +77,33 @@ p.write_text(json.dumps(d, indent=2))
     fi
 }
 
-# ── Helper: read robot config from JSON ──────────────────────────────────────
-read_robot_config() {
-    FOLLOWER_PORT=$(python3 -c "
-import json
-d = json.load(open('${CONFIG_DIR}/ports.json'))
-v = d.get('follower_port')
-print(v if v is not None else 'None')
-" 2>/dev/null || echo "None")
-
-    TOP_IDX=$(python3 -c "
-import json
-d = json.load(open('${CONFIG_DIR}/cameras.json'))
-v = d.get('top', {}).get('index')
-print(v if v is not None else 'None')
-" 2>/dev/null || echo "None")
-
-    WRIST_IDX=$(python3 -c "
-import json
-d = json.load(open('${CONFIG_DIR}/cameras.json'))
-v = d.get('wrist', {}).get('index')
-print(v if v is not None else 'None')
-" 2>/dev/null || echo "None")
+# ── Helper: resolve device paths (udev rule 도입 2026-05-24) ─────────────────
+# orin/config/udev/99-hylion.rules 가 다음 심볼릭 링크를 생성:
+#   /dev/so_arm_left, /dev/so_arm_right, /dev/cam_top, /dev/cam_wrist
+# 환경변수 override 가능 (FOLLOWER_PORT, CAM_TOP, CAM_WRIST).
+resolve_devices() {
+    FOLLOWER_PORT="${FOLLOWER_PORT:-/dev/so_arm_left}"
+    CAM_TOP="${CAM_TOP:-/dev/cam_top}"
+    CAM_WRIST="${CAM_WRIST:-/dev/cam_wrist}"
 }
 
-# ── Helper: validate robot config (all non-None) ──────────────────────────────
-validate_robot_config() {
+# ── Helper: validate udev device nodes exist ─────────────────────────────────
+validate_devices() {
     local missing=0
-    if [[ "${FOLLOWER_PORT}" == "None" ]]; then
-        echo "ERROR: follower_port is null in ${CONFIG_DIR}/ports.json"
-        missing=1
-    fi
-    if [[ "${TOP_IDX}" == "None" ]]; then
-        echo "ERROR: cameras.top.index is null in ${CONFIG_DIR}/cameras.json"
-        missing=1
-    fi
-    if [[ "${WRIST_IDX}" == "None" ]]; then
-        echo "ERROR: cameras.wrist.index is null in ${CONFIG_DIR}/cameras.json"
-        missing=1
-    fi
+    for dev in "${FOLLOWER_PORT}" "${CAM_TOP}" "${CAM_WRIST}"; do
+        if [[ ! -e "${dev}" ]]; then
+            echo "ERROR: device not found: ${dev}"
+            missing=1
+        fi
+    done
     if [[ "${missing}" == "1" ]]; then
         echo ""
-        echo "Fill in the null values in orin/config/{ports,cameras}.json before running live inference."
-        echo "Example override (without editing JSON):"
-        echo "  FOLLOWER_PORT=/dev/ttyUSB0 TOP_IDX=0 WRIST_IDX=2 ./run_inference_leftarm_v2.sh live task1"
+        echo "udev rule 미적용 또는 디바이스 미연결. 점검:"
+        echo "  ls -la /dev/cam_top /dev/cam_wrist /dev/so_arm_left /dev/so_arm_right"
+        echo "  cat /etc/udev/rules.d/99-hylion.rules"
+        echo "  sudo udevadm control --reload && sudo udevadm trigger"
+        echo "환경변수 override:"
+        echo "  FOLLOWER_PORT=/dev/so_arm_right ./run_inference_leftarm_v2.sh live task1"
         exit 1
     fi
 }
@@ -171,11 +154,10 @@ cmd_dry_run() {
     # shellcheck source=/dev/null
     source "${VENV_PATH}"
 
-    # config 상태 확인 (robot 연결 불필요)
-    read_robot_config
+    # 디바이스 경로 결정 (udev path default + env override)
+    resolve_devices
 
-    # dry-run 실행 (--follower-port 가 None 이면 에러 출력되지만 코드 경로 검증 가능)
-    # Orin 에 robot 미연결 가능성 — 에러 출력 후 계속 진행 (|| true)
+    # dry-run 실행 (robot 미연결 가능 — connect() 에러는 정상)
     OUTPUT_JSON="/tmp/leftarm_v2_dryrun_${task_key}_$(date +%Y%m%d_%H%M%S).json"
     echo "--- output-json: ${OUTPUT_JSON} ---"
     echo ""
@@ -194,10 +176,10 @@ cmd_dry_run() {
     echo "NOTE: dry-run 은 robot 연결 없이도 LoRA 로드 + 코드 경로를 검증합니다."
     echo "      robot 미연결 시 connect() 에서 에러 발생 (정상 — 코드 경로 검증 완료)."
     echo "      live 실행: ./run_inference_leftarm_v2.sh live task1"
-    echo "      현재 config 값:"
-    echo "        follower_port = ${FOLLOWER_PORT}"
-    echo "        top.index     = ${TOP_IDX}"
-    echo "        wrist.index   = ${WRIST_IDX}"
+    echo "      현재 디바이스 (env override 가능):"
+    echo "        FOLLOWER_PORT = ${FOLLOWER_PORT}"
+    echo "        CAM_TOP       = ${CAM_TOP}"
+    echo "        CAM_WRIST     = ${CAM_WRIST}"
 }
 
 # ── Subcommand: live ──────────────────────────────────────────────────────────
@@ -224,18 +206,18 @@ cmd_live() {
     # Validate checkpoint
     check_n_action_steps
 
-    # Read and validate robot config
-    read_robot_config
-    validate_robot_config
+    # 디바이스 경로 결정 + udev 노드 존재 검증
+    resolve_devices
+    validate_devices
 
     # shellcheck source=/dev/null
     source "${VENV_PATH}"
 
     echo ""
     echo "--- Running leftarm_v2_inference.py (LoRA adapter, live mode) ---"
-    echo "    follower_port:  ${FOLLOWER_PORT}"
-    echo "    top.index:      ${TOP_IDX}"
-    echo "    wrist.index:    ${WRIST_IDX}"
+    echo "    FOLLOWER_PORT:  ${FOLLOWER_PORT}"
+    echo "    CAM_TOP:        ${CAM_TOP}"
+    echo "    CAM_WRIST:      ${CAM_WRIST}"
     echo "    ckpt:           ${CKPT_LOCAL_DIR}"
     echo "    task:           ${task_key}"
     echo "    rename_map:     top->camera1, wrist->camera2 (내부 자동 적용)"
@@ -245,13 +227,13 @@ cmd_live() {
     # Ref: orin/inference/leftarm_v2_inference.py
     # - LoRA adapter: PeftConfig + PeftModel (peft>=0.10.0 필요)
     # - rename_map: 내부 apply_rename_map() 자동 적용
-    # - gate-json: ports.json + cameras.json 자동 로드
+    # - gate-json: cameras.json 부가 설정 (rotation/fps/fourcc/flip) 만 로드
     python "${INFERENCE_SCRIPT}" \
         --task "${task_key}" \
         --mode live \
         --ckpt-dir "${CKPT_LOCAL_DIR}" \
         --follower-port "${FOLLOWER_PORT}" \
-        --cameras "top:${TOP_IDX},wrist:${WRIST_IDX}" \
+        --cameras "top:${CAM_TOP},wrist:${CAM_WRIST}" \
         --gate-json "${CONFIG_DIR}" \
         --n-action-steps 50 \
         --max-steps 1000
@@ -280,19 +262,19 @@ cmd_zero_shot() {
     echo "=== zero-shot: ${task_key} (base smolvla_base only, LoRA 없음) ==="
     echo "    inference script: ${BASE_INFERENCE_SCRIPT}"
 
-    # Read and validate robot config (cameras + ports)
+    # 디바이스 경로 결정 + udev 노드 존재 검증
     # ckpt 점검은 불요 — zero-shot 은 HF Hub base 직접 사용 (로컬 ckpt 없음)
-    read_robot_config
-    validate_robot_config
+    resolve_devices
+    validate_devices
 
     # shellcheck source=/dev/null
     source "${VENV_PATH}"
 
     echo ""
     echo "--- Running leftarm_base_inference.py (zero-shot, base 사전학습만) ---"
-    echo "    follower_port:  ${FOLLOWER_PORT}"
-    echo "    top.index:      ${TOP_IDX}"
-    echo "    wrist.index:    ${WRIST_IDX}"
+    echo "    FOLLOWER_PORT:  ${FOLLOWER_PORT}"
+    echo "    CAM_TOP:        ${CAM_TOP}"
+    echo "    CAM_WRIST:      ${CAM_WRIST}"
     echo "    base ckpt:      lerobot/smolvla_base (HF Hub)"
     echo "    task:           ${task_key}"
     echo "    rename_map:     top->camera1, wrist->camera2 (내부 자동 적용)"
@@ -308,7 +290,7 @@ cmd_zero_shot() {
         --task "${task_key}" \
         --mode live \
         --follower-port "${FOLLOWER_PORT}" \
-        --cameras "top:${TOP_IDX},wrist:${WRIST_IDX}" \
+        --cameras "top:${CAM_TOP},wrist:${CAM_WRIST}" \
         --gate-json "${CONFIG_DIR}" \
         --n-action-steps 50 \
         --max-steps 1000
@@ -357,13 +339,14 @@ EXAMPLES:
     # 5. Live inference — task2
     ./run_inference_leftarm_v2.sh live task2
 
-    # 6. Override robot port without editing JSON
-    FOLLOWER_PORT=/dev/ttyUSB0 TOP_IDX=0 WRIST_IDX=2 \
+    # 6. Override device path (예: 우암으로 전환)
+    FOLLOWER_PORT=/dev/so_arm_right \
         ./run_inference_leftarm_v2.sh live task1
 
 NOTES:
-    - orin/config/ports.json (follower_port) and orin/config/cameras.json (top.index, wrist.index)
-      must be filled in before running 'live'. Use env overrides if not.
+    - udev rule (orin/config/udev/99-hylion.rules → /etc/udev/rules.d/99-hylion.rules) 가
+      /dev/so_arm_left, /dev/so_arm_right, /dev/cam_top, /dev/cam_wrist 를 생성.
+      디바이스 미발견 시 validate_devices 가 에러 + 점검 명령 안내.
     - rename_map (top->camera1, wrist->camera2) 은 leftarm_v2_inference.py 내부에서 자동 적용.
       (학습: prof_train_setting.md §3 --rename_map 동일)
     - n_action_steps=50 이 default (config.json 이미 수정됨).

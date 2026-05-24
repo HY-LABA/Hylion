@@ -1,4 +1,4 @@
 {
-  "top":   {"index": null, "rotation": -90, "width": 480, "height": 640, "fps": 30, "fourcc": "MJPG", "flip": false},
-  "wrist": {"index": null, "rotation":   0, "width": 640, "height": 480, "fps": 30, "fourcc": "MJPG", "flip": false}
+  "top":   {"rotation": -90, "width": 480, "height": 640, "fps": 30, "fourcc": "MJPG", "flip": false},
+  "wrist": {"rotation":   0, "width": 640, "height": 480, "fps": 30, "fourcc": "MJPG", "flip": false}
 }

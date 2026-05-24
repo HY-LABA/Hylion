@@ -47,9 +47,9 @@ CKPT_REPO_ID=BaboGaeguri/leftarm_v2_003_a2_310ep_empty1_sched_sync_bf16_b6 \
 
 ### 사전 조건
 
-- `orin/config/ports.json` 의 `follower_port` 채워져 있어야 함
-- `orin/config/cameras.json` 의 `top.index`, `wrist.index` 채워져 있어야 함
-- 또는 환경 변수로 override: `FOLLOWER_PORT=/dev/ttyUSB0 TOP_IDX=0 WRIST_IDX=2 ./run_inference_leftarm_v2.sh live task1`
+- udev rule (`orin/config/udev/99-hylion.rules`) 적용 → `/dev/cam_top`, `/dev/cam_wrist`, `/dev/so_arm_left`, `/dev/so_arm_right` 4개 심볼릭 링크 존재. 설치 절차는 [`orin/config/README.md`](../config/README.md) 참조
+- wrapper 진입 시 `validate_devices()` 가 4개 노드 존재 자동 확인 — 미존재 시 FAIL + 점검 명령 안내
+- 환경변수 override (우암 전환 등): `FOLLOWER_PORT=/dev/so_arm_right ./run_inference_leftarm_v2.sh live task1`
 
 ### 관련 문서
 

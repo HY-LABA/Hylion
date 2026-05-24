@@ -24,6 +24,14 @@
 | `inference_baseline.py` | 사전학습 분포 미러링 더미 입력 1회 forward — `model.config.input_features` 자동 추출. action shape/dtype/range 출력 | 현 era 의 `smoke_test.py` (환경 forward 검증) + `load_checkpoint_test.py` (ckpt 호환성 + action shape) 가 동일 책임 흡수. 현 era 호출 0건. 옛 spec 산출물 (`03_smolvla_test_on_orin TODO-03`). |
 | `measure_latency.py` | latency p50/p95 + RAM peak 측정. warmup N회 + 측정 N회 forward. `--num-steps` 로 flow matching steps 분기 | 현 era 평가 흐름은 *Orin trial 결과 (003 의 8/8 = 100%) + wandb 메트릭*. latency 측정은 *별도 영역* 으로 분리. 다음 era 의 성능 분석 시점에 재활용 가능. |
 
+### 1-3) 옛 디바이스 게이트 자산 (2026-05-24 tests/ 에서 이관)
+
+| 파일 | 옛 책임 | 이관 사유 |
+|---|---|---|
+| `check_hardware.sh` | first-time (lerobot-find-port + OpenCVCamera.find_cameras 발견 → ports.json/cameras.json cache 갱신) + resume (cache vs 현재 비교 검증) 두 모드의 단일 게이트. wrapper 가 진입 전 sub-call 하던 흐름. | 2026-05-24 **udev rule 도입** (`orin/config/udev/99-hylion.rules`) 으로 발견·매핑 책임이 udev 로 이관. cache 파일 (`ports.json` 폐기, `cameras.json` 의 index 필드 제거) 도 함께 정리. 진입 시 검증 책임은 `run_inference_leftarm_v2.sh` 의 `validate_devices()` 함수가 흡수 (4개 심볼릭 링크 존재만 확인). |
+| `check_hardware_configs/first_time.yaml` | first-time 모드 점검 항목·임계치 정의 | check_hardware.sh 와 한 셋트로 이관 |
+| `check_hardware_configs/resume.yaml` | resume 모드 cached 값 검증 룰 정의 | check_hardware.sh 와 한 셋트로 이관 |
+
 ---
 
 ## 2) 현 era 와의 관계 — 책임 이관

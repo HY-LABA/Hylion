@@ -42,40 +42,33 @@
 ## 외부 의존성
 
 - `orin/checkpoints/<repo_id>/` — 학습된 ckpt 로드 위치 (HF Hub `hf download` 캐시)
-- `orin/config/{ports,cameras}.json` — SO-ARM·카메라 설정 cache
+- `orin/config/udev/99-hylion.rules` — 디바이스 심볼릭 링크 (`/dev/cam_top`, `/dev/cam_wrist`, `/dev/so_arm_left`, `/dev/so_arm_right`)
+- `orin/config/cameras.json` — 카메라 부가 설정 (rotation/width/height/fps/fourcc/flip)
 - `orin/lerobot/` — SmolVLA 추론 모듈 (정책 + 카메라 + robot 추상화)
 
 ---
 
-## 사전 단계 — 카메라 인덱스 발견
+## 디바이스 매핑 — udev rule 도입 (2026-05-24)
 
-`orin/config/cameras.json` 에는 `index` 외에도 `rotation`, `width`, `height`, `fps`, `fourcc` 필드가 있으며, `leftarm_v2_inference.py` 가 이를 읽어 `OpenCVCameraConfig` 를 구성한다 (수집/학습 base_config.yaml 의 카메라 설정과 정합). 시연 전 `cameras.json` 의 `index` 만 채우면 되고, 나머지 필드는 기본값이 기재돼 있어 변경 불필요.
+이전엔 `lerobot-find-cameras opencv` 로 인덱스 발견 + `cameras.json` 의 `index` 필드 cache 갱신이 필수였다. udev rule 도입 후엔 다음 4개 심볼릭 링크가 시리얼 기반으로 영속 생성된다:
 
-추론 entry 실행 전 **반드시** 카메라 인덱스를 확인하라.
-Linux 에서 카메라 인덱스(/dev/videoN)는 재부팅·USB 재연결 시 변경될 수 있다.
+| 링크 | 대상 디바이스 |
+|---|---|
+| `/dev/cam_top` | YJX-C5 카메라 |
+| `/dev/cam_wrist` | Innomaker U20CAM-720P 카메라 |
+| `/dev/so_arm_left` | SO-ARM follower (좌암) |
+| `/dev/so_arm_right` | SO-ARM follower (우암) |
+
+추론 entry default 가 위 path 로 일원화. 재부팅·USB 재연결과 무관하게 동일 path. 설치 + 실측 절차는 [`orin/config/README.md`](../config/README.md) 참조.
+
+CLI 인자로 override 가능:
 
 ```bash
-source ~/smolvla/orin/.hylion_arm/bin/activate
-lerobot-find-cameras opencv
+# 우암으로 전환
+python leftarm_v2_inference.py --follower-port /dev/so_arm_right ...
+# 정수 인덱스도 하위 호환
+python leftarm_v2_inference.py --cameras top:2,wrist:0 ...
 ```
-
-출력 예시:
-
-```
---- Detected Cameras ---
-Camera #0:
-  Name: OpenCV Camera @ /dev/video2
-  ...
-Camera #1:
-  Name: OpenCV Camera @ /dev/video4
-  ...
-```
-
-위 결과를 바탕으로 `--cameras top:2,wrist:4` (또는 해당하는 인덱스) 를 명시한다.
-
-**자동 발견 fallback**: `--cameras` 를 생략하면 `OpenCVCamera.find_cameras()` 로 자동 발견.
-발견 수가 정확히 2 대일 때만 자동 적용 (첫 번째 → top, 두 번째 → wrist).
-자동 발견 실패 또는 2 대가 아니면 기본값 `top:0,wrist:1` 로 후퇴하며 경고를 출력한다.
 
 ## wrist 카메라 플립
 
@@ -91,12 +84,13 @@ wrist 카메라를 거꾸로 장착한 경우 `--flip-cameras wrist` 를 추가�
 
 본 디렉터리 entry 는 `orin/scripts/run_inference_leftarm_v2.sh` wrapper 를 통해 호출하는 게 표준이다. 직접 호출도 가능.
 
-### Step 1 — 카메라 인덱스 확인
+### Step 1 — udev 노드 확인
 
 ```bash
-source ~/smolvla/orin/.hylion_arm/bin/activate
-lerobot-find-cameras opencv
+ls -la /dev/cam_top /dev/cam_wrist /dev/so_arm_left /dev/so_arm_right
 ```
+
+→ 4개 모두 존재하면 OK. 미존재 시 [`orin/config/README.md`](../config/README.md) 의 설치 절차로 udev rule 재적용.
 
 ### LoRA ckpt 추론 (현행 sequence)
 

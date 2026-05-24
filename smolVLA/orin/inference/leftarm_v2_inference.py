@@ -32,8 +32,10 @@ rename_map 적용:
 - 추론 시: robot.get_observation() 결과의 'observation.images.top' 키를
            'observation.images.camera1' 로 rename 후 policy 입력
 
-gate-json:
-- orin/config/ports.json + cameras.json 자동 로드 (orin/docs/legacy/hil_inference.py / orin/docs/legacy/lego_v1_inference.py 와 동일 패턴).
+device 매핑 (2026-05-24 udev rule 도입 후):
+- /dev/cam_top, /dev/cam_wrist, /dev/so_arm_left, /dev/so_arm_right — orin/config/udev/99-hylion.rules 가 생성
+- 인자 default 가 udev path. --follower-port·--cameras override 로 우암 등 전환 가능
+- gate-json: 카메라 부가 설정 (rotation/fps/fourcc/flip) 만 cameras.json 에서 로드
 """
 
 import argparse
@@ -70,16 +72,20 @@ TASK_INSTRUCTIONS = {
 
 
 # ── 카메라 파싱 유틸 ──────────────────────────────────────────────────────────
-def parse_camera_arg(value: str) -> dict[str, int]:
-    """`--cameras top:0,wrist:1` 형식을 파싱.
+def parse_camera_arg(value: str) -> dict[str, int | str]:
+    """`--cameras top:0,wrist:1` 또는 `--cameras top:/dev/cam_top,wrist:/dev/cam_wrist` 형식을 파싱.
 
-    패턴 출처: orin/docs/legacy/hil_inference.py (검증된 구현)
-    Returns: {camera_name: device_index} 매핑. 입력 순서 보존 (Python 3.7+).
+    udev rule 도입 (2026-05-24) 후 default 는 path 기반. 정수 인덱스도 하위 호환.
+    Returns: {camera_name: device_index_or_path} 매핑. 입력 순서 보존 (Python 3.7+).
     """
-    pairs: dict[str, int] = {}
+    pairs: dict[str, int | str] = {}
     for item in value.split(","):
-        name, idx = item.split(":")
-        pairs[name.strip()] = int(idx.strip())
+        name, idx = item.split(":", 1)
+        idx_s = idx.strip()
+        try:
+            pairs[name.strip()] = int(idx_s)
+        except ValueError:
+            pairs[name.strip()] = idx_s
     return pairs
 
 
@@ -118,64 +124,38 @@ def apply_rename_map(obs: dict) -> dict:
     return obs
 
 
-# ── gate-json 로드 유틸 ──────────────────────────────────────────────────────
-def load_gate_config(gate_json_path: str) -> tuple[dict | None, dict | None]:
-    """orin/config/ports.json + cameras.json 을 로드하여 반환.
+# ── cameras.json 부가 설정 로드 ─────────────────────────────────────────────
+def load_camera_config(camera_json_path: str) -> dict | None:
+    """orin/config/cameras.json 을 로드하여 카메라 부가 설정 (rotation/fps/fourcc/flip) 만 반환.
 
-    패턴 출처: orin/docs/legacy/hil_inference.py load_gate_config (검증된 구현 그대로 차용)
+    2026-05-24 udev rule 도입으로 device path 는 --cameras default (`/dev/cam_top`, `/dev/cam_wrist`) 로 일원화.
+    cameras.json 은 부가 파라미터 (rotation/width/height/fps/fourcc/flip) 만 관리.
     """
-    p = Path(gate_json_path)
-    config_dir = p if p.is_dir() else p.parent
+    p = Path(camera_json_path)
+    cameras_path = p if p.suffix == ".json" else p / "cameras.json"
 
-    ports_path = config_dir / "ports.json"
-    cameras_path = config_dir / "cameras.json"
+    if not cameras_path.exists():
+        return None
 
-    ports_data = None
-    cameras_data = None
-
-    if ports_path.exists():
-        try:
-            with open(ports_path) as f:
-                ports_data = json.load(f)
-        except (json.JSONDecodeError, OSError) as e:
-            print(f"[gate] ports.json 로드 실패 ({ports_path}): {e}", file=sys.stderr)
-
-    if cameras_path.exists():
-        try:
-            with open(cameras_path) as f:
-                cameras_data = json.load(f)
-        except (json.JSONDecodeError, OSError) as e:
-            print(f"[gate] cameras.json 로드 실패 ({cameras_path}): {e}", file=sys.stderr)
-
-    return ports_data, cameras_data
+    try:
+        with open(cameras_path) as f:
+            return json.load(f)
+    except (json.JSONDecodeError, OSError) as e:
+        print(f"[gate] cameras.json 로드 실패 ({cameras_path}): {e}", file=sys.stderr)
+        return None
 
 
-def apply_gate_config(
+def apply_camera_config(
     args: argparse.Namespace,
-    ports_data: dict | None,
     cameras_data: dict | None,
 ) -> argparse.Namespace:
-    """gate config 값으로 미지정 인자를 채운다.
+    """cameras.json 의 부가 설정으로 카메라 파라미터·flip 을 채운다.
 
-    CLI 직접 지정 우선 (하위 호환). 패턴: orin/docs/legacy/hil_inference.py apply_gate_config.
-    카메라 키: top (cameras.json 원본) → top 그대로 사용 (본 스크립트 --cameras 인자 키와 동일).
-
-    cameras.json schema (rotation 정합 복원 — TODO-03-H 2026-05-18):
-      {"top": {"index": null, "rotation": -90, "width": 480, "height": 640, "fps": 30, "fourcc": "MJPG", "flip": false}, ...}
-    신규 필드 (rotation/width/height/fps/fourcc) 는 _camera_params 에 저장 → OpenCVCameraConfig 생성 시 활용.
-    기존 cameras.json (index/flip 만) 과 하위 호환 유지 — 신규 필드 누락 시 default 적용.
+    cameras.json schema (2026-05-24, udev 도입 후):
+      {"top":   {"rotation": -90, "width": 480, "height": 640, "fps": 30, "fourcc": "MJPG", "flip": false},
+       "wrist": {"rotation":   0, "width": 640, "height": 480, "fps": 30, "fourcc": "MJPG", "flip": false}}
+    device path 는 --cameras default 또는 CLI override 로 결정 (cameras.json 에 없음).
     """
-    # --follower-port
-    if args.follower_port is None and ports_data is not None:
-        fp = ports_data.get("follower_port")
-        if fp:
-            args.follower_port = fp
-            print(f"[gate] follower_port ← {fp} (ports.json)")
-        else:
-            print("[gate] ports.json.follower_port = null — --follower-port 는 여전히 필수", file=sys.stderr)
-
-    # cameras.json 에서 카메라 파라미터 추출 (rotation/width/height/fps/fourcc — rotation 정합 복원)
-    # 신규 필드 없는 기존 cameras.json 과 하위 호환: 누락 시 default (rotation=0, width=640, height=480, fps=30, fourcc=MJPG).
     if cameras_data is not None:
         cam_params: dict[str, dict] = {}
         for cam_name in ("top", "wrist"):
@@ -198,26 +178,11 @@ def apply_gate_config(
                 "fps": fps,
                 "fourcc": fourcc,
             }
-        # args._camera_params 에 저장 (OpenCVCameraConfig 생성 시 참조)
         args._camera_params = cam_params
     else:
         args._camera_params = {}
 
-    # --cameras
-    if cameras_data is not None and args.cameras is None:
-        top_idx = cameras_data.get("top", {}).get("index")
-        wrist_idx = cameras_data.get("wrist", {}).get("index")
-        if top_idx is not None and wrist_idx is not None:
-            def _to_idx(v):
-                try:
-                    return int(v)
-                except (ValueError, TypeError):
-                    return Path(v)
-
-            args.cameras = {"top": _to_idx(top_idx), "wrist": _to_idx(wrist_idx)}
-            print(f"[gate] cameras ← top:{top_idx},wrist:{wrist_idx} (cameras.json)")
-
-    # --flip-cameras
+    # --flip-cameras: cameras.json 의 flip=true 카메라 자동 합산
     if cameras_data is not None and not args.flip_cameras:
         flip_names: set[str] = set()
         for cam_name in ("top", "wrist"):
@@ -227,61 +192,7 @@ def apply_gate_config(
             args.flip_cameras = flip_names
             print(f"[gate] flip_cameras ← {sorted(flip_names)} (cameras.json)")
 
-    # _camera_params 기본값 보장 (cameras_data 없을 때 생략됐을 경우)
-    if not hasattr(args, "_camera_params"):
-        args._camera_params = {}
-
     return args
-
-
-def _auto_discover_cameras() -> dict[str, int] | None:
-    """OpenCVCamera.find_cameras() 로 시스템에 연결된 카메라를 자동 발견한다.
-
-    발견된 카메라가 정확히 2 대인 경우에만 자동 적용 (top: 첫 번째, wrist: 두 번째).
-    패턴 출처: orin/docs/legacy/hil_inference.py _auto_discover_cameras (검증된 구현 그대로 차용)
-    """
-    try:
-        from lerobot.cameras.opencv import OpenCVCamera
-
-        found = OpenCVCamera.find_cameras()
-    except Exception as e:
-        print(f"[camera] 자동 발견 중 오류: {e}", file=sys.stderr)
-        return None
-
-    if len(found) == 0:
-        print("[camera] 연결된 카메라를 찾지 못했습니다. lerobot-find-cameras opencv 로 확인하세요.", file=sys.stderr)
-        return None
-
-    if len(found) != 2:
-        print(
-            f"[camera] 카메라 {len(found)} 대 발견 — 자동 적용 불가 (정확히 2 대 필요).\n"
-            f"[camera] lerobot-find-cameras opencv 결과를 확인하고 --cameras top:<idx>,wrist:<idx> 로 명시하십시오.",
-            file=sys.stderr,
-        )
-        return None
-
-    def _to_idx(v) -> int:
-        try:
-            return int(v)
-        except (ValueError, TypeError):
-            import re
-
-            m = re.search(r"(\d+)$", str(v))
-            if m:
-                return int(m.group(1))
-            raise ValueError(f"카메라 id 를 정수 인덱스로 변환할 수 없음: {v!r}")
-
-    try:
-        top_idx = _to_idx(found[0]["id"])
-        wrist_idx = _to_idx(found[1]["id"])
-    except Exception as e:
-        print(f"[camera] 자동 발견 인덱스 변환 실패: {e}", file=sys.stderr)
-        return None
-
-    result = {"top": top_idx, "wrist": wrist_idx}
-    print(f"[camera] 자동 발견 성공 — top:{top_idx}, wrist:{wrist_idx} (2대 발견)")
-    print("[camera] 인덱스가 올바르지 않으면 lerobot-find-cameras opencv 로 확인 후 --cameras 로 명시하십시오.")
-    return result
 
 
 # ── LoRA 로드 헬퍼 ────────────────────────────────────────────────────────────
@@ -375,10 +286,10 @@ def main():
     parser.add_argument(
         "--follower-port",
         type=str,
-        default=None,
+        default="/dev/so_arm_left",
         help=(
-            "Follower SO-101 serial port (예: /dev/ttyACM1). "
-            "--gate-json 의 ports.json 이 있으면 자동으로 채워진다."
+            "Follower SO-101 serial port. default: /dev/so_arm_left (udev rule 도입 2026-05-24). "
+            "우암으로 전환 시 --follower-port /dev/so_arm_right."
         ),
     )
     parser.add_argument(
@@ -390,13 +301,12 @@ def main():
     parser.add_argument(
         "--cameras",
         type=parse_camera_arg,
-        default=None,
+        default=parse_camera_arg("top:/dev/cam_top,wrist:/dev/cam_wrist"),
         help=(
-            "Camera mapping `name:device_idx,...` (예: top:2,wrist:0). "
+            "Camera mapping `name:device_path_or_idx,...`. "
+            "default: top:/dev/cam_top,wrist:/dev/cam_wrist (udev rule 도입 2026-05-24). "
             "키: top, wrist (학습 rename_map 의 원본 키 — 내부에서 camera1/camera2 로 rename). "
-            "미지정 시 자동 발견 시도 (2대 발견 시에만). "
-            "사전 발견 명령: lerobot-find-cameras opencv. "
-            "--gate-json cameras.json 이 있으면 우선 적용."
+            "정수 인덱스도 하위 호환 (예: top:2,wrist:0)."
         ),
     )
     parser.add_argument(
@@ -434,9 +344,9 @@ def main():
         type=str,
         default=None,
         help=(
-            "orin/config/ 디렉터리 경로 또는 ports.json / cameras.json 파일 경로. "
-            "미지정 인자 (--follower-port, --cameras, --flip-cameras) 를 자동으로 채운다. "
-            "CLI 직접 지정이 우선."
+            "orin/config/ 디렉터리 경로 또는 cameras.json 파일 경로. "
+            "카메라 부가 설정 (rotation/width/height/fps/fourcc/flip) 을 로드한다. "
+            "device path 는 --cameras default 또는 CLI override 로 결정 (udev rule 도입 2026-05-24)."
         ),
     )
     args = parser.parse_args()
@@ -449,28 +359,14 @@ def main():
     ckpt_dir_str = str(Path(args.ckpt_dir).expanduser())
     print(f"[ckpt] {ckpt_dir_str}")
 
-    # ── gate-json 자동 인자 채우기 ────────────────────────────────
+    # ── cameras.json 부가 설정 적용 ───────────────────────────────
     if args.gate_json is not None:
-        ports_data, cameras_data = load_gate_config(args.gate_json)
-        args = apply_gate_config(args, ports_data, cameras_data)
-
-    # ── 카메라 인덱스 결정: CLI > gate-json > 자동 발견 > 기본값 ───
-    if args.cameras is None:
-        args.cameras = _auto_discover_cameras()
-
-    if args.cameras is None:
-        print(
-            "[camera] 자동 발견 실패 — Orin 실측 기본값(top:2,wrist:0) 을 사용합니다.\n"
-            "[camera] 카메라 인덱스 확인 명령: lerobot-find-cameras opencv\n"
-            "[camera] 확인 후 --cameras top:<idx>,wrist:<idx> 로 명시하십시오.",
-            file=sys.stderr,
-        )
-        args.cameras = parse_camera_arg("top:2,wrist:0")
+        cameras_data = load_camera_config(args.gate_json)
+        args = apply_camera_config(args, cameras_data)
+    else:
+        args._camera_params = {}
 
     # ── 필수 인자 최종 검증 ───────────────────────────────────────
-    if args.follower_port is None:
-        parser.error("--follower-port 는 필수입니다 (또는 --gate-json 으로 ports.json 경로 지정).")
-
     if args.mode == "dry-run" and args.output_json is None:
         parser.error("--output-json 은 dry-run 모드에서 필수입니다.")
 

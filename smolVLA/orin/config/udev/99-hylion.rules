@@ -1,0 +1,25 @@
+# 99-hylion.rules — Hylion smolVLA persistent device names
+#
+# 설치 위치: /etc/udev/rules.d/99-hylion.rules (deploy 스크립트가 sudo cp)
+# 적용 명령: sudo udevadm control --reload && sudo udevadm trigger
+#
+# 본 룰은 시리얼 단독으로 4개 디바이스를 식별한다.
+# 시리얼이 unique 인 것은 2026-05-24 ssh 실측으로 확인됨.
+
+# ----------------------------------------------------------------------------
+# Cameras — video4linux capture interfaces only (ATTR{index}=="0")
+# ----------------------------------------------------------------------------
+
+# top camera: YJX-C5 (Realtek 0bda:0565)
+SUBSYSTEM=="video4linux", KERNEL=="video[0-9]*", ATTR{index}=="0", ATTRS{idVendor}=="0bda", ATTRS{idProduct}=="0565", ATTRS{serial}=="200901010001", SYMLINK+="cam_top"
+
+# wrist camera: Innomaker U20CAM-720P (Microdia 0c45:6367)
+SUBSYSTEM=="video4linux", KERNEL=="video[0-9]*", ATTR{index}=="0", ATTRS{idVendor}=="0c45", ATTRS{idProduct}=="6367", ATTRS{serial}=="SN0001", SYMLINK+="cam_wrist"
+
+# ----------------------------------------------------------------------------
+# SO-ARM Feetech controllers — WCH CH343 (1a86:55d3)
+# ----------------------------------------------------------------------------
+
+SUBSYSTEM=="tty", KERNEL=="ttyACM[0-9]*", ATTRS{idVendor}=="1a86", ATTRS{idProduct}=="55d3", ATTRS{serial}=="5AE6056701", SYMLINK+="so_arm_left"
+
+SUBSYSTEM=="tty", KERNEL=="ttyACM[0-9]*", ATTRS{idVendor}=="1a86", ATTRS{idProduct}=="55d3", ATTRS{serial}=="5AE6082773", SYMLINK+="so_arm_right"

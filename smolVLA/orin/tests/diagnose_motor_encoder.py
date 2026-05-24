@@ -37,8 +37,8 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="SO-ARM encoder diagnostic tool")
     parser.add_argument(
         "--port",
-        default="/dev/ttyACM0",
-        help="Serial port to diagnose (default: /dev/ttyACM0, follower expected)",
+        default="/dev/so_arm_left",
+        help="Serial port to diagnose (default: /dev/so_arm_left, udev rule 도입 2026-05-24)",
     )
     parser.add_argument(
         "--hz",
@@ -60,6 +60,10 @@ def guess_role(link_name: str, tty_path: str) -> str:
         return "follower"
     if "leader" in lowered:
         return "leader"
+    if "so_arm_left" in tty_path:
+        return "left"
+    if "so_arm_right" in tty_path:
+        return "right"
     if tty_path.endswith("ttyACM0"):
         return "follower?"
     if tty_path.endswith("ttyACM1"):

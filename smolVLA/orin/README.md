@@ -9,9 +9,9 @@ smolVLA의 Orin 커스텀 레이어입니다.
 - `scripts/`: 운영용 셸 스크립트 — venv·추론·텔레오프 wrapper (`orin/scripts/README.md` 참조)
 - `tests/`: 환경 검증·호환성·baseline·latency 측정 스크립트
 - `checkpoints/`: 학습 ckpt 다운로드 위치 (HF Hub `huggingface-cli/hf download` 대상)
-- `config/`: 시연장 환경 설정 cache — `cameras.json`, `ports.json` (시연장에서 사용자가 채움)
+- `config/`: 디바이스 매핑 (`udev/99-hylion.rules`) + 카메라 부가 설정 (`cameras.json`). udev rule 도입 2026-05-24 — device path 4개 영속화
 - `docs/leftarm_v2/`: 추론 평가 시트 (분기별)
-- `docs/legacy/`: 옛 era 추론 entry 보존 — `hil_inference.py`, `lego_v1_inference.py` (참조만, 현 시연 호출 X)
+- `docs/legacy/`: 옛 era 자산 보존 — 추론 entry (`hil_inference.py`, `lego_v1_inference.py`), 디바이스 게이트 (`check_hardware.sh`, `check_hardware_configs/`), 측정 도구 (`inference_baseline.py`, `measure_latency.py`). 참조만, 현 시연 호출 X
 - `pyproject.toml`: Orin 의존성 — `lerobot[smolvla]` + peft + 시스템 ABI 호환 (`docs/storage/lerobot_upstream_check/02_orin_pyproject_diff.md` 참조)
 
 ## 트리 구조
@@ -24,20 +24,25 @@ orin/
 |   `-- README.md           # ckpt 다운로드 안내 (HF Hub 캐시)
 |-- config/
 |   |-- README.md
-|   |-- cameras.json        # {index, rotation, width, height, fps, fourcc, flip}
-|   `-- ports.json          # {follower_port, leader_port}
+|   |-- cameras.json        # {rotation, width, height, fps, fourcc, flip} — device path 는 udev 가 담당
+|   `-- udev/
+|       `-- 99-hylion.rules # /dev/{cam_top,cam_wrist,so_arm_left,so_arm_right} 심볼릭 링크 정의
 |-- inference/                      # 현행 era (leftarm_v2)
 |   |-- README.md
 |   |-- leftarm_base_inference.py   # zero-shot 검증 entry (base smolvla_base 만)
 |   `-- leftarm_v2_inference.py     # LoRA ckpt 추론 (CKPT_REPO_ID env override)
 |-- docs/
 |   |-- leftarm_v2/                 # 추론 평가 시트 (000_base, 001, 002, 003 분기별)
-|   `-- legacy/                     # 옛 era 추론·측정 자산 보존
+|   `-- legacy/                     # 옛 era 추론·측정·게이트 자산 보존
 |       |-- README.md
 |       |-- hil_inference.py        # era 무관 환경 검증 추론
 |       |-- lego_v1_inference.py    # lego_v1 era 추론
 |       |-- inference_baseline.py   # 더미 입력 forward 검증 (legacy)
-|       `-- measure_latency.py      # latency p50/p95 측정 (legacy)
+|       |-- measure_latency.py      # latency p50/p95 측정 (legacy)
+|       |-- check_hardware.sh       # 옛 디바이스 발견·캐시 게이트 (udev 도입으로 이관)
+|       `-- check_hardware_configs/
+|           |-- first_time.yaml     # 옛 first-time 모드 점검 항목
+|           `-- resume.yaml         # 옛 resume 모드 검증 룰
 |-- lerobot/
 |   |-- __init__.py
 |   |-- __version__.py
@@ -61,11 +66,7 @@ orin/
 |   `-- run_inference_leftarm_v2.sh # leftarm_v2 era wrapper (download/check/dry-run/live/zero-shot)
 `-- tests/
     |-- README.md
-    |-- check_hardware.sh           # 단일 진입점 (first-time/resume 모드)
-    |-- configs/
-    |   |-- first_time.yaml         # first-time 모드 점검 항목·임계치
-    |   `-- resume.yaml             # resume 모드 cached 값 검증 룰
     |-- smoke_test.py               # venv/CUDA/import/smolvla forward 환경 검증
     |-- load_checkpoint_test.py     # ckpt 호환성 검증 (forward + action shape)
-    `-- diagnose_motor_encoder.py   # SO-ARM 모터 encoder 진단 (관절별 raw position)
+    `-- diagnose_motor_encoder.py   # SO-ARM 모터 encoder 진단 (default /dev/so_arm_left)
 ```
