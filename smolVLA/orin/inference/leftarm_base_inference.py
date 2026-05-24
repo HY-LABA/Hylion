@@ -70,9 +70,11 @@ ROBOT_TYPE = "so101_follower"
 SLOT_MAP = ["camera1", "camera2"]
 
 # Task instruction (출처: dgx/docs/finetune/leftarm_v2/collection_log.md §task 정의)
+# task3: 학습 분포 외 일반화 검증용 (2026-05-24 사용자 추가)
 TASK_INSTRUCTIONS = {
     "task1": "Pick up the blue and yellow doll and place it on the left side of the table",
     "task2": "Hand the yellow can to the person",
+    "task3": "Hand the white can to the person",
 }
 
 
@@ -235,12 +237,13 @@ def main():
     )
     parser.add_argument(
         "--task",
-        choices=["task1", "task2"],
+        choices=["task1", "task2", "task3"],
         required=True,
         help=(
             "수행할 task. "
             "task1: 'Pick up the blue and yellow doll and place it on the left side of the table'. "
-            "task2: 'Hand the yellow can to the person'."
+            "task2: 'Hand the yellow can to the person'. "
+            "task3: 'Hand the white can to the person' (학습 분포 외 일반화 검증, 2026-05-24 추가)."
         ),
     )
     parser.add_argument(

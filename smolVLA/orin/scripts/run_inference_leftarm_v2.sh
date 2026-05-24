@@ -12,12 +12,13 @@
 # Reference: orin/inference/leftarm_v2_inference.py
 #   - task1: "Pick up the blue and yellow doll and place it on the left side of the table"
 #   - task2: "Hand the yellow can to the person"
+#   - task3: "Hand the white can to the person" (학습 분포 외 일반화 검증, 2026-05-24 추가)
 #   - rename_map: top->camera1, wrist->camera2 (학습 분포 정합)
 #   - LoRA adapter: PeftConfig + PeftModel (peft>=0.10.0 필요)
 #
 # Usage:
 #   ./run_inference_leftarm_v2.sh <subcommand> [args]
-#   Subcommands: download | check | dry-run | live <task1|task2> | help
+#   Subcommands: download | check | dry-run | live <task1|task2|task3> | help
 #
 # Environment override (export before calling):
 #   CKPT_REPO_ID, CKPT_LOCAL_DIR, VENV_PATH, CONFIG_DIR, INFERENCE_SCRIPT
@@ -38,9 +39,12 @@ INFERENCE_SCRIPT="${INFERENCE_SCRIPT:-${HOME}/smolvla/orin/inference/leftarm_v2_
 # 가설 분리 검증 (learning_log1 §001 분기 추론 후 가설 분리 검증 사이클, 2026-05-18)
 BASE_INFERENCE_SCRIPT="${BASE_INFERENCE_SCRIPT:-${HOME}/smolvla/orin/inference/leftarm_base_inference.py}"
 
-# Task instructions (from collection_log.md)
+# Task instructions (from collection_log.md). 본 변수는 문서화 용도 — 실제 instruction
+# lookup 은 Python entry 의 TASK_INSTRUCTIONS dict (leftarm_v2_inference.py:68, leftarm_base_inference.py:73).
+# task3: 학습 분포 외 일반화 검증용 (2026-05-24 사용자 추가).
 TASK1_INSTRUCTION="Pick up the blue and yellow doll and place it on the left side of the table"
 TASK2_INSTRUCTION="Hand the yellow can to the person"
+TASK3_INSTRUCTION="Hand the white can to the person"
 
 CONFIG_PATH="${CKPT_LOCAL_DIR}/config.json"
 
@@ -192,10 +196,10 @@ cmd_live() {
     fi
 
     case "${task_key}" in
-        task1|task2)
+        task1|task2|task3)
             ;;
         *)
-            echo "ERROR: Unknown task '${task_key}'. Use 'task1' or 'task2'."
+            echo "ERROR: Unknown task '${task_key}'. Use 'task1', 'task2', or 'task3'."
             exit 1
             ;;
     esac
@@ -251,10 +255,10 @@ cmd_zero_shot() {
     fi
 
     case "${task_key}" in
-        task1|task2)
+        task1|task2|task3)
             ;;
         *)
-            echo "ERROR: Unknown task '${task_key}'. Use 'task1' or 'task2'."
+            echo "ERROR: Unknown task '${task_key}'. Use 'task1', 'task2', or 'task3'."
             exit 1
             ;;
     esac
@@ -311,9 +315,11 @@ SUBCOMMANDS:
     check           Inspect config.json (n_action_steps + image feature keys)
     dry-run [task]  LoRA 로드 + 코드 경로 검증 (robot 미연결 가능) [default task: task1]
     live task1      Run live inference (task1: doll pick-and-place, LoRA ckpt)
-    live task2      Run live inference (task2: can handover, LoRA ckpt)
+    live task2      Run live inference (task2: yellow can handover, LoRA ckpt)
+    live task3      Run live inference (task3: white can handover — 학습 분포 외 일반화 검증)
     zero-shot task1 Run zero-shot inference (base smolvla_base only — 가설 분리 검증)
     zero-shot task2 Run zero-shot inference (base smolvla_base only — 가설 분리 검증)
+    zero-shot task3 Run zero-shot inference (base smolvla_base only — task3 응답성)
     help            Show this help
 
 ENVIRONMENT OVERRIDES (export before calling):
