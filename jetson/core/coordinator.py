@@ -517,7 +517,7 @@ def run_live_pipeline(
 	_append_session_log(session_id, {"event": "session_start", "session_id": session_id})
 
 	# Initialize mouth servo for lip-sync
-	mouth_servo = MouthServoController(pin=33)
+	mouth_servo = MouthServoController(pin=7)
 	# MouthServoController initializes on first use, no explicit init() needed
 	print(f"[MouthServo] created (available: {mouth_servo.is_available})")
 

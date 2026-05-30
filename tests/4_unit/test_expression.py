@@ -187,11 +187,11 @@ def test_mouth_servo_uses_direct_gpio_pulses(monkeypatch):
 	monkeypatch.setattr(mouth_servo.time, "sleep", clock.sleep)
 	monkeypatch.setattr(mouth_servo.time, "monotonic", clock.monotonic)
 
-	controller = mouth_servo.MouthServoController(pin=33, move_interval_sec=0.04)
+	controller = mouth_servo.MouthServoController(pin=7, move_interval_sec=0.04)
 	controller.initialize()
 	controller.move_to_angle(30.0)
 	controller.cleanup()
 
-	assert ("setup", 33, fake_gpio.OUT) in fake_gpio.calls
-	assert any(call[0] == "output" and call[1] == 33 for call in fake_gpio.calls)
+	assert ("setup", 7, fake_gpio.OUT) in fake_gpio.calls
+	assert any(call[0] == "output" and call[1] == 7 for call in fake_gpio.calls)
 	assert not hasattr(fake_gpio, "PWM")
