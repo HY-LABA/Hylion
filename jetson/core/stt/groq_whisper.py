@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Optional
 
-from jetson.core.env_secrets import ensure_env_from_dotenv
+from jetson.utils.env_secrets import ensure_env_from_dotenv
 from jetson.core.stt.base import STTResult
 
 

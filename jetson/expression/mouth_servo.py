@@ -142,6 +142,6 @@ def cleanup_gpio(pin: Optional[int] = None) -> None:
 		if pin is None:
 			GPIO.cleanup()
 		else:
-			GPIO.cleanup(pin)
+			GPIO.cleanup(pin) 
 	except Exception:
 		pass

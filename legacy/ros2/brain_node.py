@@ -8,7 +8,6 @@ import uuid
 from datetime import datetime
 from groq import Groq
 
-from hylion_perception import perceive_environment, pixel_to_robot_coords
 
 class BrainNode(Node):
     def __init__(self):

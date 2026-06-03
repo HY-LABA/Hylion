@@ -4,7 +4,7 @@ import time
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
 
-from jetson.core.env_secrets import ensure_env_from_dotenv
+from jetson.utils.env_secrets import ensure_env_from_dotenv
 from jetson.core.llm.prompt import (
 	ONLINE_SYSTEM_PROMPT,
 	assemble_action,

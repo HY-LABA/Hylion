@@ -158,8 +158,9 @@ Ctrl+C (KeyboardInterrupt)
    ║                                                          ║
    ║  ④ history append (최근 10턴) + session jsonl 로그       ║
    ║                                                          ║
-   ║  ⑤ _play_gesture_if_any()  ← chat 턴만, non-blocking     ║
-   ║     gesture_daemon.play(name) → Unix socket ACK 즉시 반환║
+   ║  ⑤ _start_gesture_if_any() ← chat 턴만, non-blocking     ║
+   ║     요청 스레드에서 gesture_daemon.play(name) ACK 대기   ║
+   ║     coordinator 는 즉시 다음 단계(TTS)로 진행            ║
    ║     실패해도 대화 루프 안 끊김                           ║
    ║                                                          ║
    ║  ⑥ _speak_reply_if_any() TTS + 입 서보 lipsync (blocking)║
