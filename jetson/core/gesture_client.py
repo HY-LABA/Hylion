@@ -160,6 +160,7 @@ def start_gesture_daemon() -> GestureDaemonHandle:
     #    re-exec 가드가 있지만, 미리 넣어주면 re-exec 한 번을 아낀다).
     #  - 소켓/데이터 경로를 명시적으로 전달해 coordinator 와 일치 보장.
     env = {k: v for k, v in os.environ.items() if k != "VIRTUAL_ENV"}
+    env.setdefault("PYTHONUNBUFFERED", "1")
     venv_root = venv_python.parent.parent
     cusparselt = venv_root / "lib" / "python3.10" / "site-packages" / "nvidia" / "cusparselt" / "lib"
     if (cusparselt / "libcusparseLt.so.0").is_file():

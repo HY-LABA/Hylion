@@ -1,0 +1,19 @@
+# SSH config template for Hylion workspace
+# Usage: ssh -F ./ssh_config jetson
+# Fill in HostName and User fields before use.
+
+# Read more about SSH config files: https://linux.die.net/man/5/ssh_config
+Host jetson
+    HostName 172.16.146.4
+    User laba
+    HostKeyAlias hylion-jetson
+
+Host nuc
+    HostName 10.42.0.221
+    User laba
+    ProxyJump jetson
+    HostKeyAlias hylion-nuc
+
+# Example usage:
+#  ssh -F ./ssh_config jetson
+#  ssh -F ./ssh_config nuc

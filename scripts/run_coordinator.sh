@@ -26,6 +26,7 @@ if [ ! -e "$CUSPARSELT_LIB/libcusparseLt.so.0" ]; then
     exit 1
 fi
 export LD_LIBRARY_PATH="$CUSPARSELT_LIB:${LD_LIBRARY_PATH:-}"
+export PYTHONUNBUFFERED=1
 
 # NUC bridge 주소: Jetson↔NUC 유선 직결(NetworkManager 공유망 10.42.0.0/24).
 # bhl_client.py 의 기본값은 127.0.0.1 이므로 NUC 의 실제 IP 를 명시해야

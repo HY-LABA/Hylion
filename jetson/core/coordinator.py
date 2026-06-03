@@ -762,6 +762,7 @@ def main() -> None:
 	# connect, in the .hylion_arm venv) overlaps with model warm-up below.
 	# Failure is non-fatal — start_gesture_daemon() returns a disabled handle.
 	gesture_daemon = start_gesture_daemon()
+	gesture_ready_timeout = float(os.environ.get("HYLION_GESTURE_READY_TIMEOUT_SEC", "3.0"))
 	# Single sticky online/offline gate; one is_online() probe is paid at
 	# construction and then reused across wake activations (with cooldown-based
 	# retry on failures) instead of probing inside every turn.
@@ -774,7 +775,7 @@ def main() -> None:
 		# and the move executes without wake-word stop.
 		estop_listener = build_emergency_stop_listener()
 		_startup_warm_up(args, gate)
-		if gesture_daemon.wait_ready(timeout=15.0):
+		if gesture_daemon.is_alive() and gesture_daemon.wait_ready(timeout=gesture_ready_timeout):
 			print("[Warm-up] Gesture daemon ... OK")
 		else:
 			print("[Warm-up] Gesture daemon ... 미준비 (gesture 비활성 상태로 계속)")

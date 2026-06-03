@@ -28,11 +28,13 @@ from __future__ import annotations
 
 import argparse
 import os
+import shlex
 import subprocess
 import sys
 import time
 from dataclasses import dataclass, field
 from enum import Enum
+from pathlib import Path
 from typing import Callable, Optional
 
 try:
@@ -70,6 +72,11 @@ SESSION_COORDINATOR = "hylion-coordinator"
 
 LOG_BUFFER_MAX = 240
 LOG_VISIBLE_LINES = 22
+REPO_ROOT = Path(__file__).resolve().parents[1]
+LOCAL_SSH_CONFIG = os.environ.get(
+    "HYLION_SSH_CONFIG",
+    str(REPO_ROOT / "ssh_config"),
+)
 
 
 class Status(str, Enum):
@@ -135,6 +142,19 @@ class TUI:
         self.log_lines: list[Text] = []
         self.current_action: str = "대기 중"
         self.live: Optional[Live] = None
+        self.spawned_tmux_sessions: list[tuple[str, str]] = []
+
+    def _ssh_base_args(self) -> list[str]:
+        args = [
+            "ssh",
+            "-o", "BatchMode=yes",
+            "-o", "ConnectTimeout=10",
+            "-o", "ServerAliveInterval=15",
+        ]
+        ssh_config = Path(LOCAL_SSH_CONFIG)
+        if ssh_config.exists():
+            args[1:1] = ["-F", str(ssh_config)]
+        return args
 
     # ── 로그 + 렌더링 ────────────────────────────────────────────
     def log(self, text: str, style: str = "") -> None:
@@ -219,14 +239,7 @@ class TUI:
             self.log(f"    [dry-run] ssh {host}: {command[:140]}", "yellow")
             return 0, ""
         self.log(f"    $ ssh {host}: {command[:160]}", "dim")
-        cmd = [
-            "ssh",
-            "-o", "BatchMode=yes",
-            "-o", "ConnectTimeout=10",
-            "-o", "ServerAliveInterval=15",
-            host,
-            command,
-        ]
+        cmd = self._ssh_base_args() + [host, command]
         try:
             proc = subprocess.Popen(
                 cmd,
@@ -273,10 +286,65 @@ class TUI:
             "[dim]   (이 SSH 세션이 끝나면 TUI 로 돌아옵니다)[/]\n"
         )
         try:
-            return subprocess.call(["ssh", "-t", host, command])
+            return subprocess.call(self._ssh_base_args() + ["-t", host, command])
         finally:
             if self.live:
                 self.live.start(refresh=True)
+
+    def open_local_terminal(self, command: str, title: str = "Hylion") -> bool:
+        """Best-effort local terminal launcher for GUI environments.
+
+        Returns True if a terminal emulator was launched successfully.
+        """
+        if self.dry_run:
+            self.log(f"    [dry-run] open terminal: {command[:160]}", "yellow")
+            return True
+
+        terminal_commands = [
+            ["x-terminal-emulator", "-e", "bash", "-lc", command],
+            ["gnome-terminal", "--", "bash", "-lc", command],
+            ["konsole", "-e", "bash", "-lc", command],
+            ["xfce4-terminal", "--command", f"bash -lc {shlex.quote(command)}"],
+            ["xterm", "-e", "bash", "-lc", command],
+            ["kitty", "-e", "bash", "-lc", command],
+            ["alacritty", "-e", "bash", "-lc", command],
+        ]
+
+        if not os.environ.get("DISPLAY") and not os.environ.get("WAYLAND_DISPLAY"):
+            self.log("    GUI display 환경이 없어 새 터미널을 열 수 없습니다.", "yellow")
+            return False
+
+        for cmd in terminal_commands:
+            try:
+                subprocess.Popen(cmd)
+                self.log(f"    새 터미널 실행: {' '.join(cmd[:1])}", "cyan")
+                return True
+            except FileNotFoundError:
+                continue
+            except Exception as exc:
+                self.log(f"    터미널 실행 실패: {exc}", "yellow")
+                continue
+
+        self.log("    지원되는 터미널 에뮬레이터를 찾지 못했습니다.", "yellow")
+        return False
+
+    def register_tmux_cleanup(self, host: str, session_name: str) -> None:
+        if (host, session_name) not in self.spawned_tmux_sessions:
+            self.spawned_tmux_sessions.append((host, session_name))
+
+    def cleanup_spawned_tmux_sessions(self) -> None:
+        if self.dry_run:
+            return
+        for host, session_name in reversed(self.spawned_tmux_sessions):
+            try:
+                self.ssh_capture(
+                    host,
+                    f"tmux kill-session -t {session_name} 2>/dev/null; echo killed_{session_name}",
+                    timeout=10,
+                )
+            except Exception as exc:
+                self.log(f"    cleanup 실패 ({host}:{session_name}): {exc}", "yellow")
+        self.spawned_tmux_sessions.clear()
 
     # ── step 실행 wrapper ────────────────────────────────────────
     def run_step(self, step: Step) -> bool:
@@ -309,12 +377,20 @@ class TUI:
 
 def step_preflight(tui: TUI, step: Step) -> bool:
     cmd = f"cd {JETSON_PROJECT} && bash scripts/preflight.sh"
-    rc, _ = tui.ssh_capture(JETSON_HOST, cmd, timeout=60)
+    rc, out = tui.ssh_capture(JETSON_HOST, cmd, timeout=60)
     if rc == 0:
         step.detail = "모든 항목 PASS"
         return True
-    # preflight 는 WARN 만 있어도 rc=0, FAIL 이면 rc=1
-    step.detail = f"preflight FAIL (rc={rc}) — 위 [FAIL] 항목 확인"
+    # preflight 는 WARN 만 있어도 rc=0, FAIL 이면 rc!=0
+    # 실패 시 출력에서 [FAIL] 라인들을 발췌해 사용자에게 보여주기 좋게 요약
+    fail_lines = [l for l in out.splitlines() if "[FAIL]" in l]
+    if fail_lines:
+        snippet = " | ".join(fail_lines[-3:])
+    else:
+        # 없다면 출력의 마지막 몇 줄을 요약
+        tail = out.splitlines()[-6:]
+        snippet = " | ".join(tail) if tail else "(no output)"
+    step.detail = f"preflight FAIL (rc={rc}) — {snippet}"
     return False
 
 
@@ -429,6 +505,28 @@ def _ensure_tmux(tui: TUI, host: str = NUC_HOST) -> bool:
 
 
 def step_bridge(tui: TUI, step: Step) -> bool:
+    # 0) Jetson 에서 NUC bridge TCP 가 이미 열려 있으면 통과
+    # (NUC SSH 가 막혀 있어도 Stage 2/3 진행 가능)
+    rc, out = tui.ssh_capture(
+        JETSON_HOST,
+        "timeout 3 bash -c 'exec 3<>/dev/tcp/10.42.0.221/9000' 2>/dev/null "
+        "&& echo BRIDGE_OK || echo BRIDGE_FAIL",
+        timeout=10,
+    )
+    if "BRIDGE_OK" in out:
+        step.detail = "Jetson에서 NUC bridge(10.42.0.221:9000) TCP 확인"
+        return True
+
+    # 0-1) NUC 로컬에서 9000 포트가 이미 listen 중이면 bridge 는 살아있는 것
+    rc, out = tui.ssh_capture(
+        NUC_HOST,
+        "ss -tln 2>/dev/null | grep ':9000' | head -1 || true",
+        timeout=10,
+    )
+    if ":9000" in out:
+        step.detail = "NUC에서 bridge(:9000) listen 확인"
+        return True
+
     # 1) systemd 우선
     rc, out = tui.ssh_capture(
         NUC_HOST,
@@ -440,7 +538,18 @@ def step_bridge(tui: TUI, step: Step) -> bool:
         return True
 
     if not _ensure_tmux(tui):
-        step.detail = "tmux 미설치"
+        # NUC SSH 실패/미설치 등으로 tmux 확인이 불가해도,
+        # Jetson 기준 bridge TCP 가 열려 있으면 운영상 통과로 간주
+        rc2, out2 = tui.ssh_capture(
+            JETSON_HOST,
+            "timeout 3 bash -c 'exec 3<>/dev/tcp/10.42.0.221/9000' 2>/dev/null "
+            "&& echo BRIDGE_OK || echo BRIDGE_FAIL",
+            timeout=10,
+        )
+        if "BRIDGE_OK" in out2:
+            step.detail = "NUC SSH 불가지만 Jetson에서 bridge TCP 확인"
+            return True
+        step.detail = "NUC SSH/tmux 확인 실패 + bridge TCP 미확인"
         return False
 
     # 2) 기존 tmux 세션
@@ -466,10 +575,21 @@ def step_bridge(tui: TUI, step: Step) -> bool:
         NUC_HOST, "ss -tln | grep ':9000' | head -1 || true", timeout=10
     )
     if ":9000" not in out:
+        # NUC 내부 ss 확인이 실패해도 Jetson 에서 접속 가능하면 성공 처리
+        rc2, out2 = tui.ssh_capture(
+            JETSON_HOST,
+            "timeout 3 bash -c 'exec 3<>/dev/tcp/10.42.0.221/9000' 2>/dev/null "
+            "&& echo BRIDGE_OK || echo BRIDGE_FAIL",
+            timeout=10,
+        )
+        if "BRIDGE_OK" in out2:
+            step.detail = "NUC 상태 조회 불가하지만 Jetson에서 bridge TCP 확인"
+            return True
         step.detail = (
             f"bridge :9000 listen 안 잡힘 (로그: /tmp/{SESSION_BRIDGE}.log)"
         )
         return False
+    tui.register_tmux_cleanup(NUC_HOST, SESSION_BRIDGE)
     step.detail = f"tmux '{SESSION_BRIDGE}' 새로 띄움 · :9000 listen 확인"
     return True
 
@@ -508,6 +628,7 @@ def step_lowlevel(tui: TUI, step: Step) -> bool:
             f"세션이 5초 내 죽음 (로그: /tmp/{SESSION_LOWLEVEL}.log)"
         )
         return False
+    tui.register_tmux_cleanup(NUC_HOST, SESSION_LOWLEVEL)
     step.detail = f"tmux '{SESSION_LOWLEVEL}' 동작 중 (250Hz control loop)"
     return True
 
@@ -547,6 +668,7 @@ def step_policy(tui: TUI, step: Step) -> bool:
             f"정책 프로세스가 3초 내 죽음 (로그: /tmp/{SESSION_POLICY}.log)"
         )
         return False
+    tui.register_tmux_cleanup(NUC_HOST, SESSION_POLICY)
     step.detail = f"tmux '{SESSION_POLICY}' 동작 중 (ONNX @25Hz)"
     return True
 
@@ -623,30 +745,32 @@ def step_coordinator(tui: TUI, step: Step) -> bool:
                 f"(로그: /tmp/{SESSION_COORDINATOR}.log)"
             )
             return False
+        tui.register_tmux_cleanup(JETSON_HOST, SESSION_COORDINATOR)
 
-    # attach -d : 잔존 클라이언트(예: 끊긴 노트북의 좀비 SSH)가 있으면 떼고
-    # 우리가 가져옴. multi-attach 보다 깔끔.
-    attach_cmd = f"tmux attach -d -t {SESSION_COORDINATOR}"
-    rc = tui.ssh_interactive(JETSON_HOST, attach_cmd)
-
-    # 사용자가 detach 했는지 / coordinator 가 종료됐는지 구분 → 세션이 살아 있나로 판단
-    _, post_out = tui.ssh_capture(
-        JETSON_HOST,
-        f"tmux has-session -t {SESSION_COORDINATOR} 2>/dev/null "
-        f"&& echo ALIVE || echo DEAD",
-        timeout=10,
+    # 새 로컬 터미널에서 coordinator tmux 세션을 attach 하도록 띄움.
+    attach_cmd = (
+        f"ssh -F {shlex.quote(LOCAL_SSH_CONFIG)} -t {shlex.quote(JETSON_HOST)} "
+        f"{shlex.quote(f'tmux attach -d -t {SESSION_COORDINATOR}') }"
     )
-    if "ALIVE" in post_out:
-        step.detail = (
-            "detach 됨 — coordinator 는 Jetson 에서 계속 동작 중. "
-            "재인계: `python3 scripts/hylion-tui.py --attach`"
+    tui.log("", "")
+    tui.log("새 터미널에서 coordinator 화면을 엽니다.", "cyan bold")
+    tui.log("  새 창이 뜨면 그 안에서 실행 상태/출력값을 보게 됩니다.", "cyan")
+    launched = tui.open_local_terminal(attach_cmd, title="Hylion coordinator")
+    if not launched:
+        tui.log(
+            "  새 터미널을 열 수 없어 현재 터미널에서 attach 합니다.",
+            "yellow",
         )
-        return True
-    if rc in (0, 130, 143):    # 130=SIGINT, 143=SIGTERM
-        step.detail = f"coordinator 정상 종료 (rc={rc})"
-        return True
-    step.detail = f"coordinator 비정상 종료 (rc={rc})"
-    return False
+        rc = tui.ssh_interactive(JETSON_HOST, f"tmux attach -d -t {SESSION_COORDINATOR}")
+        if rc not in (0, 130, 143):
+            step.detail = f"coordinator attach 실패 (rc={rc})"
+            return False
+
+    step.detail = (
+        "coordinator 시작 · 새 터미널에서 실시간 출력 확인 가능. "
+        "TUI 종료 시 Jetson tmux 세션도 함께 종료된다."
+    )
+    return True
 
 
 # ══════════════════════════════════════════════════════════════════
@@ -660,6 +784,7 @@ def build_stages() -> list[Stage]:
             "사람이 로봇 옆에서 손을 대야 하는 단계 (매 부팅 1회)",
             [
                 Step("preflight", "Jetson preflight 점검", step_preflight),
+                Step("bridge", "NUC: hylion-bhl-bridge", step_bridge),
                 Step("can-up", "NUC: CAN 인터페이스 up", step_can_up),
                 Step("calibrate",
                      "NUC: 관절 캘리브레이션 (사람 필요)",
@@ -673,7 +798,6 @@ def build_stages() -> list[Stage]:
                 Step("daemons",
                      "Jetson: Ollama / MeloTTS 데몬 점검",
                      step_daemons),
-                Step("bridge", "NUC: hylion-bhl-bridge", step_bridge),
                 Step("lowlevel",
                      "NUC: bhl-lowlevel (C++ make run)",
                      step_lowlevel),
@@ -803,8 +927,10 @@ def cmd_attach(dry_run: bool) -> int:
         "[dim]   Ctrl+B → d : detach · Ctrl+C : coordinator 종료[/]\n"
     )
     return subprocess.call(
-        ["ssh", "-t", JETSON_HOST,
-         f"tmux attach -d -t {SESSION_COORDINATOR}"]
+        tui._ssh_base_args() + [
+            "-t", JETSON_HOST,
+            f"tmux attach -d -t {SESSION_COORDINATOR}",
+        ]
     )
 
 
@@ -880,13 +1006,31 @@ def main() -> int:
                 tui.log(f"     {stage.subtitle}", "dim")
                 for step in stage.steps:
                     proceed = tui.run_step(step)
-                    if not proceed:
+                    # 실패 시 즉시 종료하지 않고 재시도/건너뜀/중단 옵션 제공
+                    while not proceed:
                         tui.log("", "")
                         tui.log(
-                            f"❌ Stage {stage.id} 중단 — '{step.title}' 실패",
+                            f"❌ '{step.title}' 실패: {step.detail}",
                             "red bold",
                         )
-                        time.sleep(1.5)
+                        # 재시도 요청
+                        retry = tui.confirm(f"'{step.title}'을(를) 다시 시도할까요?", default=True)
+                        if retry:
+                            # 상태 초기화 후 재시도
+                            step.status = Status.PENDING
+                            step.detail = ""
+                            proceed = tui.run_step(step)
+                            continue
+                        # 재시도를 원치 않으면 건너뛸지 물어봄
+                        skip = tui.confirm(f"'{step.title}'을(를) 건너뛰고 다음으로 진행할까요?", default=False)
+                        if skip:
+                            step.status = Status.SKIP
+                            tui.log(f"  ⊘ {step.title} — 건너뜀 (사용자 결정)", "yellow")
+                            proceed = True
+                            break
+                        # 건너뛰지도 않으면 전체 중단
+                        tui.log(f"중단: '{step.title}' 실패로 워크플로우를 종료합니다.", "red")
+                        time.sleep(1.0)
                         return 1
                 if not args.no_confirm and idx < len(stages_to_run) - 1:
                     if not tui.confirm(
@@ -901,6 +1045,8 @@ def main() -> int:
             time.sleep(2.0)
         except KeyboardInterrupt:
             tui.log("\n사용자 인터럽트 (Ctrl+C)", "yellow bold")
+            # Ctrl+C 시 TUI가 띄운 tmux 세션은 정리
+            tui.cleanup_spawned_tmux_sessions()
             time.sleep(1.0)
             return 130
         finally:
