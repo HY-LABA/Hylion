@@ -1,0 +1,22 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(where pdftoppm *)",
+      "Bash(where pdftotext *)",
+      "Bash(pdftotext -f 1 -l 15 -layout \"c:/Users/hohoh/Documents/HanYang University/4-1/Biz Lab/LABA5/Hylion/docs/BHL/berkeley_humanoid.pdf\" -)",
+      "Bash(pdftotext -layout \"c:/Users/hohoh/Documents/HanYang University/4-1/Biz Lab/LABA5/Hylion/docs/BHL/berkeley_humanoid.pdf\" -)",
+      "Bash(pdftotext -f 5 -l 14 -layout \"c:/Users/hohoh/Documents/HanYang University/4-1/Biz Lab/LABA5/Hylion/docs/BHL/berkeley_humanoid.pdf\" -)",
+      "Bash(pdftotext -f 15 -l 30 -layout \"c:/Users/hohoh/Documents/HanYang University/4-1/Biz Lab/LABA5/Hylion/docs/BHL/berkeley_humanoid.pdf\" -)",
+      "Bash(pdftotext -f 18 -l 25 -layout \"c:/Users/hohoh/Documents/HanYang University/4-1/Biz Lab/LABA5/Hylion/docs/BHL/berkeley_humanoid.pdf\" -)",
+      "Bash(pdftotext -f 30 -l 35 -layout \"c:/Users/hohoh/Documents/HanYang University/4-1/Biz Lab/LABA5/Hylion/docs/BHL/berkeley_humanoid.pdf\" -)",
+      "Bash(pdftotext -f 60 -l 65 -layout \"c:/Users/hohoh/Documents/HanYang University/4-1/Biz Lab/LABA5/Hylion/docs/BHL/berkeley_humanoid.pdf\" -)",
+      "Bash(pdftotext -f 20 -l 22 -layout \"c:/Users/hohoh/Documents/HanYang University/4-1/Biz Lab/LABA5/Hylion/docs/BHL/berkeley_humanoid.pdf\" -)",
+      "Bash(pdftotext -f 50 -l 50 -layout \"c:/Users/hohoh/Documents/HanYang University/4-1/Biz Lab/LABA5/Hylion/docs/BHL/berkeley_humanoid.pdf\" -)",
+      "Bash(pdftotext -f 100 -l 100 -layout \"c:/Users/hohoh/Documents/HanYang University/4-1/Biz Lab/LABA5/Hylion/docs/BHL/berkeley_humanoid.pdf\" -)",
+      "Bash(pdftotext -f 180 -l 180 -layout \"c:/Users/hohoh/Documents/HanYang University/4-1/Biz Lab/LABA5/Hylion/docs/BHL/berkeley_humanoid.pdf\" -)",
+      "Bash(pdftotext -f 1 -l 15 -layout \"c:/Users/hohoh/Documents/HanYang University/4-1/Biz Lab/LABA5/Hylion/docs/BHL/demonstrating-berkeley-humanoid-lite.pdf\" -)",
+      "Bash(pdftotext -f 10 -l 25 -layout \"c:/Users/hohoh/Documents/HanYang University/4-1/Biz Lab/LABA5/Hylion/docs/BHL/demonstrating-berkeley-humanoid-lite.pdf\" -)",
+      "Bash(python -c \"from jetson.core.bhl_client import BhlClient; print\\('BhlClient import OK'\\)\")"
+    ]
+  }
+}

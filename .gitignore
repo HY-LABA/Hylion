@@ -218,3 +218,7 @@ third_party/*
 data/tts_ref/*
 docs/BHL/*
 docs/Legacy/*
+nuc/bhl/Berkeley_Humanoid_Lite_Lowlevel_main/*
+nuc/bhl/Berkeley-Humanoid-Lite-Assets/*
+nuc/Recoil-Motor-Controller-BESC-main/Recoil-Motor-Controller-B-G431B-ESC1/*
+nuc/IMU/IMU/10 asix IMU Inertial Navigation Module/IMU Inertial Navigation Module/*
