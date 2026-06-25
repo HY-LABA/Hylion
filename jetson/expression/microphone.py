@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
 from pathlib import Path
 import math
@@ -7,7 +8,10 @@ from typing import List, Optional, Tuple
 import wave
 
 
-DEFAULT_SAMPLE_RATE = 44100
+# Hardware-native capture rate. Some USB mics (BSX, YJX) reject 44.1kHz mono
+# even though their default_samplerate metadata advertises it; override via
+# HYLION_MIC_SAMPLE_RATE to match the actual device (BSX=48000, P5HD=44100).
+DEFAULT_SAMPLE_RATE = int(os.getenv("HYLION_MIC_SAMPLE_RATE", "44100"))
 DEFAULT_CHANNELS = 1
 DEFAULT_SAMPLE_WIDTH_BYTES = 2
 

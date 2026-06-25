@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 import os
+import threading
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional, Sequence, Tuple
+from typing import Callable, Optional, Sequence, Tuple
 
 import numpy as np
 
@@ -32,6 +33,12 @@ DEFAULT_DEVICE_KEYWORD = os.getenv("HYLION_WAKEWORD_DEVICE_KEYWORD", "")
 DEFAULT_SAMPLE_RATE = int(os.getenv("HYLION_WAKEWORD_SAMPLE_RATE", "44100"))
 DEFAULT_WAKEWORD_BLOCK_MS = int(os.getenv("HYLION_WAKEWORD_BLOCK_MS", "80"))
 DEFAULT_BATON_TOUCH_DELAY_SEC = float(os.getenv("HYLION_WAKEWORD_BATON_TOUCH_DELAY_SEC", "0.5"))
+# Debug score logging. Set HYLION_WAKEWORD_DEBUG_SCORES to a float (e.g. 0.1)
+# to print every prediction whose max score >= that value. Useful for picking
+# a good threshold for a new wake word ("얼마나 외쳐야 점수가 올라가나").
+# 0 (default) means no debug output.
+DEFAULT_DEBUG_SCORE_FLOOR = float(os.getenv("HYLION_WAKEWORD_DEBUG_SCORES", "0"))
+
 
 # openWakeWord requires 16 kHz mono int16 input, so the captured audio must be
 # resampled to this rate before feeding the model.
@@ -249,6 +256,9 @@ class WakeWordListener:
                 best_label = str(label)
                 best_score = float(score)
 
+        if DEFAULT_DEBUG_SCORE_FLOOR > 0 and best_score >= DEFAULT_DEBUG_SCORE_FLOOR:
+            print(f"[WakeWord:debug] best={best_label!r} score={best_score:.3f} threshold={self.config.threshold:.3f}")
+
         if best_score < self.config.threshold:
             return None
 
@@ -259,7 +269,7 @@ class WakeWordListener:
             device_name=self._device_name,
         )
 
-    def wait_for_wake_word(self) -> WakeWordActivation:
+    def wait_for_wake_word(self, stop_event: Optional[threading.Event] = None) -> Optional[WakeWordActivation]:
         """Block until the configured wake word is detected.
 
         Opens the device at the hardware-native sample rate and down-samples each chunk
@@ -267,6 +277,10 @@ class WakeWordListener:
         stream is closed immediately, then we sleep for a short baton-touch delay so
         ALSA can fully release the device before the recording pipeline tries to claim
         it.
+
+        If ``stop_event`` is provided, the loop polls it between audio reads and
+        returns ``None`` (no detection) when it is set, allowing a background
+        thread to shut the listener down cleanly without waiting for a wake.
         """
         if self._closed:
             raise RuntimeError("WakeWordListener is already closed")
@@ -282,6 +296,9 @@ class WakeWordListener:
             while True:
                 if self._closed:
                     raise RuntimeError("WakeWordListener is closed")
+                if stop_event is not None and stop_event.is_set():
+                    self._close_stream()
+                    return None
 
                 raw_chunk, _overflowed = self._stream.read(self._stream.blocksize)
                 audio_frame = self._frame_to_model_input(raw_chunk)
@@ -323,3 +340,5 @@ def build_wake_word_listener(
         baton_touch_delay_sec=DEFAULT_BATON_TOUCH_DELAY_SEC if baton_touch_delay_sec is None else baton_touch_delay_sec,
     )
     return WakeWordListener(config=config)
+
+

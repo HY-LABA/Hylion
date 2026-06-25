@@ -29,7 +29,7 @@ def simulate_coordinator_flow():
     
     # 2. Mouth Servo 초기화 (선택사항)
     print("[2] Mouth Servo 초기화...")
-    mouth_servo = MouthServoController(pin=33)
+    mouth_servo = MouthServoController(pin=7)
     print(f"✅ Mouth Servo 생성 (available: {mouth_servo.is_available})\n")
     
     # 3. 시뮬레이션: 대답 출력 (Coordinator의 _speak_reply_if_any와 동일)

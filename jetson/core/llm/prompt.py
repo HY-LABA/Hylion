@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any, Dict, Tuple
 from uuid import uuid4
 
-from jetson.core import gesture_registry
+from jetson.core.client import gesture_registry
 
 
 SCHEMA_VERSION = "1.0"
@@ -18,7 +18,7 @@ DEFAULT_ACTION_SCHEMA_PATH = PROJECT_ROOT / "configs" / "schemas" / "action.sche
 # Harness contract (Step 1 responsibility map)
 #
 # The LLM emits only 4 "judgment" fields. The harness derives the rest:
-# intent-driven fields (requires_smolvla / requires_bhl / state_current /
+# intent-driven fields (requires_smolvla / state_current /
 # safety_allowed), the keyword-detected gesture_name, and injects the metadata
 # fields. Keeping the model's output surface this small is the core reliability
 # lever for the 1.5B offline model: fewer fields to fill = fewer ways to be
@@ -280,7 +280,7 @@ def derive_full_action(
 		"target_object": target_object,
 		"reply_text": reply_text,
 		"requires_smolvla": intent == "pick_place",
-		"requires_bhl": intent in {"move", "stop"},
+		"requires_bhl": intent in {"move", "stop", "pick_place"},
 		"gait_cmd": gait_cmd,
 		"gesture_name": gesture_name if intent == "chat" else "none",
 		# duration_sec: bridge 가 동작을 얼마나 유지할지. 현재는 harness-derived (move=3s 고정).

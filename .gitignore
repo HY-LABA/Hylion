@@ -218,7 +218,16 @@ third_party/*
 data/tts_ref/*
 docs/BHL/*
 docs/Legacy/*
+<<<<<<< HEAD
 nuc/bhl/Berkeley_Humanoid_Lite_Lowlevel_main/*
 nuc/bhl/Berkeley-Humanoid-Lite-Assets/*
 nuc/Recoil-Motor-Controller-BESC-main/Recoil-Motor-Controller-B-G431B-ESC1/*
 nuc/IMU/IMU/10 asix IMU Inertial Navigation Module/IMU Inertial Navigation Module/*
+=======
+nuc/bhl/Berkeley-Humanoid-Lite-Lowlevel-main/*
+nuc/bhl/Berkeley-Humanoid-Lite-main/*
+
+# nuc/IMU: 벤더 IMU SDK 번들(zip/dll/pack/pdf/stp 등 ~213MB) 제외, 통합 가이드만 추적
+nuc/IMU/*
+!nuc/IMU/BHL_IMU_통합_가이드.md
+>>>>>>> c0524dc2210b93c9a0788351af67e6a74e4a5449

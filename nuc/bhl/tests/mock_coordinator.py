@@ -10,9 +10,14 @@
     python mock_coordinator.py watchdog       # 1건 보내고 침묵 (200ms 후 STOP 되는지)
     python mock_coordinator.py loop           # walk_forward 10Hz 무한 송신 (Ctrl+C 로 종료 → 끊김 검증)
     python mock_coordinator.py stop_mid       # walk 2초 keepalive 중 1초 시점에 stop 송신
+
+대상 bridge 주소는 기본 127.0.0.1:9000. NUC 로 쏠 때는 두 번째 인자 또는 env 로:
+    python mock_coordinator.py walk 10.42.0.221
+    BRIDGE_HOST=10.42.0.221 python mock_coordinator.py walk
 """
 
 import json
+import os
 import socket
 import sys
 import threading
@@ -20,8 +25,9 @@ import time
 import uuid
 from datetime import datetime, timezone
 
-HOST = "127.0.0.1"
-PORT = 9000
+# env(BRIDGE_HOST/BRIDGE_PORT) 또는 두 번째 CLI 인자로 override 가능.
+HOST = os.environ.get("BRIDGE_HOST", "127.0.0.1")
+PORT = int(os.environ.get("BRIDGE_PORT", "9000"))
 
 
 def now_iso() -> str:
@@ -206,10 +212,15 @@ SCENARIOS = {
 
 
 def main() -> None:
+    global HOST
     if len(sys.argv) < 2 or sys.argv[1] not in SCENARIOS:
         print(__doc__)
         print("scenarios:", ", ".join(SCENARIOS.keys()))
         sys.exit(1)
+
+    # 두 번째 인자가 있으면 대상 host override (env 보다 우선).
+    if len(sys.argv) >= 3:
+        HOST = sys.argv[2]
 
     sock = connect()
     reader = DoneReader(sock)

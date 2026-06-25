@@ -17,7 +17,7 @@ class MouthServoController:
 	# parameters: MG90S defaults on Jetson 40-pin header (physical Pin 33)
 	def __init__(
 		self,
-		pin: int = 33,
+		pin: int = 7,
 		pwm_hz: int = 50,
 		servo_model: str = "MG90S",
 		min_pulse_ms: float = 0.5,
@@ -142,6 +142,6 @@ def cleanup_gpio(pin: Optional[int] = None) -> None:
 		if pin is None:
 			GPIO.cleanup()
 		else:
-			GPIO.cleanup(pin)
+			GPIO.cleanup(pin) 
 	except Exception:
 		pass

@@ -30,6 +30,14 @@ DEFAULT_HOST = os.getenv("HYLION_TTS_HOST", "http://127.0.0.1:8001")
 DEFAULT_TIMEOUT_SEC = 30.0
 DEFAULT_REPLY_DIR = Path(__file__).resolve().parents[3] / "data" / "reply"
 
+# Auto-launch defaults for the lazy daemon path (offline mode only). The daemon
+# is started as a detached subprocess so it survives a coordinator restart and
+# the next offline session can reuse it. Override via env when running off the
+# default Jetson layout.
+DEFAULT_TTS_VENV = Path.home() / "Hylion" / "jetson" / "expression" / ".venv-melotts"
+DAEMON_LAUNCH_TIMEOUT_SEC = 30.0
+DAEMON_LOG_PATH = Path("/tmp/hylion-tts.log")
+
 # Sox post-process defaults — pitch shift up to make MeloTTS adult voice sound
 # closer to a young Korean child. 100 cents = 1 semitone; +400 ≈ +4 semitones.
 # tempo > 1.0 speeds the speech without changing pitch (so the cadence feels
@@ -130,12 +138,98 @@ class MeloTTSSpeaker:
 		self.last_audio_file: Optional[str] = None
 		self._pitch_cents = pitch_cents
 		self._tempo = tempo
+		# Skip the daemon liveness check after the first success; reset on
+		# transport failure so the next call re-launches if the daemon died.
+		self._daemon_ensured = False
 		logger.info(
 			"MeloTTSSpeaker initialized (host=%s, sink=%s, pitch=%+d cents, tempo=%.2f)",
 			self.host, self.device, self._pitch_cents, self._tempo,
 		)
 
+	def _daemon_health(self, timeout_sec: float = 1.0) -> bool:
+		try:
+			with urllib.request.urlopen(f"{self.host}/health", timeout=timeout_sec) as resp:
+				return resp.status == 200
+		except Exception:
+			return False
+
+	def _launch_daemon(self) -> bool:
+		"""Spawn the MeloTTS daemon as a detached subprocess.
+
+		Only attempted when self.host points at loopback — otherwise the user
+		has redirected to a remote daemon and auto-launch is meaningless.
+		Returns False on any spawn failure (logged, never raised).
+		"""
+		if not any(token in self.host for token in ("127.0.0.1", "localhost")):
+			logger.error(
+				"MeloTTS daemon auto-launch skipped: host %s is not loopback", self.host,
+			)
+			return False
+		venv_root = Path(os.getenv("HYLION_TTS_VENV", str(DEFAULT_TTS_VENV))).expanduser()
+		venv_py = venv_root / "bin" / "python3"
+		if not (venv_py.exists() and os.access(str(venv_py), os.X_OK)):
+			logger.error(
+				"MeloTTS daemon venv not found at %s — install per services/tts_server/README.md",
+				venv_py,
+			)
+			return False
+		project_root = Path(__file__).resolve().parents[3]
+		try:
+			DAEMON_LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
+			log_fh = open(DAEMON_LOG_PATH, "ab")
+		except OSError as exc:
+			logger.error("MeloTTS daemon log open failed (%s): %s", DAEMON_LOG_PATH, exc)
+			return False
+		try:
+			subprocess.Popen(
+				[
+					str(venv_py), "-m", "uvicorn",
+					"services.tts_server.server:app",
+					"--host", "127.0.0.1",
+					"--port", "8001",
+				],
+				cwd=str(project_root),
+				stdout=log_fh,
+				stderr=subprocess.STDOUT,
+				stdin=subprocess.DEVNULL,
+				start_new_session=True,
+			)
+		except Exception as exc:
+			log_fh.close()
+			logger.error("MeloTTS daemon launch failed: %s", exc)
+			return False
+		logger.info("MeloTTS daemon launched (detached); log: %s", DAEMON_LOG_PATH)
+		return True
+
+	def _ensure_daemon_alive(self, wait_sec: float = DAEMON_LAUNCH_TIMEOUT_SEC) -> bool:
+		"""Make sure the daemon answers on /health, launching it if absent.
+
+		Cheap on the steady-state path (one HTTP probe). Only when the probe
+		fails do we spawn a new daemon and poll /health until it responds —
+		typical cold-launch is ~5s for uvicorn startup, before any model load.
+		"""
+		if self._daemon_ensured and self._daemon_health(timeout_sec=1.0):
+			return True
+		if self._daemon_health(timeout_sec=2.0):
+			self._daemon_ensured = True
+			return True
+		if not self._launch_daemon():
+			return False
+		deadline = time.monotonic() + wait_sec
+		while time.monotonic() < deadline:
+			time.sleep(1.0)
+			if self._daemon_health(timeout_sec=1.0):
+				logger.info("MeloTTS daemon healthy after auto-launch")
+				self._daemon_ensured = True
+				return True
+		logger.error(
+			"MeloTTS daemon spawned but never became healthy within %.1fs", wait_sec,
+		)
+		return False
+
 	def _post_synthesize(self, text: str, speed: float = 1.0) -> Optional[bytes]:
+		if not self._ensure_daemon_alive():
+			return None
 		body = json.dumps({"text": text, "speed": speed}).encode("utf-8")
 		req = urllib.request.Request(
 			f"{self.host}/synthesize",
@@ -147,6 +241,7 @@ class MeloTTSSpeaker:
 			with urllib.request.urlopen(req, timeout=self.timeout_sec) as resp:
 				return resp.read()
 		except urllib.error.URLError as exc:
+			self._daemon_ensured = False
 			logger.error("MeloTTS daemon unreachable: %s", exc)
 			return None
 		except Exception as exc:
@@ -158,8 +253,11 @@ class MeloTTSSpeaker:
 
 		Coordinator calls this in offline mode at startup so the first user-
 		facing turn doesn't pay the ~22s cold-load cost. In online mode it is
-		intentionally NOT called so the daemon stays at ~40 MB.
+		intentionally NOT called so the daemon stays at ~40 MB — and, with
+		auto-launch in place, isn't even spawned.
 		"""
+		if not self._ensure_daemon_alive():
+			return False
 		req = urllib.request.Request(
 			f"{self.host}/warmup",
 			data=b"",
@@ -172,6 +270,7 @@ class MeloTTSSpeaker:
 			logger.info("MeloTTS daemon warm-up: %s", body)
 			return True
 		except urllib.error.URLError as exc:
+			self._daemon_ensured = False
 			logger.error("MeloTTS warm-up failed (daemon unreachable): %s", exc)
 			return False
 		except Exception as exc:

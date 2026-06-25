@@ -1080,3 +1080,373 @@
   - 4번/5번 (다른 팀원 영역): DGX 학습 정책의 명령 범위가 BHL 원본
     `lin_vel_x∈[-0.5, 0.5]` 와 다르면 `BRIDGE_VEL_FORWARD` env 로 bridge 측
     재튜닝.
+
+### 2026-05-18 (e-stop wake-word 마무리)
+
+- 학습된 "stop" wake-word 모델이 `checkpoints/wakeword/stop.tflite` (+ `.onnx`)
+  로 도착함. `wake_word.py` / `coordinator.py` 의 e-stop 와이어링이 이전 세션
+  들에서 부분 적용된 상태였는데, 전체 흐름을 다시 검토해서 작동 가능한
+  최종 형태로 정리.
+- 동작 흐름 (move turn 기준):
+  1. coordinator 가 move action 을 BHL bridge 로 송신 직전,
+     `EmergencyStopListener.start(on_trigger)` 호출 — mic 점유.
+  2. listener 가 "stop" 검출하면 콜백이 EMERGENCY action 을
+     `bhl_client.set_command()` 로 푸시. bridge 의 `map_json_to_packet` 이
+     `state_current==EMERGENCY` 분기로 즉시 STOP UDP + 원래 action 의
+     DONE(`safety_or_emergency`) 회신.
+  3. coordinator 의 `wait_for_done` 이 풀리면서 `_dispatch_to_bhl` 이
+     `listener.stop()` → mic 즉시 해제.
+  4. `_route_action` 이 reason 을 반환하면 `run_live_pipeline` 이
+     standby reply 를 "비상정지했어요. 다음 지시를 기다릴게요." 로 교체.
+- 안전 원칙:
+  - listener 가 mic 을 점유하는 구간은 정확히 BHL move 실행 구간 →
+    녹음 루프 / main wake listener 와 mic 충돌 없음 (ALSA single-open
+    제약 회피).
+  - threshold 는 main wake 보다 낮은 0.4 (missed e-stop 이 false e-stop
+    보다 훨씬 위험하므로 false positive 쪽으로 살짝 치우치게).
+  - stop intent 자체는 e-stop listener 안 띄움 (이미 stop 명령이라 mic
+    점유 낭비).
+  - listener.available==False (모델/오디오 미가용) 면 dispatch 측이 자동
+    우회하고 move 는 e-stop 없이 정상 실행.
+- 수정/추가한 파일:
+  - `checkpoints/wakeword/stop.tflite`, `checkpoints/wakeword/stop.onnx`
+    — 학습 산출물 추가 (Git 추적).
+  - `jetson/expression/wake_word.py` — `EmergencyStopListener` 클래스 +
+    `build_emergency_stop_listener()`. `start(on_trigger)` per-call 콜백
+    인자 (각 dispatch 마다 다른 session_id closure 를 잡아야 해서 instance
+    에 저장하지 않음). `DEFAULT_ESTOP_MODEL`/`DEFAULT_ESTOP_THRESHOLD` 환경
+    변수 override.
+  - `jetson/core/coordinator.py` — `_build_emergency_stop_action()` (state
+    EMERGENCY + intent stop + requires_bhl true). `_dispatch_to_bhl` 시그
+    니처에 `estop_listener`/`session_id` 추가, set_command 직전 start,
+    wait_for_done 직후 stop, reason 반환. `_route_action` 이 reason 전파.
+    `run_live_pipeline` 이 reason==safety_or_emergency 면 standby reply
+    교체. `main()` 이 listener 생성 + 종료 cleanup.
+- 검증 (예정):
+  - Jetson 에서 `python -m jetson.core.coordinator` 실행, "앞으로 가" 로
+    move 시작 후 1~2 초 사이 "stop" 발화 → `[E-Stop]` 로그 +
+    `[BHL] DONE reason=safety_or_emergency` + "비상정지했어요" TTS.
+  - 동일 시나리오에서 stop 발화 없이 끝까지 가서 정상 종료 ("작업을
+    마쳤고…") 도 회귀 없는지.
+- 다음 환경에서 바로 할 일:
+  - 위 두 가지 실제 마이크 시나리오 검증 + 결과 본 파일에 기록.
+  - false trigger 잦으면 `HYLION_ESTOP_THRESHOLD` 로 0.45~0.5 까지 미세
+    조정.
+
+### 2026-05-18 (systemd user service + headless 토글 + 문서 갱신)
+
+- 한 줄 요약:
+  - 부팅 시 coordinator 자동 실행 (systemd user service) + 현장 배치용
+    GUI 토글 스크립트 + 전체 흐름 문서 (`docs/09`) 와 README 갱신.
+- 동기:
+  - 로봇에 Jetson 올린 뒤 모니터/키보드 없이 전원만 켜도 동작해야 함.
+  - "자동 실행 (B)" 과 "GUI on/off (A)" 는 직교 설정이라 따로 토글
+    가능하게. 평소 개발은 GUI on + B on, 현장 배치는 GUI off + B on.
+- 추가한 파일:
+  - `scripts/systemd/hylion-coordinator.service.in` — unit 템플릿.
+    install 시 `__PROJECT_ROOT__` 치환해서 `~/.config/systemd/user/` 에
+    설치. `ExecStartPre=sleep 5` (USB 마이크 안정화),
+    `Restart=on-failure`, `WantedBy=default.target`.
+  - `scripts/install-coordinator-service.sh` — 설치/제거 자동화.
+    `--uninstall` 지원. 첫 설치 때 `sudo loginctl enable-linger` 자동
+    호출 (이미 켜져 있으면 skip).
+  - `scripts/headless-on.sh` — `sudo systemctl set-default
+    multi-user.target`. 다음 부팅부터 GUI 안 뜸.
+  - `scripts/headless-off.sh` — `set-default graphical.target` 로 원복.
+  - 둘 다 idempotent (이미 같은 target 이면 skip + 메시지).
+- 변경한 파일:
+  - `docs/09_project_flow_overview.md` — 전면 갱신. 기준 시점 2026-05-05
+    → 2026-05-18. 누락돼 있던 BHL bridge 실연결, gesture daemon,
+    e-stop listener, online/offline LLM 분리, MeloTTS, run_coordinator.sh
+    env 자동 설정, 새 systemd 서비스, headless 토글 모두 반영. 시스템
+    토폴로지·라이프사이클·메인 루프·E-stop 흐름·파일 인벤토리·
+    환경변수 참조표·Mermaid 다이어그램 포함.
+  - `README.md` — "빠른 사용법" 으로 재구성: 수동 실행 / systemd 자동
+    실행 / GUI 토글 / 현장 배치 체크리스트. docs/09 로 cross-ref.
+- 검증 (이 세션, Jetson):
+  - 수동 설치 단계 (sudo 없는 부분만 자동화):
+    `mkdir -p ~/.config/systemd/user`, 템플릿 치환 후 unit 설치,
+    `systemctl --user daemon-reload && enable && start` 성공.
+    `systemctl --user status` → `active (running)`, PID 22025,
+    Memory 117M. ExecStartPre 통과, ONNX runtime + XNNPACK 로딩 확인.
+    gesture daemon 은 팔 미연결로 ConnectionError (예상대로 coordinator
+    본체는 영향 없음, non-fatal handle 반환).
+  - `headless-on.sh` / `headless-off.sh` 는 코드만 작성, 실행 안 함
+    (현장 배치 직전까지 GUI 유지).
+- 사용자가 직접 한 번 해야 할 것:
+  - `sudo loginctl enable-linger laba` — 로그인 없이 부팅 시 user
+    service 가 시작되게 하는 1회성 토글. 이 세션에서는 sudo 비번
+    프롬프트를 피해 자동화에서 빠짐.
+- 다음 환경에서 바로 할 일:
+  - linger 켠 뒤 `sudo reboot` 후 자동 실행 확인 (모니터/키보드 떼지
+    말고 한 번은 직접 보고).
+  - e-stop wake-word 실 마이크 시나리오 검증 (앞 항목과 동일).
+  - 현장 배치 시점에 `bash scripts/headless-on.sh && sudo reboot`.
+
+### 2026-05-20
+
+- 오늘 변경 요약:
+  - e-stop wake-word 모델 파일명 정정: `hailion_stop` → `hyleon_stop`.
+    `checkpoints/wakeword/hyleon_stop.onnx` / `.tflite` 추가,
+    `jetson/expression/wake_word.py` 의 `DEFAULT_ESTOP_MODEL_PATH` 를
+    새 파일명으로 수정.
+  - `scripts/run_coordinator.sh` — e-stop 튜닝용 env 두 개
+    (`HYLION_ESTOP_THRESHOLD`, `HYLION_WAKEWORD_DEBUG_SCORES`) 제거.
+    튜닝이 끝나 코드 기본값으로 복귀, 콘솔 출력 정리.
+  - `docs/09_project_flow_overview.md` — 7장 다이어그램 섹션 전면 확장
+    (시스템 토폴로지·부팅 시퀀스·메인 턴 흐름·BHL+E-stop 시퀀스·
+    데이터 흐름·systemd 의존 그래프 6종 Mermaid).
+  - 문서 정리: `docs/06_smolvla_collection_schema.md` 삭제,
+    `docs/11_bhl_reference_flow.md` 추가.
+  - `.gitignore` — `nuc/bhl/Berkeley-Humanoid-Lite-main/*` 제외 추가.
+    `nuc/IMU/` 벤더 IMU SDK 번들(zip/dll/pack/pdf/stp 등 ~213MB)도
+    제외하되 `nuc/IMU/BHL_IMU_통합_가이드.md` 한 파일만 추적.
+- 테스트 결과: 이 세션은 파일 정리/문서 작업 위주, 별도 테스트 미실행.
+- 수정 파일 목록: `.gitignore`, `WORKLOG.md`, `docs/09_project_flow_overview.md`,
+  `jetson/expression/wake_word.py`, `scripts/run_coordinator.sh`,
+  `docs/06_smolvla_collection_schema.md`(삭제), `docs/11_bhl_reference_flow.md`(신규),
+  `checkpoints/wakeword/hyleon_stop.{onnx,tflite}`(신규),
+  `nuc/IMU/BHL_IMU_통합_가이드.md`(신규).
+- 다음 환경에서 바로 할 일:
+  - e-stop 모델 파일명 변경 후 실제 wake-word 트리거 1회 검증.
+  - NUC 쪽 `nuc/IMU/` 벤더 번들은 git 미추적 — 필요 시 별도 전달.
+
+### 운영 흐름 2단계 분리 — preflight 추가 (2026-05-20)
+
+- 오늘 변경 요약:
+  - 부팅 시 코디네이터 자동 실행을 취소. 이 Jetson 에서
+    `install-coordinator-service.sh --uninstall` 실행 →
+    `hylion-coordinator.service` disable + unit 파일 삭제.
+    install 스크립트·unit 템플릿·headless 토글은 삭제하지 않고
+    "옵션(무인 배치용)" 으로 강등.
+  - 운영을 2단계로 분리: ① 환경 점검(preflight) ② 작동 시작
+    (run_coordinator.sh). 부팅만으로는 코디네이터가 안 뜨고, 노트북에서
+    SSH 로 들어와 점검을 마친 뒤 사람이 작동을 시작한다.
+  - 신규 `scripts/preflight.sh` — 코디네이터를 띄우지 않고 venv/모델/
+    마이크·스피커/NUC bridge/Ollama·MeloTTS/gesture venv·SO-ARM/네트워크·
+    API 키/서비스 충돌을 점검. [OK]/[WARN]/[FAIL] 요약, FAIL 시 exit 1.
+    키 점검은 실제 코드 기준(GROQ=환경변수, Clova=.env Naver_Clova_*).
+  - `README.md` — "환경 설정 / 작동" 2단계 흐름으로 재작성,
+    systemd 자동 실행·headless 를 옵션 섹션으로 이동.
+  - `docs/09_project_flow_overview.md` — §0 토폴로지·§1 라이프사이클·
+    §3 인벤토리·§5 운영·§7.2 캡션·§8 요약을 2단계 모델로 갱신.
+- 테스트 결과: `bash scripts/preflight.sh` 실행 — PASS (13 OK / 5 WARN /
+  0 FAIL, exit 0). WARN 은 스피커·NUC bridge·SO-ARM 미연결(시연 당일
+  하드웨어 연결 시 해소).
+- 수정 파일 목록: `scripts/preflight.sh`(신규), `README.md`,
+  `docs/09_project_flow_overview.md`, `WORKLOG.md`.
+- 다음 환경에서 바로 할 일:
+  - 시연 당일: SSH 접속 → `preflight.sh` 로 FAIL 0 확인 →
+    `test_wakeword.sh` 간단 테스트 → `run_coordinator.sh` 작동 시작.
+  - 무인 배치가 필요해지면 `install-coordinator-service.sh` 로 옵션 B 설치.
+
+### 원격 제어용 env override 정리 (2026-05-23)
+
+- 오늘 변경 요약:
+  - `scripts/run_coordinator.sh` — `HYLION_BHL_HOST=10.42.0.221`,
+    `HYLION_BHL_PORT=9000` 기본값 추가. `bhl_client.py` 의 default 는
+    127.0.0.1 이라 그대로면 coordinator 가 NUC bridge 로 못 갔음. Jetson↔NUC
+    유선 직결(NetworkManager 공유망 10.42.0.0/24) 가정. NUC IP 가 바뀌면 셸
+    export 로 override.
+  - `nuc/bhl/tests/mock_coordinator.py` — `BRIDGE_HOST`/`BRIDGE_PORT` env
+    override + 두 번째 CLI 인자로 host 지정 가능. NUC 실제 IP 로 통합 테스트
+    가능. 기본값은 그대로 127.0.0.1:9000 (Jetson 로컬 테스트).
+- 테스트 결과: 코드 변경만, 별도 런타임 테스트 미실행.
+- 수정 파일 목록: `scripts/run_coordinator.sh`,
+  `nuc/bhl/tests/mock_coordinator.py`, `WORKLOG.md`.
+- 다음 환경에서 바로 할 일:
+  - 노트북→Jetson SSH 환경에서 `bash scripts/run_coordinator.sh` 가 새 기본값
+    그대로 NUC bridge(:9000) 에 도달하는지 확인.
+  - 실제 NUC IP 가 10.42.0.221 이 아니면 셸에서 `export HYLION_BHL_HOST=…`.
+
+### 노트북 SSH 한 줄 런처 (hylion-tui.py) 추가 (2026-05-23)
+
+- 오늘 변경 요약:
+  - `scripts/hylion-tui.py`(신규) — 노트북에서 SSH 로 Jetson + NUC 를 같이
+    띄우는 3단계 TUI 런처. 의도적으로 부팅 자동 실행을 안 쓰는 운영 모드와
+    맞물림. rich Live 패널로 stage·step 진행 + 라이브 SSH stdout 스트림.
+      · Stage 1 초기 셋팅: preflight · NUC CAN up · 관절 캘리브(`ssh -t` 인계)
+      · Stage 2 Cold Start: Jetson 데몬 점검 + NUC bridge / bhl-lowlevel /
+        bhl-policy 를 NUC tmux 세션(`hylion-*`) 으로 detach 후 헬스체크
+      · Stage 3 전체 실행: `run_coordinator.sh` 를 노트북 foreground 인계
+    옵션: `--stage {1,2,3}` / `--status` / `--reset` / `--dry-run` /
+    `--no-confirm`. 환경변수 5종으로 호스트·경로·Python 인터프리터 override.
+    같은 부팅 안에서 `calibration.yaml` 이 신선하면 캘리브 step 자동 SKIP 제안
+    (mtime > `/proc/1` mtime 비교).
+  - `docs/12_hylion_tui_launcher.md`(신규) — 사용 가이드, SSH config 예제
+    (`Host nuc` 에 `ProxyJump=jetson`), 환경변수 표, 실제 SSH 호출 시퀀스,
+    트러블슈팅, 설계 메모 (tmux 선택 이유, 인터랙티브/비대화 분리 이유 등).
+  - `README.md` — 맨 위에 "가장 빠른 시작 — 노트북에서 한 줄 TUI 런처" 절
+    추가. 기존 2단계 수동 절차는 그 아래 그대로 보존 (TUI 안 쓰는 경로용).
+- 테스트 결과:
+  - `python3 -m py_compile scripts/hylion-tui.py` → OK.
+  - `python3 scripts/hylion-tui.py --help` → argparse 출력 정상.
+  - 실제 SSH/리모트 테스트는 노트북·NUC 셋업 후에 수행 예정.
+- 수정 파일 목록: `scripts/hylion-tui.py`(신규),
+  `docs/12_hylion_tui_launcher.md`(신규), `README.md`, `WORKLOG.md`.
+- 다음 환경에서 바로 할 일:
+  - 노트북에 `pip install rich`, `~/.ssh/config` 에 `jetson`/`nuc`(ProxyJump)
+    등록, NUC 에 `tmux` 설치.
+  - `python3 scripts/hylion-tui.py --dry-run` 으로 흐름 한 번 점검.
+  - `--stage 2 --dry-run` → 실제 NUC tmux 세션 띄우기까지 검증.
+  - NUC 의 BHL 리포 경로가 기본값과 다르면 `HYLION_NUC_BHL_REPO` export.
+
+### 노트북 교체 끊김 0 — coordinator tmux 패치 (2026-05-23)
+
+- 오늘 변경 요약:
+  - Stage 3 의 coordinator 를 `ssh -t bash …` 포그라운드 인계 → **Jetson tmux
+    세션 `hylion-coordinator` 안에서 실행 + `tmux attach -d` 로 보기** 방식
+    으로 전환. 사용자가 "노트북 여러 대로 배터리 교체 가능?" 질문 후 적용.
+    핵심은 coordinator 의 부모를 sshd 가 아닌 tmux 로 만드는 것 — 메모리·GPU
+    부담은 0 에 가깝고 (tmux 본체 ~3MB) coordinator 자체는 원래부터 Jetson
+    에서 도는 프로세스라 위치 변화 없음.
+  - 효과: 노트북 배터리 사망/wifi 끊김 시 SSH 끊기지만 coordinator 는
+    그대로 살아 있음 → 새 노트북에서 `--attach` 한 줄로 끊김 0 인계.
+    LLM history (최근 4 턴), session_id, BHL FSM 상태 모두 보존.
+  - 추가된 옵션: `--attach` (Stage 1·2 SKIP 후 바로 attach), `_ensure_tmux`
+    Jetson host 도 검사, `--status` 가 Jetson coordinator tmux 도 표시,
+    `--reset` 이 NUC 와 Jetson coordinator 를 따로 묻고 정리.
+  - tmux 키: Ctrl+B,d 로 detach (살려둠), Ctrl+C 로 종료 (세션도 닫힘).
+  - docs/12_hylion_tui_launcher.md 에 §3.4 "노트북 교체" 시나리오 추가,
+    §4 의 Stage 3 SSH 호출 시퀀스 갱신, 세션 표에 Jetson 행 추가.
+  - README.md 의 빠른 시작 절에 `--attach` 옵션 + 끊김 0 설명 추가.
+- 테스트 결과:
+  - `python3 -m py_compile scripts/hylion-tui.py` → OK.
+  - `python3 scripts/hylion-tui.py --help` → `--attach` 신규 옵션 노출 확인.
+  - 실제 노트북 교체 검증은 노트북 2대 셋업 후 수행 예정.
+- 수정 파일 목록: `scripts/hylion-tui.py`,
+  `docs/12_hylion_tui_launcher.md`, `README.md`, `WORKLOG.md`.
+- 다음 환경에서 바로 할 일:
+  - Jetson 에 `sudo apt install tmux` (없으면 Stage 3 가 명시적 실패).
+  - 노트북 2대 시나리오 시연: A 에서 `hylion-tui.py` → A 강제 종료 →
+    B 에서 `hylion-tui.py --attach` 가 끊김 없이 같은 history 로 잇는지 검증.
+
+### preflight.sh — 스피커 점검 locale 의존 grep 보정 (2026-05-23)
+
+- 오늘 변경 요약:
+  - `scripts/preflight.sh` §3 의 스피커 점검이 한글 locale Jetson 에서 false
+    WARN 발생. `aplay -l` 출력이 "카드 N:" (한글) 로 나와서 `grep -q '^card'`
+    가 매치 실패하던 것. `aplay` 호출에 `LC_ALL=C` prefix 추가해 영문 출력
+    강제 → locale-independent.
+  - 진단 경위: README "사전 점검만" 흐름으로 preflight 실행 시 §3 (재생
+    장치) 가 WARN. `/proc/asound/cards` 와 `aplay -l` 한글 출력 비교로 false
+    alarm 확인. 실제로는 USB-Audio 카드(YJX-C5, BSX, P5HD) 모두 인식됨.
+  - `arecord` 쪽 마이크 검사는 영문 키워드(`P5HD`) 매치라 locale 영향 없어
+    그대로 둠.
+- 테스트 결과:
+  - 노트북: 정적 변경 (1 줄 diff).
+  - Jetson pull 후 재실행해서 §3 가 OK 로 바뀌는지 검증 예정.
+- 수정 파일 목록: `scripts/preflight.sh`, `WORKLOG.md`.
+- 다음 환경에서 바로 할 일:
+  - Jetson 에서 `git pull` 후 `bash scripts/preflight.sh` 재실행, §3 OK 확인.
+  - 남은 WARN (NUC bridge / MeloTTS / GROQ_API_KEY) 각각 진단·해결.
+
+### MeloTTS daemon 자동 launch — offline 진입 시 lazy 기동 (2026-05-23)
+
+- 오늘 변경 요약:
+  - `jetson/core/tts/melotts_client.py` 의 `MeloTTSSpeaker` 에 daemon liveness
+    보장 로직 추가. `warm_up()` 과 `_post_synthesize()` 진입 시 `/health` 를
+    probe 하고, 응답이 없으면 `.venv-melotts` python 으로 `uvicorn
+    services.tts_server.server:app --host 127.0.0.1 --port 8001` 을
+    `subprocess.Popen(..., start_new_session=True)` 로 detached spawn.
+    그 후 `/health` 가 200 을 줄 때까지 폴링 (최대 30s).
+  - 진입 후 첫 성공 시 `self._daemon_ensured = True` 캐시 — 다음 호출은 health
+    probe 1회만. transport 예외 발생 시 플래그 리셋 → 다음 호출에서 재시도.
+  - online 모드에서는 coordinator 가 `MeloTTSSpeaker` 를 만들지 않아서
+    daemon 도 절대 안 뜸. offline 모드에서만 첫 호출 비용 (~5s launch +
+    ~22s 모델 load) 1회 발생, 이후 즉시. coordinator 종료 후에도 daemon 은
+    살아남아 다음 coordinator 가 즉시 reuse.
+  - 디자인 의도: README §"Install as systemd service" 의 부팅 자동기동을
+    피하면서, offline 진입을 명령 없이 자연스럽게 처리. systemd 등록 0,
+    `enable --now` 0 — 사람이 시점 결정하지 않는 lazy 패턴.
+  - 의식적으로 손대지 않은 것: coordinator.py 의 매 turn `is_online()` 호출
+    및 backend 결정 정책. 이 부분은 별도 리팩토링(시작 1회 probe + 일시
+    충돌 시 retry/cooldown) 으로 분리.
+- 테스트 결과:
+  - 노트북: `python3 -m py_compile jetson/core/tts/melotts_client.py` OK.
+  - Jetson pull 후 실제 daemon launch 검증 예정 — `.venv-melotts` 존재
+    확인 → `MeloTTSSpeaker().warm_up()` → `/tmp/hylion-tts.log` + `ss :8001`.
+- 수정 파일 목록: `jetson/core/tts/melotts_client.py`, `WORKLOG.md`.
+- 다음 환경에서 바로 할 일:
+  - Jetson 에서 `git pull` 후 위 검증 수행.
+  - online 정책 리팩토링 (별도 작업): coordinator.py 의 매 turn
+    `is_online()` 제거 → 시작 1회 probe 로 sticky online, 호출 예외 catch
+    시 그 turn 만 offline fallback → 다음 turn online retry. 연속 실패
+    N회 시 sticky offline (cooldown). 매개변수는 별도 결정.
+
+### GROQ_API_KEY .env 로 통일 + 코드가 자동 로드 (2026-05-23)
+
+- 오늘 변경 요약:
+  - 운영 중 진단 도중 `~/.bashrc` 에 평문으로 적혀 있던 GROQ_API_KEY 가
+    grep 출력으로 conversation 에 노출됨 → 키 revoke + 재발급 필요. 노출
+    범위는 conversation log (Anthropic 측) 뿐, repo·GitHub history 에는
+    없음 (`.env` 가 .gitignore 138 행에 있고 키 문자열도 tracked file 어디에도
+    없음으로 확인).
+  - 원인 구조: groq_llm/groq_whisper/llm_runtime 3 곳이 `os.getenv` 만
+    봐서, 비-인터랙티브 SSH 셸·systemd unit 등 `.bashrc` 가 안 읽히는
+    환경에서는 키가 누락. Clova 만 `.env` 파싱하던 패턴을 공용으로 옮김.
+  - `jetson/core/env_secrets.py` 신규: `_read_env_file()` + `get_secret()`
+    + `ensure_env_from_dotenv()`. 마지막 함수는 셸 env 가 비어 있고
+    `.env` 에 값이 있으면 `os.environ` 에 inject — Groq SDK 의 `Groq()`
+    가 자동으로 키를 잡도록.
+  - 사용처 3 곳 (`groq_llm.py`, `groq_whisper.py`, `llm_runtime.py`)
+    `os.getenv` → `ensure_env_from_dotenv` 로 교체, unused `import os` 정리.
+  - `scripts/preflight.sh` §7 의 GROQ 점검을 셸 env + `.env` 둘 다 보도록
+    보강. ENV_FILE 정의를 함수 정의 직후로 끌어올려 GROQ/Clova 가 공유.
+- 테스트 결과:
+  - 노트북: py_compile (4 파일) OK, bash -n preflight.sh OK.
+  - 단위 시뮬레이션: 임시 .env 로 `ensure_env_from_dotenv("GROQ_API_KEY")`
+    호출 → 반환값·`os.environ` 양쪽에 주입됨 확인.
+  - Jetson 검증 예정: pull 후 사용자가 `~/.bashrc` 노출 line 삭제 + 새 키를
+    .env 에 적은 다음, `bash scripts/preflight.sh` 가 §7 를 OK 로 잡는지.
+- 수정 파일 목록: `jetson/core/env_secrets.py` (신규),
+  `jetson/core/llm/groq_llm.py`, `jetson/core/stt/groq_whisper.py`,
+  `jetson/core/brain/llm_runtime.py`, `scripts/preflight.sh`, `WORKLOG.md`.
+- 다음 환경에서 바로 할 일:
+  - 사용자: Groq 콘솔에서 노출된 키 revoke → 새 키 발급 → `~/.bashrc`
+    line 120 의 `export GROQ_API_KEY=...` 제거 → 새 키를 `.env` 의
+    `GROQ_API_KEY=` 줄에 적기.
+  - Jetson: `git pull` → `bash scripts/preflight.sh` 재실행, §7 OK 확인.
+
+### Online/offline sticky gate + 일시 충돌 cooldown (2026-05-23)
+
+- 오늘 변경 요약:
+  - 기존 동작: `run_live_pipeline` 의 wake 활성화 직후마다 `is_online()`
+    호출 → 인터넷이 끊긴 환경에선 4 target × 1.5 s timeout 이 매번
+    누적되어 응답 latency 에 ~6 s 가 추가. `_startup_warm_up` 도 별도로
+    한 번 더 `is_online()` 호출.
+  - `jetson/core/online_gate.py` 신규: `OnlineGate` 클래스.
+    · 생성 시점에 1회만 `is_online()` 으로 sticky 결정.
+    · `is_active()` 는 캐시된 상태를 반환하되, 마지막 probe 후
+      `cooldown_sec`(=60 s) 지나면 lazy re-probe — startup offline 상태도
+      복구 가능.
+    · `report_online_failure()` 호출되면 한 cooldown window (60 s) 동안
+      강제 False, 만료 후 재 probe 로 회복 시도.
+    · 단위 시뮬레이션으로 4 시나리오 (sticky True, latch False, cooldown
+      recovery, startup offline → recover) 의 probe 호출 횟수 모두 확인.
+  - `coordinator.py`:
+    · `OnlineGate` import + `is_online` 직접 import 제거 (호출처 0).
+    · `main()` 안 `gesture_daemon` 직후 `gate = OnlineGate()` 1회 생성.
+    · `_startup_warm_up(args)` → `_startup_warm_up(args, gate)`. 안에서
+      `is_online()` → `gate.is_active()`. online warm-up 예외 catch 시
+      `gate.report_online_failure()`.
+    · `run_live_pipeline` 시그니처에 `gate: OnlineGate` 추가, 호출처에서
+      전달. 매 wake 직후 `online_probe = gate.is_active()`.
+    · `_build_turn_services(..., gate=...)` kwarg 추가. online build/warm
+      실패 catch 시 `gate.report_online_failure()`.
+  - 의도적으로 안 손댄 것: chat 안 inner turn loop 의 LLM/STT/TTS 호출
+    중 네트워크 예외 catch + 그 turn 만 offline fallback. 이 부분은 별도
+    follow-up 으로 분리 (사이즈·테스트 부담 분리 위해).
+- 테스트 결과:
+  - 노트북: py_compile (coordinator.py + online_gate.py) OK.
+  - OnlineGate 단위 시뮬레이션: 시나리오 4 종 모두 probe 호출 횟수
+    예상치와 일치 (S1: 1, S2: 1 latched, S3: 2 after recover, S4: 3 final).
+- 수정 파일 목록: `jetson/core/online_gate.py` (신규),
+  `jetson/core/coordinator.py`, `WORKLOG.md`.
+- 다음 환경에서 바로 할 일:
+  - Jetson `git pull` 후 `python3 -m py_compile jetson/core/coordinator.py`
+    회귀 검증, 짧은 dry-run 으로 `[Network] online_active=...` 로그가
+    실제로 한 번만 찍히고 다음 wake 부터는 sticky 인지 확인.
+  - Follow-up: chat inner loop 의 호출 단계 fallback (예외 catch → 그 turn
+    offline backend 로 재시도) — 별도 변경/PR.
+

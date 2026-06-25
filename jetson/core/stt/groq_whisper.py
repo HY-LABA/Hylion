@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-import os
 from pathlib import Path
 from typing import Any, Optional
 
+from jetson.utils.env_secrets import ensure_env_from_dotenv
 from jetson.core.stt.base import STTResult
 
 
@@ -36,7 +36,7 @@ class GroqWhisperBackend:
         if self._client is not None:
             return self._client
 
-        if not os.getenv("GROQ_API_KEY"):
+        if not ensure_env_from_dotenv("GROQ_API_KEY"):
             raise RuntimeError("GROQ_API_KEY not set; cannot use Groq Whisper backend")
 
         try:
